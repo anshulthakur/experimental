@@ -1,0 +1,14 @@
+Django==1.6.8
+amqp==1.4.6
+anyjson==0.3.3
+argparse==1.2.1
+billiard==3.3.0.19
+celery==3.1.17
+kombu==3.0.24
+oauth==1.0.1
+pexpect==3.3
+pytz==2015.2
+selenium==2.45.0
+twitter==1.16.0
+virtualenv==1.11.6
+wsgiref==0.1.2

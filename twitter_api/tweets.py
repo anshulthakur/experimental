@@ -55,10 +55,11 @@ while True and busy:
         t.statuses.update(status="Deleting...done.")
         print "Done."
 '''
-'''
+
 if get_tweets() is True:
     for tweet in tweet_ids:
         print tweet,"\n"
+
 '''
 import sys
 
@@ -67,3 +68,4 @@ if len(message) < 140:
     send_tweet(message = message)
 else:
     print 'Message too long!'
+'''

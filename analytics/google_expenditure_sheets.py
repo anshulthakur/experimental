@@ -52,12 +52,9 @@ def get_credentials():
         print('Storing credentials to ' + credential_path)
     return credentials
 
-def own():
-    """Shows basic usage of the Sheets API.
-
-    Creates a Sheets API service object and prints the names and majors of
-    students in a sample spreadsheet:
-    https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit
+def main():
+    """Reads data off the google spreadsheets
+    
     """
     credentials = get_credentials()
     http = credentials.authorize(httplib2.Http())
@@ -67,34 +64,6 @@ def own():
                               discoveryServiceUrl=discoveryUrl)
 
     spreadsheetId = '1T3qmnmPugaDfQfkhMGITba1tiBuA_AfcNwKHd4HGc3U'
-    rangeName = 'Class Data!A1:E'
-    result = service.spreadsheets().values().get(
-        spreadsheetId=spreadsheetId, range=rangeName).execute()
-    values = result.get('values', [])
-
-    if not values:
-        print('No data found.')
-    else:
-        print('Date, Spent on:')
-        for row in values:
-            # Print columns A and D, which correspond to indices 0 and 3.
-            print('%s, %s' % (row[0], row[3]))
-
-def main():
-    """Shows basic usage of the Sheets API.
-
-    Creates a Sheets API service object and prints the names and majors of
-    students in a sample spreadsheet:
-    https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit
-    """
-    credentials = get_credentials()
-    http = credentials.authorize(httplib2.Http())
-    discoveryUrl = ('https://sheets.googleapis.com/$discovery/rest?'
-                    'version=v4')
-    service = discovery.build('sheets', 'v4', http=http,
-                              discoveryServiceUrl=discoveryUrl)
-
-    spreadsheetId = '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms'
     rangeName = 'Class Data!A2:E'
     result = service.spreadsheets().values().get(
         spreadsheetId=spreadsheetId, range=rangeName).execute()

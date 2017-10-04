@@ -1,24 +1,62 @@
 #!/usr/bin/python
+'''
+This script opens a file for taking in activity input from user when invoked during morning half.
+Before that is done, it will put the previous feedback into a report file.
+In the evening, it will open a feedback file to collect a followup feedback from the user.
 
+The schedule file is kept intact for the week and for a new week, the file is cleared after the 
+details are put in the report.
+'''
 import os
 import sys
 
 import datetime 
 
-schedule_filename = "/home/anshul/scripts/schedule/schedule.md"
-feedback_filename = "/home/anshul/scripts/schedule/feedback.txt"
-report_file = "/home/anshul/scripts/schedule/report.csv"
+schedule_filename = "/home/anshul/Dropbox/schedule/schedule.md"
+feedback_filename = "/home/anshul/Dropbox/schedule/feedback.txt"
+report_file = "/home/anshul/Dropbox/schedule/report.csv"
 
 time = datetime.datetime.now()
 
+import re
+
 def create_schedule():
-  fd = open(schedule_filename, 'a')
-  if time.weekday() == 0:
+  '''
+  Opens the file @schedule_filename and makes entry for day.
+  
+  If it is the first working day of the week, its makes entry for the week
+  plan also. For that, it looks into the last feedback file date and sees if we
+  are on the same week.
+  '''
+  feedback_fd = open(feedback_filename, 'r')
+  query_str = '### Schedule for (\d{1,2})-(\d{1,2})-(\d{4})'
+  found = False;
+  for line in feedback_fd:
+    ret = re.match(query_str,line)
+    if found is False and ret is not None:
+      #Under normal cases, expect to find it in the first line itself.
+      day = int(ret.group(1))
+      month = int(ret.group(2))
+      year = int(ret.group(3))
+      found = True
+      break
+  feedback_fd.close()
+  #If year is the same, just compare if both dates are on the same week
+  if(time.year == year):
+    if( datetime.date(time.year, time.month, time.day).isocalendar()[1] != datetime.date(year, month, day).isocalendar()[1]):
+      fd = open(schedule_filename, 'w') #Write Mode: Overwrite Previous Contents
+      fd.write('\n\n***\n### Tentative Schedule for this week\n- ')
+    else:
+      fd = open(schedule_filename, 'a')
+  elif time.weekday() == 0:
+    #If New Year's first day is in the middle of the week, just see if we are on 0th weekday
+    fd = open(schedule_filename, 'w')
     fd.write('\n\n***\n### Tentative Schedule for this week\n- ')
+    
   fd.write('\n\n***\n### Schedule for {day}-{month}-{year}\n- '.format(day=time.day, month=time.month, year=time.year))
   fd.close()
 
-import re
+
 def get_todays_schedule(fd, time=None):
   schedule = ''
   time = datetime.datetime.now() if time is None else time

@@ -6,6 +6,8 @@ on the sheets software (Python or otherwise).
 
 More info may be obtained from [Google Sheets API Tutorials](https://developers.google.com/sheets/api/guides/concepts)
 
+For Python APIs, see [link](https://developers.google.com/api-client-library/python/start/get_started)
+
 A typical Google Spreadsheets URL looks like:
 
 ```
@@ -35,3 +37,13 @@ Yields `1646970894`
 ```
 GET https://sheets.googleapis.com/v4/spreadsheets/spreadsheetId?&fields=sheets.properties
 ```
+
+### Making GET requests using Python API
+
+While the above is just an HTTP GET request, how do we make a GET request using Python client?
+For a service object `service`, we can invoke a general GET method as
+```
+service.<resource>.get(<param>)
+```
+
+[Resource](https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/get)

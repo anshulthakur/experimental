@@ -1,0 +1,12 @@
+virtualenv mongodb
+cd mongodb/
+source bin/activate
+pip install pymongo
+sudo apt-get install build-essential python-dev
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 7F0CEB10
+echo "deb http://repo.mongodb.org/apt/ubuntu trusty/mongodb-org/3.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-3.0.list
+sudo apt-get update
+sudo apt-get install -y mongodb-org
+#Book URL: http://img105.job1001.com/upload/adminnew/2015-04-07/1428393873-MHKX3LN.pdf
+# Tutorial: https://docs.mongodb.org/master/tutorial/install-mongodb-on-ubuntu/?_ga=1.65136557.2061202964.1448729109
+

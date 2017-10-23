@@ -1,0 +1,10 @@
+virtualenv neo4j
+cd neo4j/
+source bin/activate
+pip install py2neo
+#Neo4j URL to download community edition: http://neo4j.com/
+Untar the archive in some location.
+From inside that location, run: $NEO4J_HOME/bin/neo4j console
+Change user password after accessing: http://localhost:7474/
+
+#http://py2neo.org/2.0/

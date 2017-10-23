@@ -1,0 +1,25 @@
+### Schedule for 29-6-2017
+
+
+Activity:
+Activity 1
+Started?:
+Yes
+Time taken[3]:
+2
+Completed?:
+Yes
+Remarks:
+Done
+
+
+Activity:
+Activity 2
+Started?:
+Yes
+Time taken[1]:
+1hr
+Completed?:
+No
+Remarks:
+

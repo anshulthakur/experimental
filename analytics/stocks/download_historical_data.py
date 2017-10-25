@@ -10,6 +10,16 @@ from selenium import webdriver
 import csv
 import time
 from selenium.webdriver.chrome.options import Options
+import thread
+import multiprocessing
+
+num_threads = multiprocessing.cpu_count()
+thread_busy = [1 for i in range(0,num_threads)]
+
+download_dir = "/home/anshul/web/analytics/analytics/stocks/bsedata/"
+preferences = {"download.default_directory" : download_dir}
+
+base_url = "http://www.bseindia.com/markets/equity/EQReports/StockPrcHistori.aspx?expandable=7&scripcode=%s&flag=sp&Submit=G"
 
 class Stock(object):
 	def __init__(self, params=None):
@@ -44,51 +54,70 @@ def error_occured(data):
 		return True
 
 def download_data(driver, url):
-	driver.get(url)
-	if not error_occured(driver.find_element_by_tag_name('body').text):
-		from_date = driver.find_element_by_id('ctl00_ContentPlaceHolder1_txtFromDate')
-		if from_date is not None:
-			from_date.clear()
-			from_date.send_keys('01/01/2007')
-		#to_date defaults to today. So, we are good!
-		submit_btn = driver.find_element_by_id('ctl00_ContentPlaceHolder1_btnSubmit')
-		time.sleep(1)
-		submit_btn.click()
-
+	try:
+		driver.get(url)
 		if not error_occured(driver.find_element_by_tag_name('body').text):
-			download_link = driver.find_element_by_id('ctl00_ContentPlaceHolder1_btnDownload')
-			download_link.click()
-			return True
+			from_date = driver.find_element_by_id('ctl00_ContentPlaceHolder1_txtFromDate')
+			if from_date is not None:
+				from_date.clear()
+				from_date.send_keys('01/01/2007')
+			#to_date defaults to today. So, we are good!
+			submit_btn = driver.find_element_by_id('ctl00_ContentPlaceHolder1_btnSubmit')
+			time.sleep(1)
+			submit_btn.click()
+
+			if not error_occured(driver.find_element_by_tag_name('body').text):
+				download_link = driver.find_element_by_id('ctl00_ContentPlaceHolder1_btnDownload')
+				download_link.click()
+				return True
+			else:
+				return False
 		else:
 			return False
-	else:
+	except:
 		return False
+
+def work_loop(thread_name, tid):
+	global thread_busy
+	global stock_codes
+
+	options = webdriver.ChromeOptions() 
+	
+	#options.add_argument("")
+	options.add_experimental_option("prefs", preferences)
+	driver = webdriver.Chrome('/home/anshul/web/analytics/analytics/stocks/chromedriver',chrome_options=options)
+	driver.implicitly_wait(10) #seconds: After page load, some classes may load up by JS. So, wait if not available
+
+
+	for stock in stock_codes:
+		if not os.path.exists(download_dir+"{file_name}".format(file_name=stock.code)+".csv"):
+			#time.sleep(1)
+			ret_val = download_data(driver, base_url%stock.code)
+			while ret_val is not True:
+				print 'Retry {name}'.format(name=stock.name)
+				time.sleep(2)
+				ret_val = download_data(driver, base_url%stock.code)
+		else:
+			print "Skipping %s" %stock.name
+	thread_busy[0] = 0
+
+
 
 if len(sys.argv) < 2:
 	print "Insufficient Parameters"
 	print "Usage: %s <csv file of equity list>" %sys.argv[0]
 	exit()
 
+
 stock_codes = get_next_stock_code(sys.argv[1])
 
-options = webdriver.ChromeOptions() 
-download_dir = "/home/anshul/web/analytics/analytics/stocks/bsedata/"
-preferences = {"download.default_directory" : download_dir}
-#options.add_argument("")
-options.add_experimental_option("prefs", preferences)
-driver = webdriver.Chrome(chrome_options=options)
-driver.implicitly_wait(10) #seconds: After page load, some classes may load up by JS. So, wait if not available
+try:
+	for thread_id in range(1,num_threads):
+		thread.start_new_thread(work_loop, ("Thread ID {id}".format(id=thread_id), thread_id))
+except:
+	print "Unable to start thread ({id})".format(id=thread_id)
 
+work_loop("Thread ID 0", 0)
 
-
-base_url = "http://www.bseindia.com/markets/equity/EQReports/StockPrcHistori.aspx?expandable=7&scripcode=%s&flag=sp&Submit=G"
-for stock in stock_codes:
-	if not os.path.exists(download_dir+"{file_name}".format(file_name=stock.code)+".csv"):
-		time.sleep(1)
-		ret_val = download_data(driver, base_url%stock.code)
-		while ret_val is not True:
-			print 'Retry {name}'.format(name=stock.name)
-			time.sleep(2)
-			ret_val = download_data(driver, base_url%stock.code)
-	else:
-		print "Skipping %s" %stock.name
+while 1 in thread_busy:
+	pass #Loop until all threads are done

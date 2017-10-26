@@ -11,12 +11,13 @@ import csv
 import time
 from selenium.webdriver.chrome.options import Options
 import thread
+import threading
 import multiprocessing
 
 num_threads = multiprocessing.cpu_count()
 thread_busy = [1 for i in range(0,num_threads)]
 
-download_dir = "/home/anshul/web/analytics/analytics/stocks/bsedata/"
+download_dir = "/home/craft/tests/experimental/analytics/stocks/bsedata/"
 preferences = {"download.default_directory" : download_dir}
 
 base_url = "http://www.bseindia.com/markets/equity/EQReports/StockPrcHistori.aspx?expandable=7&scripcode=%s&flag=sp&Submit=G"
@@ -34,6 +35,20 @@ class Stock(object):
 			self.industry = params['Industry']
 			self.instrument = params['Instrument']
 
+#For thread safe operation using locks			
+class LockedIterator(object):
+    def __init__(self, it):
+        self.lock = threading.Lock()
+        self.it = it.__iter__()
+
+    def __iter__(self): return self
+
+    def next(self):
+        self.lock.acquire()
+        try:
+            return self.it.next()
+        finally:
+            self.lock.release()
 
 def get_next_stock_code(filename=None):
 	try:
@@ -58,9 +73,12 @@ def download_data(driver, url):
 		driver.get(url)
 		if not error_occured(driver.find_element_by_tag_name('body').text):
 			from_date = driver.find_element_by_id('ctl00_ContentPlaceHolder1_txtFromDate')
-			if from_date is not None:
+			if from_date is not None and from_date.get_attribute("value") is not u'':
 				from_date.clear()
 				from_date.send_keys('01/01/2007')
+			else:
+				print 'Returned Empty results'
+				return True
 			#to_date defaults to today. So, we are good!
 			submit_btn = driver.find_element_by_id('ctl00_ContentPlaceHolder1_btnSubmit')
 			time.sleep(1)
@@ -71,21 +89,24 @@ def download_data(driver, url):
 				download_link.click()
 				return True
 			else:
+				print 'Error processing'
 				return False
 		else:
 			return False
 	except:
+		print 'Exception Geting URL'
 		return False
 
 def work_loop(thread_name, tid):
 	global thread_busy
 	global stock_codes
 
+	print '{t} Started'.format(t=thread_name)
 	options = webdriver.ChromeOptions() 
 	
 	#options.add_argument("")
 	options.add_experimental_option("prefs", preferences)
-	driver = webdriver.Chrome('/home/anshul/web/analytics/analytics/stocks/chromedriver',chrome_options=options)
+	driver = webdriver.Chrome('/home/craft/tests/experimental/analytics/stocks/chromedriver',chrome_options=options)
 	driver.implicitly_wait(10) #seconds: After page load, some classes may load up by JS. So, wait if not available
 
 
@@ -100,6 +121,9 @@ def work_loop(thread_name, tid):
 		else:
 			print "Skipping %s" %stock.name
 	thread_busy[0] = 0
+	print '{t} done'.format(t=thread_name)
+	driver.close()
+	driver.quit()
 
 
 
@@ -109,15 +133,27 @@ if len(sys.argv) < 2:
 	exit()
 
 
-stock_codes = get_next_stock_code(sys.argv[1])
+stock_codes = LockedIterator(get_next_stock_code(sys.argv[1]))
 
+# try:
+# 	for thread_id in range(1,num_threads):
+# 		thread.start_new_thread(work_loop, ("Thread ID {id}".format(id=thread_id), thread_id))
+# except:
+# 	print "Unable to start thread ({id})".format(id=thread_id)
+
+threads = []
 try:
-	for thread_id in range(1,num_threads):
-		thread.start_new_thread(work_loop, ("Thread ID {id}".format(id=thread_id), thread_id))
+	for thread_id in range(num_threads):
+	    t = threading.Thread(target=work_loop, args=("Thread ID {id}".format(id=thread_id), thread_id))
+	    threads.append(t)
+	    t.start()
+
+	for t in threads:
+	    t.join()
 except:
-	print "Unable to start thread ({id})".format(id=thread_id)
+	print "Unable to start thread ({id})".format(id=thread_id)	    
 
-work_loop("Thread ID 0", 0)
+#work_loop("Thread ID 0", 0)
 
-while 1 in thread_busy:
-	pass #Loop until all threads are done
+#while 1 in thread_busy:
+#	pass #Loop until all threads are done

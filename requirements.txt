@@ -63,3 +63,5 @@ singledispatch
 six
 tornado
 uritemplate
+libnmap
+feedparser

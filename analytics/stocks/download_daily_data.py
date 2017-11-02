@@ -13,6 +13,10 @@ download_dir = "/home/craft/tests/experimental/analytics/stocks/bsedata/"
 day = datetime.date.today()
 num_threads = 8
 
+processed = []
+failed = []
+skipped = []
+
 class Stock(object):
   def __init__(self, params=None):
     if params is not None:
@@ -47,36 +51,65 @@ class CompanyArchivedQuotes:
     self.percent_qty = []
     self.highlow_spread = []
     self.closeopen_spread = []
+    self.read_fd = open('bsedata/'+self.company_code+'.csv', 'r')
     #Parse the URL to get the various stock attributes values
-    self.parse_URL()
+    if self.write_needed(self.read_fd) is False:
+      self.ok = True
+    else :
+      self.ok = self.parse_URL()
+      if self.ok:
+        self.write_csv()
+    self.read_fd.close()
+
+
   #function to parse stock data from URL
   def parse_URL(self):
     #open and read from URL
-    response = urllib.urlopen(self.url)
-    html_page = response.read()
-    soup = BeautifulSoup(html_page, "html.parser")
-    self.company_name = soup.find('span', id='ctl00_ContentPlaceHolder1_lblCompanyValue').find('a').string
-    stockdata = soup.find('span', id='ctl00_ContentPlaceHolder1_spnStkData')
-    table_vals = stockdata.find('table').findAll('tr')
-    row = table_vals[2]
-    tds = row('td')
-    if(tds[0].string == day.strftime(u'%d/%m/%y')):
-      self.date = datetime.datetime.strptime(tds[0].string, "%d/%m/%y")
-      self.date = self.date.strftime('%d-%B-%Y')
-      self.open_price = float(tds[1].string.replace(',', ''))
-      self.day_high = float(tds[2].string.replace(',', ''))
-      self.day_low = float(tds[3].string.replace(',', ''))
-      self.close_price = float(tds[4].string.replace(',', ''))
-      self.wap = float(tds[5].string.replace(',', ''))
-      self.no_of_shares = float(tds[6].string.replace(',', ''))
-      self.no_of_trades = float(tds[7].string.replace(',', ''))
-      self.total_turnover = float(tds[8].string.replace(',', ''))
-      self.deliverable_qty = float(tds[9].string.replace(',', ''))
-      self.percent_qty = float(tds[10].string.replace(',', ''))
-      self.highlow_spread = float(tds[11].string.replace(',', ''))
-      self.closeopen_spread = float(tds[12].string.replace(',', ''))
+    try:
+      response = urllib.urlopen(self.url)
+      html_page = response.read()
+      soup = BeautifulSoup(html_page, "html.parser")
+      self.company_name = soup.find('span', id='ctl00_ContentPlaceHolder1_lblCompanyValue').find('a').string
+      stockdata = soup.find('span', id='ctl00_ContentPlaceHolder1_spnStkData')
+      table_vals = stockdata.find('table').findAll('tr')
+      row = table_vals[2]
+      tds = row('td')
+      if(tds[0].string == day.strftime(u'%d/%m/%y')):
+        self.date = datetime.datetime.strptime(tds[0].string, "%d/%m/%y")
+        self.date = self.date.strftime('%d-%B-%Y')
+        self.open_price = float(tds[1].string.replace(',', ''))
+        self.day_high = float(tds[2].string.replace(',', ''))
+        self.day_low = float(tds[3].string.replace(',', ''))
+        self.close_price = float(tds[4].string.replace(',', ''))
+        self.wap = float(tds[5].string.replace(',', ''))
+        self.no_of_shares = float(tds[6].string.replace(',', ''))
+        self.no_of_trades = float(tds[7].string.replace(',', ''))
+        self.total_turnover = float(tds[8].string.replace(',', ''))
+        self.deliverable_qty = float(tds[9].string.replace(',', ''))
+        self.percent_qty = float(tds[10].string.replace(',', ''))
+        self.highlow_spread = float(tds[11].string.replace(',', ''))
+        self.closeopen_spread = float(tds[12].string.replace(',', ''))
+        print "{code} OK".format(code=self.company_code)
+        return True
+      else:
+        print "{code} No data available for today".format(code=self.company_code)
+        return False
+    except:
+      print "{code} Failed".format(code=self.company_code)
+      return False
+
+  def write_needed(self, fd):
+    reader = csv.reader(fd,delimiter=",")
+    for row in reversed(list(reader)):
+      if row[0] == day.strftime('%d-%B-%Y'):
+        print 'Skipping {code}'.format(code=self.company_code)
+        return False
+      else:
+        return True
+
   def write_csv(self):
     fd = open('bsedata/'+self.company_code+'.csv', 'a')
+  
     writer = csv.writer(fd)
     writer.writerow([self.date,
                     self.open_price,
@@ -162,7 +195,10 @@ def work_loop(thread_name, tid):
   for stock in stock_codes:
     if os.path.exists(download_dir+"{file_name}".format(file_name=stock.code)+".csv"):
       obj = CompanyArchivedQuotes(str(stock.code))
-      obj.write_csv()
+      if obj.ok:
+        processed.append(str(stock.code))
+      else:
+        failed.append(str(stock.code))
 
 if len(sys.argv) < 2:
   print "Insufficient Parameters"
@@ -180,4 +216,9 @@ try:
   for t in threads:
       t.join()
 except:
-  print "Unable to start thread ({id})".format(id=thread_id)      
+  print "Unable to start thread ({id})".format(id=thread_id)
+
+failed_items = '.'.join(failed)
+retry_item_file = open(day.strftime('%d-%B-%Y')+'_failed.txt', 'w')
+retry_item_file.write(failed_items)
+retry_item_file.close()

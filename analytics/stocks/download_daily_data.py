@@ -10,7 +10,9 @@ import multiprocessing
 import urllib
 
 download_dir = "/home/craft/tests/experimental/analytics/stocks/bsedata/"
+
 day = datetime.date.today()
+
 num_threads = 8
 
 processed = []
@@ -64,6 +66,8 @@ class CompanyArchivedQuotes:
 
   #function to parse stock data from URL
   def parse_URL(self):
+    global current
+    global day
     #open and read from URL
     try:
       response = urllib.urlopen(self.url)
@@ -72,9 +76,22 @@ class CompanyArchivedQuotes:
       self.company_name = soup.find('span', id='ctl00_ContentPlaceHolder1_lblCompanyValue').find('a').string
       stockdata = soup.find('span', id='ctl00_ContentPlaceHolder1_spnStkData')
       table_vals = stockdata.find('table').findAll('tr')
-      row = table_vals[2]
-      tds = row('td')
-      if(tds[0].string == day.strftime(u'%d/%m/%y')):
+      if current:
+        row = table_vals[2]
+        tds = row('td')
+        if not (tds[0].string == day.strftime(u'%-d/%m/%y')):
+          print "{code} No data available for today".format(code=self.company_code)
+          return False
+      else:
+        #print "Look for old date {date}".format(date = day.strftime(u'%-d/%m/%y'))
+        for row in table_vals:
+          tds = row('td')
+          if(tds[0].string == day.strftime(u'%-d/%m/%y')):
+            break
+          else:
+            tds = None
+
+      if tds is not None:
         self.date = datetime.datetime.strptime(tds[0].string, "%d/%m/%y")
         self.date = self.date.strftime('%d-%B-%Y')
         self.open_price = float(tds[1].string.replace(',', ''))
@@ -92,7 +109,7 @@ class CompanyArchivedQuotes:
         print "{code} OK".format(code=self.company_code)
         return True
       else:
-        print "{code} No data available for today".format(code=self.company_code)
+        print "{code} No data available for the day".format(code=self.company_code)
         return False
     except:
       print "{code} Failed".format(code=self.company_code)
@@ -204,6 +221,14 @@ if len(sys.argv) < 2:
   print "Insufficient Parameters"
   print "Usage: %s <csv file of equity list>" %sys.argv[0]
   exit()
+if len(sys.argv) == 3:
+  day = datetime.datetime.strptime(sys.argv[2], "%d/%m/%y")
+
+
+if day==datetime.date.today():
+  current = True
+else:
+  current = False
 stock_codes = LockedIterator(get_next_stock_code(sys.argv[1]))
 
 threads = []
@@ -218,7 +243,7 @@ try:
 except:
   print "Unable to start thread ({id})".format(id=thread_id)
 
-failed_items = '.'.join(failed)
+failed_items = ','.join(failed)
 retry_item_file = open(day.strftime('%d-%B-%Y')+'_failed.txt', 'w')
 retry_item_file.write(failed_items)
 retry_item_file.close()

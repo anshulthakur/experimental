@@ -65,3 +65,4 @@ tornado
 uritemplate
 libnmap
 feedparser
+scapy

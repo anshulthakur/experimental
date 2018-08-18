@@ -14,12 +14,7 @@ def populate_trades(stock):
         #print(stock)
         listings = []
         for row in reader:
-            #print(stock)
-            #print(row)
-            try:
-                listing = Listing.objects.get(stock=stock, date=datetime.strptime(row.get('Date'), '%d-%B-%Y'))
-            except Listing.DoesNotExist:
-                listing = Listing(stock=stock,
+            listing = Listing(stock=stock,
                                   date=datetime.strptime(row.get('Date').strip(), '%d-%B-%Y'),
                                   opening=float(row.get('Open Price').strip()),
                                   high = float(row.get('High Price').strip()),
@@ -33,17 +28,7 @@ def populate_trades(stock):
                                   ratio = float(row.get('% Deli. Qty to Traded Qty').strip()) if len(row.get('% Deli. Qty to Traded Qty').strip()) > 0 else 0,
                                   spread_high_low = float(row.get('Spread High-Low').strip()),
                                   spread_close_open = float(row.get('Spread Close-Open').strip()))
-                try:
-                    #listing.save()
-                    listings += listing
-                except:
-                    print(stock)
-                    print(row)
-                    print("Unexpected error:", sys.exc_info()[0])
-            except:
-                print(stock)
-                print(row)
-                print("Unexpected error:", sys.exc_info()[0])
+            listings += [listing]
         try:
             Listing.objects.bulk_create(listings) 
         except:
@@ -68,18 +53,13 @@ fd.close()
 print(len(Industry.objects.all()))
 
 #List of Equity
-
-
 fd = open('ListOfScrips.csv', 'r')
 reader = csv.DictReader(fd)
 
+stocks = []
 for row in reader:
     #print(row)
     try:
-        stock = Stock.objects.get(security=int(row.get('Security Code')))
-        print(stock)
-        populate_trades(stock)
-    except Stock.DoesNotExist:
         industry = row.get('Industry', '').strip()
         if industry is not None and len(industry) > 0:
             industry = Industry.objects.get(name=industry)
@@ -92,13 +72,34 @@ for row in reader:
               face_value = row.get('Face Value').strip(),
               isin = row.get('ISIN No').strip(),
               industry = industry)
-        stock.save()
-        print(stock)
-        populate_trades(stock)
+        stocks += [stock]
+        #populate_trades(stock)
     except:
-            print("Unexpected error:", sys.exc_info()[0])
+        print(stock)
+        print("Unexpected error:", sys.exc_info()[0])
+
+fd.close()
+Stock.objects.bulk_create(stocks)
+
+#Historical Trading Data
+print(len(Stock.objects.all()))
+
+fd = open('ListOfScrips.csv', 'r')
+reader = csv.DictReader(fd)
+sids = []
+for row in reader:
+    sids += [row.get('Security Code')]
 
 fd.close()
 
-print(len(Stock.objects.all()))
+for sid in sids:
+    #print(row)
+    try:
+        stock = Stock.objects.get(security=int(sid))
+        populate_trades(stock)
+    except:
+        print(stock)
+        print("Unexpected error:", sys.exc_info()[0])
+
+
 

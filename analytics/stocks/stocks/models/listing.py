@@ -14,7 +14,7 @@ class Listing(models.Model):
     trades = models.BigIntegerField()
     turnover = models.BigIntegerField()
     deliverable = models.BigIntegerField()
-    ratio = models.DecimalField(max_digits=5, decimal_places=2)
+    ratio = models.DecimalField(max_digits=10, decimal_places=2)
     spread_high_low = models.DecimalField(max_digits=20, decimal_places=10)
     spread_close_open = models.DecimalField(max_digits=20, decimal_places=10)
     stock = models.ForeignKey(Stock,

@@ -24,3 +24,6 @@ class Stock(models.Model):
                                  
     def __str__(self):
         return (self.name)
+
+    def get_quote_url(self):
+        return ("http://www.bseindia.com/markets/equity/EQReports/StockPrcHistori.aspx?expandable=7&scripcode=" + str(self.security) + "&flag=sp&Submit=G")

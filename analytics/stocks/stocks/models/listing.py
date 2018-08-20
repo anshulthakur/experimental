@@ -22,4 +22,5 @@ class Listing(models.Model):
                               on_delete = models.CASCADE)
 
     def __str__(self):
-        return (self.stock.name+' '+ self.date("%d-%m-%Y"))
+        return (self.stock.name+' '+ self.date.strftime("%d-%m-%Y"))
+

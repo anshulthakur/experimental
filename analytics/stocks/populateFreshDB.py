@@ -30,36 +30,42 @@ def populate_trades(stock):
                                   spread_close_open = float(row.get('Spread Close-Open').strip()))
             listings += [listing]
         try:
-            Listing.objects.bulk_create(listings) 
-        except:
-            print("Unexpected error:", sys.exc_info()[0])
+            Listing.objects.bulk_create(listings)
+        except Exception as e:
+            print(e)
+            print(("Unexpected error:", sys.exc_info()[0]))
     except IOError:
         pass
 
 #Industries
-fd = open('industries.txt', 'r')
-for line in fd:
-    industry = line.strip()
-    if len(industry) > 0:
+fd = open('ListOfScrips_equity.csv', 'r')
+reader = csv.DictReader(fd)
+for row in reader:
+    industry = row.get('Industry', '').strip()
+    if industry is not None and len(industry) > 0:
         try:
             Industry.objects.get(name=industry)
         except Industry.DoesNotExist:
+            #print('Creating {}'.format(industry))
             Industry(name=industry).save()
-        except:
-            print("Unexpected error:", sys.exc_info()[0])
+        except Exception as e:
+            print(e)
+            print(("Unexpected error:", sys.exc_info()[0]))
 
 fd.close()
 
-print(len(Industry.objects.all()))
+print((len(Industry.objects.all())))
 
 #List of Equity
-fd = open('ListOfScrips.csv', 'r')
+fd = open('ListOfScrips_equity.csv', 'r')
 reader = csv.DictReader(fd)
 
 stocks = []
 for row in reader:
     #print(row)
     try:
+        if row.get('Status','') != 'Active':
+          continue
         industry = row.get('Industry', '').strip()
         if industry is not None and len(industry) > 0:
             industry = Industry.objects.get(name=industry)
@@ -72,22 +78,29 @@ for row in reader:
               face_value = row.get('Face Value').strip(),
               isin = row.get('ISIN No').strip(),
               industry = industry)
-        stocks += [stock]
+        #stocks += [stock]
+        #print(stock.name)
+        stock.save()
         #populate_trades(stock)
-    except:
+    except Exception as e:
         print(stock)
-        print("Unexpected error:", sys.exc_info()[0])
+        print(e)
+        print(("Unexpected error:", sys.exc_info()[0]))
 
 fd.close()
-Stock.objects.bulk_create(stocks)
+if len(stocks)>0:
+  Stock.objects.bulk_create(stocks)
+
 
 #Historical Trading Data
-print(len(Stock.objects.all()))
+print((len(Stock.objects.all())))
 
-fd = open('ListOfScrips.csv', 'r')
+#fd = open('ListOfScrips.csv', 'r')
+fd = open('ListOfScrips_equity.csv', 'r')
 reader = csv.DictReader(fd)
 sids = []
 for row in reader:
+  if row.get('Status','') == 'Active':
     sids += [row.get('Security Code')]
 
 fd.close()
@@ -99,7 +112,7 @@ for sid in sids:
         populate_trades(stock)
     except:
         print(stock)
-        print("Unexpected error:", sys.exc_info()[0])
+        print(("Unexpected error:", sys.exc_info()[0]))
 
 
 

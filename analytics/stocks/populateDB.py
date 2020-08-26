@@ -35,56 +35,70 @@ def populate_trades(stock):
                                   spread_close_open = float(row.get('Spread Close-Open').strip()))
                 try:
                     #listing.save()
-                    listings += listing
+                    #print('Adding to list')
+                    listings.append(listing)
                 except:
                     print(stock)
                     print(row)
-                    print("Unexpected error:", sys.exc_info()[0])
+                    print(listing)
+                    for e in sys.exc_info():
+                        print(("Unexpected error:", e))
             except:
+                print('Something went wrong')
                 print(stock)
                 print(row)
-                print("Unexpected error:", sys.exc_info()[0])
+                print(("Unexpected error:", sys.exc_info()[0]))
         try:
-            Listing.objects.bulk_create(listings) 
+            Listing.objects.bulk_create(listings)
         except:
-            print("Unexpected error:", sys.exc_info()[0])
+            print(("Unexpected error:", sys.exc_info()[0]))
     except IOError:
         pass
 
 #Industries
-fd = open('industries.txt', 'r')
-for line in fd:
-    industry = line.strip()
-    if len(industry) > 0:
+#fd = open('industries.txt', 'r')
+fd = open('ListOfScrips_equity.csv', 'r')
+reader = csv.DictReader(fd)
+for row in reader:
+    industry = row.get('Industry', '').strip()
+    if industry is not None and len(industry) > 0:
         try:
             Industry.objects.get(name=industry)
         except Industry.DoesNotExist:
             Industry(name=industry).save()
-        except:
-            print("Unexpected error:", sys.exc_info()[0])
+        except Exception as e:
+            print(e)
+            print(("Unexpected error:", sys.exc_info()[0]))
 
+Industry.objects.bulk_create(stocks)
 fd.close()
 
-print(len(Industry.objects.all()))
+print((len(Industry.objects.all())))
 
 #List of Equity
 
 
-fd = open('ListOfScrips.csv', 'r')
+#fd = open('ListOfScrips.csv', 'r')
+fd = open('ListOfScrips_equity.csv', 'r')
 reader = csv.DictReader(fd)
+
 
 for row in reader:
     #print(row)
     try:
         stock = Stock.objects.get(security=int(row.get('Security Code')))
-        print(stock)
+        #print(stock)
         populate_trades(stock)
     except Stock.DoesNotExist:
         industry = row.get('Industry', '').strip()
-        if industry is not None and len(industry) > 0:
-            industry = Industry.objects.get(name=industry)
-        else:
-            industry = None
+        try:
+          if industry is not None and len(industry) > 0:
+              industry = Industry.objects.get(name=industry)
+          else:
+              industry = None
+        except Industry.DoesNotExist:
+            print('Industry: {} does not exist'.format(row.get('Industry', '').strip()))
+            exit()
         stock = Stock(security=int(row.get('Security Code')),
               sid = row.get('Security Id'),
               name = row.get('Security Name').strip(),
@@ -96,9 +110,9 @@ for row in reader:
         print(stock)
         populate_trades(stock)
     except:
-            print("Unexpected error:", sys.exc_info()[0])
+            print(("Unexpected error:", sys.exc_info()[0]))
 
 fd.close()
 
-print(len(Stock.objects.all()))
+print((len(Stock.objects.all())))
 

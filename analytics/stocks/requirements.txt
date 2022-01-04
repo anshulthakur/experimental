@@ -1,0 +1,15 @@
+Django
+matplotlib
+selenium
+urllib3
+virtualenv
+numpy
+requests
+rsa
+scikit-learn
+scipy
+six
+tornado
+jupyterlab
+pandas
+django_pandas

@@ -46,3 +46,12 @@ jupyer notebook
 - Do stuff in it.
 
 - Also, we don't need just an on-demand visualization, but also a programmatic way of visualization that we may embed later into a suite.
+
+
+
+# Setting up Django project on a new machine
+
+1. python3 manage.py makemigrations
+2. python3 manage.py migrate
+
+

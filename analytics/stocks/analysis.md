@@ -20,9 +20,29 @@ DB: bsedata.db
 2. Historical data of each equity
 3. Industry classification of BSE
 
-* With the use of DB come general issues of design. We're using DBs with Objects. So, we would want to 
+* With the use of DB come general issues of design. We're using DBs with Objects. So, we would want to
 directly operate on objects which would control the DB on their own. (Much like Django and other frameworks).
 So, there is a need for two methods at the least - to_db, and to_representation - to convert into and from DB format.
 Then, the question would be, why do it? Just use Django or Flask, no? (I'd use Django because I can)
 
 * The problem with trying to write each field after reading it line by line is simply thus: It takes a lot of effing time!
+
+### So we take a U-turn and try to use Django outside Django
+
+And that works!
+
+### So, we would like some visualization
+
+Enter, Jupyter notebooks
+
+- Install Jupyter.
+- Fire up a Notebook
+
+```
+jupyer notebook
+```
+
+- Create a notebook `Stock Visualization`
+- Do stuff in it.
+
+- Also, we don't need just an on-demand visualization, but also a programmatic way of visualization that we may embed later into a suite.

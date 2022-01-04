@@ -183,6 +183,7 @@ def get_next_stock():
 def work_loop(thread_name, tid):
     global stock_iter
     for stock in stock_iter:
+        #print(day)
         if get_data_for_date(stock, day) is False:
             error_stocks.append(stock)
 
@@ -196,10 +197,10 @@ args = parser.parse_args()
 stock_code = None
 
 if args.stock is not None and len(args.stock)>0:
-    print('Get data for {}'.format(args.stock))
+    print('Get data for stock {}'.format(args.stock))
     stock_code = int(args.stock)
 if args.date is not None and len(args.date)>0:
-    print('Get data for {}'.format(args.date))
+    print('Get data for date: {}'.format(args.date))
     day = datetime.strptime(args.date, "%d/%m/%y")
 
 if stock_code is None:

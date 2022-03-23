@@ -12,6 +12,7 @@ from mplfinance.original_flavor import candlestick_ohlc
 import matplotlib.dates as mpl_dates
 
 from matplotlib.dates import date2num
+from pandas.tseries.frequencies import to_offset
 
 
 import django
@@ -55,41 +56,57 @@ def get_stock_listing(stock):
            df[column] = pd.to_numeric(df[column])
     df = df.sort_index()
     df = df.reindex(columns = ['closing'])
-    df.rename(columns={"closing":stock.sid.replace(' ', '_')}, inplace=True)
+    df.index = pd.to_datetime(df.index)
+    #Resample weekly
+    logic = {'closing' : 'last',
+             }
+    #Resample on weekly levels
+    df_weekly = df.resample('W').apply(logic)
+    df_weekly.index -= to_offset("6D")
+
+    #df_weekly.rename(columns={"closing":stock.sid.replace(' ', '_')}, inplace=True)
+    df_weekly.rename(columns={"closing":stock.security}, inplace=True)
+
     #Optionally, filter out by date range
     #start_date = '2020-01-01'
     #end_date = '2021-12-31'
     #df = df.loc[start_date:end_date]
-    return df
+    return df_weekly.T
 
 
 
 stocks = Stock.objects.all()
 
 read_list = []
-with open('read_stocks.txt', 'r') as fd:
-    for line in fd:
-        read_list.append(line.strip())
+try:
+    with open('read_stocks.txt', 'r') as fd:
+        for line in fd:
+            read_list.append(line.strip())
+except:
+    pass
 
 count = 0
 #store = pd.HDFStore('store.h5')
 
+chunk_size = 500
+
 path = 'store.h5'
 df = pd.DataFrame()
 if len(read_list) < len(stocks):
-    chunk = (len(read_list)//100)+1
+    chunk = (len(read_list)//chunk_size)+1
 for stock in stocks:
     if stock.sid.strip() in read_list:
         print('Skip')
         continue
-    if count == 100:
+    if count == chunk_size:
         fd = open('read_stocks.txt', 'w')
         for sid in read_list:
             fd.write('{}\n'.format(sid))
         fd.close()
         with pd.HDFStore(path) as store:
             print('Save chunk_{}'.format(chunk))
-            store['chunk_{}'.format(chunk)] = df  # save it
+            #store['chunk_{}'.format(chunk)] = df  # save it
+            store.append('df', df)
         chunk += 1
         df = pd.DataFrame()
         count = 0
@@ -97,8 +114,8 @@ for stock in stocks:
     if stock.name != 'NIFTY' and stock.name != 'BANKNIFTY':
         sdf = get_stock_listing(stock)
         if len(sdf>0):
-            #df = df.append(sdf)
-            df = pd.concat([df, sdf])
+            df = df.append(sdf)
+            #df = pd.concat([df, sdf])
             count += 1
             read_list.append(stock.sid.strip())
 fd = open('read_stocks.txt', 'w')
@@ -107,7 +124,8 @@ for sid in read_list:
 fd.close()
 with pd.HDFStore(path) as store:
     print('Save chunk_{}'.format(chunk))
-    store['chunk_{}'.format(chunk)] = df  # save it
+    #store['chunk_{}'.format(chunk)] = df  # save it
+    store.append('df', df)
 
 #for col in df.columns:
 #    print(col)
@@ -116,10 +134,18 @@ with pd.HDFStore(path) as store:
 #store['df']  # load it
 print('Done collecting. Condensing')
 
+'''
 print('Chunks={}'.format(chunk))
 with pd.HDFStore(path) as store:
     df = store['chunk_1']
     for chunk in range(2, chunk+1):
-        df = pd.concat[df, store['chunk_{}'.format(chunk)]]
+        print('Concating chunk_{}'.format(chunk))
+        df = pd.concat([df, store['chunk_{}'.format(chunk)]])
 
     store['df'] = df
+'''
+with pd.HDFStore(path) as store:
+    df = store['df']
+    df = df.T
+    store['df'] = df
+    print(df.head())

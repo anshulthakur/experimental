@@ -23,4 +23,8 @@ class Listing(models.Model):
 
     def __str__(self):
         return (self.stock.name+' '+ self.date.strftime("%d-%m-%Y"))
-
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['date'], name='date_idx'),
+        ]

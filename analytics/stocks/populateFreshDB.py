@@ -4,7 +4,8 @@ import settings
 import csv
 from datetime import datetime
 
-from stocks.models import Listing, Industry, Stock
+scrip_list = 'scrip_list.csv'
+from stocks.models import Listing, Industry, Stock, Market
 
 def populate_trades(stock):
     try:
@@ -25,9 +26,7 @@ def populate_trades(stock):
                                   trades = int(row.get('No. of Trades').strip()),
                                   turnover = float(row.get('Total Turnover (Rs.)').strip()),
                                   deliverable = float(row.get('Deliverable Quantity').strip()) if len(row.get('Deliverable Quantity').strip()) > 0 else 0,
-                                  ratio = float(row.get('% Deli. Qty to Traded Qty').strip()) if len(row.get('% Deli. Qty to Traded Qty').strip()) > 0 else 0,
-                                  spread_high_low = float(row.get('Spread High-Low').strip()),
-                                  spread_close_open = float(row.get('Spread Close-Open').strip()))
+)
             listings += [listing]
         try:
             Listing.objects.bulk_create(listings)
@@ -38,7 +37,7 @@ def populate_trades(stock):
         pass
 
 #Industries
-fd = open('ListOfScrips_equity.csv', 'r')
+fd = open(scrip_list, 'r')
 reader = csv.DictReader(fd)
 for row in reader:
     industry = row.get('Industry', '').strip()
@@ -56,8 +55,22 @@ fd.close()
 
 print((len(Industry.objects.all())))
 
+#Markets
+markets = ['NSE', 'BSE']
+for market in markets:
+    mkt = market
+    try:
+        Market.objects.get(name=market)
+    except Market.DoesNotExist:
+        #print('Creating {}'.format(industry))
+        Market(name=market).save()
+    except Exception as e:
+        print(e)
+        print(("Unexpected error:", sys.exc_info()[0]))
+
+
 #List of Equity
-fd = open('ListOfScrips_equity.csv', 'r')
+fd = open(scrip_list, 'r')
 reader = csv.DictReader(fd)
 
 stocks = []
@@ -66,6 +79,7 @@ for row in reader:
     try:
         if row.get('Status','') != 'Active':
           continue
+        market = Market.objects.get(name = 'BSE')
         industry = row.get('Industry', '').strip()
         if industry is not None and len(industry) > 0:
             industry = Industry.objects.get(name=industry)
@@ -77,7 +91,8 @@ for row in reader:
               group = row.get('Group').strip(),
               face_value = row.get('Face Value').strip(),
               isin = row.get('ISIN No').strip(),
-              industry = industry)
+              industry = industry,
+              market = market)
         #stocks += [stock]
         #print(stock.name)
         stock.save()
@@ -96,7 +111,7 @@ if len(stocks)>0:
 print((len(Stock.objects.all())))
 
 #fd = open('ListOfScrips.csv', 'r')
-fd = open('ListOfScrips_equity.csv', 'r')
+fd = open(scrip_list, 'r')
 reader = csv.DictReader(fd)
 sids = []
 for row in reader:

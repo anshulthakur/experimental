@@ -10,6 +10,10 @@ from selenium import webdriver
 import csv
 import time
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
 
 import threading
 import multiprocessing
@@ -17,7 +21,7 @@ import multiprocessing
 num_threads = multiprocessing.cpu_count()
 thread_busy = [1 for i in range(0,num_threads)]
 
-download_dir = "/home/craft/web/analytics/analytics/stocks/bsedata/"
+download_dir = "/home/anshul/web/analytics/analytics/stocks/bsedata/"
 preferences = {"download.default_directory" : download_dir}
 
 base_url = "http://www.bseindia.com/markets/equity/EQReports/StockPrcHistori.aspx?expandable=7&scripcode=%s&flag=sp&Submit=G"
@@ -77,41 +81,41 @@ def download_data(driver, url):
     try:
         print(('URL: '+url))
         driver.get(url)
-        if not error_occured(driver.find_element_by_tag_name('body').text):
-            to_date_year = driver.find_element_by_id('ContentPlaceHolder1_txtToDate').get_attribute('value').split('/')[-1]
+        if not error_occured(driver.find_element(by=By.TAG_NAME, value='body').text):
+            to_date_year = driver.find_element(by=By.ID, value='ContentPlaceHolder1_txtToDate').get_attribute('value').split('/')[-1]
             if to_date_year=='':
                 return True
             elif int(to_date_year) < 2018:
                 #pass because date lies before time of interest
                 return True
-            from_date = driver.find_element_by_id('ContentPlaceHolder1_txtFromDate')
-            if from_date is not None and from_date.get_attribute("value") is not '':
+            from_date = driver.find_element(by=By.ID, value='ContentPlaceHolder1_txtFromDate')
+            if from_date is not None and from_date.get_attribute("value") != '':
                 from_date.clear()
                 #from_date.send_keys('01/01/2007')
                 #No longer allows text input from keyboard
                 from_date.click()
-                month_el = driver.find_element_by_css_selector('select[class="ui-datepicker-month"]')
+                month_el = driver.find_element(by=By.CSS_SELECTOR, value='select[class="ui-datepicker-month"]')
                 month_el.click()
-                month_el.find_element_by_css_selector('option[value="0"]').click()
-                year_el = driver.find_element_by_css_selector('select[class="ui-datepicker-year"]')
+                month_el.find_element(by=By.CSS_SELECTOR, value='option[value="0"]').click()
+                year_el = driver.find_element(by=By.CSS_SELECTOR, value='select[class="ui-datepicker-year"]')
                 year_el.click()
-                year_el.find_element_by_css_selector('option[value="2008"]').click()
-                year_el = driver.find_element_by_css_selector('select[class="ui-datepicker-year"]')
+                year_el.find_element(by=By.CSS_SELECTOR, value='option[value="2012"]').click()
+                year_el = driver.find_element(by=By.CSS_SELECTOR, value='select[class="ui-datepicker-year"]')
                 year_el.click()
-                year_el.find_element_by_css_selector('option[value="2007"]').click()
-                date_el = driver.find_element_by_css_selector('table[class="ui-datepicker-calendar"]').find_elements_by_tag_name('tbody')[0]
-                date_elem = date_el.find_element_by_xpath(".//*[contains(text(), '1')]")
+                year_el.find_element(by=By.CSS_SELECTOR, value='option[value="2007"]').click()
+                date_el = driver.find_element(by=By.CSS_SELECTOR, value='table[class="ui-datepicker-calendar"]').find_elements(by=By.TAG_NAME, value='tbody')[0]
+                date_elem = date_el.find_element(by=By.XPATH, value=".//*[contains(text(), '1')]")
                 date_elem.click()
             else:
                 print ('Returned Empty results')
                 return True
             #to_date defaults to today. So, we are good!
-            submit_btn = driver.find_element_by_id('ContentPlaceHolder1_btnSubmit')
+            submit_btn = driver.find_element(by=By.ID, value='ContentPlaceHolder1_btnSubmit')
             time.sleep(1)
             submit_btn.click()
 
-            if not error_occured(driver.find_element_by_tag_name('body').text):
-                download_link = driver.find_element_by_id('ContentPlaceHolder1_btnDownload')
+            if not error_occured(driver.find_element(by=By.TAG_NAME, value='body').text):
+                download_link = driver.find_element(by=By.ID, value='ContentPlaceHolder1_btnDownload')
                 download_link.click()
                 return True
             else:
@@ -119,9 +123,10 @@ def download_data(driver, url):
                 return False
         else:
             return False
-    except:
-        print ('Exception Geting URL')
-        return True
+    except Exception as e:
+    	print(e)
+    	print ('Exception Geting URL')
+    	return True
 
 def work_loop(thread_name, tid):
     global thread_busy
@@ -130,11 +135,24 @@ def work_loop(thread_name, tid):
     print(('{t} Started'.format(t=thread_name)))
     options = webdriver.ChromeOptions() 
     
+    from selenium.webdriver.chrome.options import Options
+
+    options = Options()
+    #opt.add_experimental_option("prefs", {
+    #  "download.default_directory": r"C:/Users/Future/Desktop",
+    #  "download.prompt_for_download": False,
+    #  "download.directory_upgrade": True,
+    #  "safebrowsing_for_trusted_sources_enabled": False,
+    #  "safebrowsing.enabled": False
+    #})
+    
     #options.add_argument("")
     options.add_experimental_option("prefs", preferences)
     #options.add_argument('headless')
     #options.add_argument('window-size=0x0')
-    driver = webdriver.Chrome('/home/craft/Downloads/chromedriver_linux64/chromedriver',chrome_options=options)
+    #driver = webdriver.Chrome('/home/anshul/web/analytics/analytics/chromedriver_linux64/chromedriver',chrome_options=options)
+    service = ChromeService(executable_path=ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service)
     driver.implicitly_wait(10) #seconds: After page load, some classes may load up by JS. So, wait if not available
 
     for stock in stock_codes:

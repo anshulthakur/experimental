@@ -96,9 +96,9 @@ def get_data_for_date(stock, dateObj):
                         listing.trades = fix_float(tds[7])
                         listing.turnover = fix_float(tds[8])
                         listing.deliverable = fix_float(tds[9])
-                        listing.ratio = fix_float(tds[10])
-                        listing.spread_high_low = fix_float(tds[11])
-                        listing.spread_close_open = fix_float(tds[12])
+                        #listing.ratio = fix_float(tds[10])
+                        #listing.spread_high_low = fix_float(tds[11])
+                        #listing.spread_close_open = fix_float(tds[12])
                         listing.save()
                         print(("{code} OK[{d}] [{id}]".format(code=stock.security, d=listing.date, id=listing.id)))
                         return True
@@ -186,6 +186,81 @@ def work_loop(thread_name, tid):
         #print(day)
         if get_data_for_date(stock, day) is False:
             error_stocks.append(stock)
+
+import os
+
+def read_bhav_file(filename, dateval):
+    try:
+        with open(filename, 'r') as fd:
+            csv_reader = csv.DictReader(fd, delimiter=',')
+            i = 0
+            for row in csv_reader:
+                try:
+                    stock = Stock.objects.get(security=row['SC_CODE'])
+                    listing = Listing()
+                    listing.stock = stock
+                    listing.date = dateval
+                    listing.opening = fix_float(row['OPEN'])
+                    listing.high = fix_float(row['HIGH'])
+                    listing.low = fix_float(row['LOW'])
+                    listing.closing = fix_float(row['CLOSE'])
+                    #listing.wap = fix_float(tds[5])
+                    listing.traded = fix_float(row['NO_OF_SHRS'])
+                    listing.trades = fix_float(row['NO_TRADES'])
+                    listing.turnover = fix_float(row['NET_TURNOV'])
+                    #listing.deliverable = fix_float(tds[9])
+                    listing.save()
+                except Stock.DoesNotExist:
+                    print('{} does not exist in DB'.format(row['SC_NAME']))
+                    continue
+    except IOError as e:
+        print(("I/O error({0}): {1}".format(e.errno, e.strerror)))
+
+    pass
+
+def download_bhav_copy(url: str, dest_folder: str):
+    from zipfile import ZipFile
+
+    if not os.path.exists(dest_folder):
+        os.makedirs(dest_folder)  # create folder if it does not exist
+
+    #filename = url.split('/')[-1].replace(" ", "_")  # be careful with file names
+    filename = 'bhav_latest.zip'
+    file_path = os.path.join(dest_folder, filename)
+
+    header = {
+                            'authority': 'api.bseindia.com',
+                            'method': 'GET',
+                            'scheme': 'https',
+                            'accept': 'application/json, text/plain, */*',
+                            'accept-encoding': 'gzip, deflate, br',
+                            'accept-language': 'en-IN,en;q=0.9,en-GB;q=0.8,en-US;q=0.7,hi;q=0.6',
+                            'dnt': '1',
+                            'origin': 'https://www.bseindia.com',
+                            'referer': url,
+                            'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.135 Safari/537.36',
+                            }
+    req = urllib.request.Request(url, headers=header)
+    response = urllib.request.urlopen(req)
+    coder = response.headers.get('Content-Encoding', 'utf-8')
+    import shutil
+    with open(file_path, 'wb') as f:
+        shutil.copyfileobj(response, f)
+    
+    with ZipFile(filename, 'r') as zip:
+        # printing all the contents of the zip file
+        #zip.printdir()
+  
+        # extracting all the files
+        print('Extracting all the files now...')
+        zip.extractall()
+        print('Done!')
+
+bhav_url  = 'https://www.bseindia.com/download/BhavCopy/Equity/EQ{datestr}_CSV.ZIP'
+dateval = datetime.today() #- timedelta(days = 1)
+bhav_file = f"EQ{datetime.today().strftime('%d%m%y')}"
+#download_bhav_copy(bhav_url.format(datestr = dateval.strftime("%d%m%y")), dest_folder=".")
+
 
 
 day = datetime.today()

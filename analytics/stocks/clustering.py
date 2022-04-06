@@ -132,8 +132,8 @@ for stock in stocks:
             #print(f'DF shape: {df.shape}\tDF columns: {len(df.columns)}({len(set(df.columns))})\
 #\tSDF columns: {len(sdf.columns)}({len(set(sdf.columns))})\tUnion:{len(set(df.columns).union(set(sdf.columns)))}')
 
-            df = df.append(sdf)
-            #df = pd.concat([df, sdf])
+            #df = df.append(sdf)
+            df = pd.concat([df, sdf])
             count += 1
             read_list.append(stock.sid.strip())
 fd = open('read_stocks.txt', 'w')

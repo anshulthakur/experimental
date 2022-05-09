@@ -49,9 +49,9 @@ def get_volume_signals(df):
     #std = df.iloc[-21:-1]['volume'].std()
     vol_ema = talib.EMA(df['volume'], period)
 
-    if np.isnan(vol_ema.iloc[-2])==False and  df.iloc[-1]['volume'] >= (vol_ema.iloc[-2]+ std.iloc[-2]):
+    if np.isnan(vol_ema.iloc[-2])==False and  std.iloc[-2] != 0 and df.iloc[-1]['volume'] >= (vol_ema.iloc[-2]+ std.iloc[-2]):
         signals['volume_shoot_up'] = (df.iloc[-1]['volume'] - vol_ema.iloc[-2])/std.iloc[-2]
-    elif np.isnan(vol_ema.iloc[-2])==False and df.iloc[-1]['volume'] <= (vol_ema.iloc[-2]- std.iloc[-2]):
+    elif np.isnan(vol_ema.iloc[-2])==False and std.iloc[-2] != 0 and df.iloc[-1]['volume'] <= (vol_ema.iloc[-2]- std.iloc[-2]):
         signals['volume_contract'] = (vol_ema.iloc[-2] - df.iloc[-1]['volume'])/std.iloc[-2]
     #else:
     #    print(f"Volume: {df.iloc[-1]['volume']}  EMA: {vol_ema.iloc[-2]} STD: {std}")
@@ -59,9 +59,9 @@ def get_volume_signals(df):
     #std = df[-21:-1]['delivery'].std()
     std = df['delivery'].ewm(span=period).std()
     del_ema = talib.EMA(df['delivery'], period)
-    if np.isnan(del_ema.iloc[-2])==False and df.iloc[-1]['delivery'] >= (del_ema.iloc[-2]+ std.iloc[-2]):
+    if np.isnan(del_ema.iloc[-2])==False and std.iloc[-2] != 0 and df.iloc[-1]['delivery'] >= (del_ema.iloc[-2]+ std.iloc[-2]):
         signals['delivery_shoot_up'] = (df.iloc[-1]['delivery'] - del_ema.iloc[-2])/std.iloc[-2]
-    elif np.isnan(del_ema.iloc[-2])==False and df.iloc[-1]['delivery'] <= (del_ema.iloc[-2]- std.iloc[-2]):
+    elif np.isnan(del_ema.iloc[-2])==False and std.iloc[-2] != 0 and df.iloc[-1]['delivery'] <= (del_ema.iloc[-2]- std.iloc[-2]):
         signals['delivery_contract'] = (del_ema.iloc[-2] - df.iloc[-1]['delivery'])/std.iloc[-2]
     #else:
     #    print(f"Delivery: {df.iloc[-1]['delivery']}  EMA: {del_ema.iloc[-2]} STD: {std}")
@@ -70,9 +70,9 @@ def get_volume_signals(df):
     dl_ema = talib.SMA(dl_ptage, period)
     #std = dl_ptage[-21:-1].std()
     std = dl_ptage.ewm(span=period).std()
-    if np.isnan(dl_ema.iloc[-2])==False and dl_ptage.iloc[-1] >= (dl_ema.iloc[-2]+ std.iloc[-2]):
+    if np.isnan(dl_ema.iloc[-2])==False and std.iloc[-2] != 0 and dl_ptage.iloc[-1] >= (dl_ema.iloc[-2]+ std.iloc[-2]):
         signals['delivery_ptage_shoot_up'] = (dl_ptage.iloc[-1] - dl_ema.iloc[-2])/std.iloc[-2]
-    elif np.isnan(dl_ema.iloc[-2])==False and dl_ptage.iloc[-1] <= (dl_ema.iloc[-2]- std.iloc[-2]):
+    elif np.isnan(dl_ema.iloc[-2])==False and std.iloc[-2] != 0 and dl_ptage.iloc[-1] <= (dl_ema.iloc[-2]- std.iloc[-2]):
         signals['delivery_ptage_contract'] = (dl_ema.iloc[-2] - dl_ptage.iloc[-1])/std.iloc[-2]
     #else:
     #    print(f"Delivery %: {dl_ptage.iloc[-1]}  EMA: {dl_ema.iloc[-2]} STD: {std}")
@@ -81,9 +81,9 @@ def get_volume_signals(df):
     dl_ema = talib.SMA(vpt_ptage, period)
     #std = vpt_ptage[-21:-1].std()
     std = vpt_ptage.ewm(span=period).std()
-    if np.isnan(dl_ema.iloc[-2])==False and vpt_ptage.iloc[-1] >= (dl_ema.iloc[-2]+ std.iloc[-2]):
+    if np.isnan(dl_ema.iloc[-2])==False and std.iloc[-2] != 0 and vpt_ptage.iloc[-1] >= (dl_ema.iloc[-2]+ std.iloc[-2]):
         signals['volume_per_trade_shoot_up'] = (vpt_ptage.iloc[-1] - dl_ema.iloc[-2])/std.iloc[-2]
-    elif np.isnan(dl_ema.iloc[-2])==False and vpt_ptage.iloc[-1] <= (dl_ema.iloc[-2]- std.iloc[-2]):
+    elif np.isnan(dl_ema.iloc[-2])==False and std.iloc[-2] != 0 and vpt_ptage.iloc[-1] <= (dl_ema.iloc[-2]- std.iloc[-2]):
         signals['volume_per_trade_contract'] = (dl_ema.iloc[-2] - vpt_ptage.iloc[-1])/std.iloc[-2]
     #else:
     #    print(f"Volume Per trade %: {vpt_ptage.iloc[-1]}  EMA: {dl_ema.iloc[-2]} STD: {std}")
@@ -114,7 +114,9 @@ def get_signals(df, threshold = 0.05):
     signals = {'proximity_short': [],
                'proximity_long': [],
                'price_crossover_short': [],
-               'price_crossover_long': [],}
+               'price_crossover_long': [],
+               'volatility_contract': None,
+               'volatility_expand': None}
     for indicator in overlap_indicators:
         if indicator in df.columns:
             #If price is near the indicator (5%), flag the indicator
@@ -129,5 +131,13 @@ def get_signals(df, threshold = 0.05):
                     signals['price_crossover_short'].append(indicator)
                 else:
                     signals['price_crossover_long'].append(indicator)
-                
+    iv = df['high'] - df['low']
+    period = 20 #20 day mean
+    std = iv.ewm(span=period).std()
+    
+    iv_ema = talib.EMA(iv, period)
+    if np.isnan(iv_ema.iloc[-2])==False and  std.iloc[-2] != 0 and iv.iloc[-1] >= (iv_ema.iloc[-2]+ std.iloc[-2]):
+        signals['volatility_expand'] = (iv.iloc[-1] - iv_ema.iloc[-2])/std.iloc[-2]
+    elif np.isnan(iv_ema.iloc[-2])==False and std.iloc[-2] != 0 and iv.iloc[-1] <= (iv_ema.iloc[-2]- std.iloc[-2]):
+        signals['volatility_contract'] = (iv_ema.iloc[-2] - iv.iloc[-1])/std.iloc[-2]
     return signals

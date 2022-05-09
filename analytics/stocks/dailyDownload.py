@@ -17,6 +17,7 @@ import brotli
 import gzip
 from io import BytesIO
 
+import traceback
 
 error_stocks = []
 ERR_FILE = '/tmp/failed_stocks'
@@ -261,49 +262,153 @@ dateval = datetime.today() #- timedelta(days = 1)
 bhav_file = f"EQ{datetime.today().strftime('%d%m%y')}"
 #download_bhav_copy(bhav_url.format(datestr = dateval.strftime("%d%m%y")), dest_folder=".")
 
+def download_index_report(dest_folder: str = './indices/reports/', date=datetime.today()):
+    if not os.path.exists(dest_folder):
+        os.makedirs(dest_folder)  # create folder if it does not exist
+        
+    #url = 'https://www1.nseindia.com/content/indices/ind_close_all_{}.csv'.format(date.strftime("%d%m%Y"))
+    url = 'https://www1.nseindia.com/homepage/Indices1.json'
+    filename = 'ind_close_all_{}.csv'.format(date.strftime("%d%m%Y"))
+    file_path = os.path.join(dest_folder, filename)
+    
+    print('URL: '+url)
 
-
-day = datetime.today()
-import argparse
-parser = argparse.ArgumentParser(description='Download stock data for stock/date')
-parser.add_argument('-s', '--stock', help="Stock code")
-parser.add_argument('-d', '--date', help="Date")
-args = parser.parse_args()
-stock_code = None
-
-if args.stock is not None and len(args.stock)>0:
-    print('Get data for stock {}'.format(args.stock))
-    stock_code = int(args.stock)
-if args.date is not None and len(args.date)>0:
-    print('Get data for date: {}'.format(args.date))
-    day = datetime.strptime(args.date, "%d/%m/%y")
-
-if stock_code is None:
-    stock_iter = LockedIterator(get_next_stock())
-
-    threads = []
-    num_threads = multiprocessing.cpu_count() * 2
+    header = {
+                'method': 'GET',
+                'scheme': 'https',
+                #'authority': 'nseindia.com',
+                'accept': 'application/json, text/plain, */*',
+                'accept-encoding': 'gzip, deflate, br',
+                'accept-language': 'en-US,en;q=0.9',
+                'dnt': '1',
+                'host': 'www1.nseindia.com',
+                'referer': 'https://www1.nseindia.com/products/content/equities/indices/homepage_indices.htm',
+                'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.135 Safari/537.36',
+                }
     try:
-      for thread_id in range(num_threads):
-          t = threading.Thread(target=work_loop, args=("Thread ID {id}".format(id=thread_id), thread_id))
-          threads.append(t)
-          t.start()
-
-      for t in threads:
-          t.join()
+        #print(header)
+        req = urllib.request.Request(url, headers=header)
+        response = urllib.request.urlopen(req)
+        coder = response.headers.get('Content-Encoding', 'utf-8')
+        #print('Coder: {}'.format(coder))
+        if coder=='br':
+            html_page = brotli.decompress(response.read()).decode('utf-8')
+        elif coder=='gzip':
+            buf = BytesIO(response.read())
+            html_page = gzip.GzipFile(fileobj=buf).read().decode('utf-8')
+            print('Got gzip response')
+        else:
+            html_page = response.read().decode('utf-8')
+        import shutil
+        with open(file_path, 'wb') as f:
+            shutil.copyfileobj(html_page, f)
+            print('Downloaded')
     except:
-      print(("Unable to start thread ({id})".format(id=thread_id)))
+        traceback.print_exc()
+        pass
 
-    with open(ERR_FILE, 'w') as fd:
-        fd.write(datetime.today().strftime("%d/%m/%y"))
-        for stock in error_stocks:
-            fd.write('\n{}'.format(stock.id))
-else:
-    try:
-        stock = Stock.objects.get(security=stock_code)
-        get_data_for_date(stock, day)
-    except Stock.DoesNotExist:
-        print('Stock does not exist in DB')
+INDEX_MAP = {"Nifty 50":"nifty50.csv",
+            "Nifty Auto":"auto.csv",
+            "Nifty Bank":"banknifty.csv",
+            "Nifty Energy":"energy.csv",
+            "Nifty Financial Services":"finance.csv",
+            "Nifty FMCG":"fmcg.csv",
+            "Nifty IT":"niftyit.csv",
+            "Nifty Media":"niftymedia.csv",
+            "Nifty Metal":"metal.csv",
+            "Nifty Pharma":"pharma.csv",
+            "Nifty PSU Bank":"psubank.csv",
+            "Nifty Realty":"realty.csv",
+            "Nifty India Consumption":"consumption.csv",
+            "Nifty Commodities":"commodities.csv",
+            "Nifty Infrastructure":"infra.csv",
+            "Nifty Services Sector":"services.csv",
+            "Nifty Non-Cyclical Consumer":"noncyclical.csv",
+            "Nifty India Manufacturing":"manufacturing.csv",
+            "Nifty Oil & Gas":"oilgas.csv",
+            "Nifty Healthcare Index":"healthcare.csv",
+            "Nifty India Digital":"digital.csv",
+            "Nifty India Defence":"defense.csv",
+            "Nifty Financial Services Ex-Bank":"finexbank.csv",
+            "Nifty Housing":"housing.csv",
+            "Nifty Transportation & Logistics":"logistics.csv",
+            "Nifty Consumer Durables":"consumer.csv",
+            "Nifty Private Bank":"pvtbank.csv",}
+
+def update_indices(date=datetime.today()):
+    fname = './indices/reports/ind_close_all_{}.csv'.format(date.strftime("%d%m%Y"))
+    from csv import writer
+    with open(fname, 'r', newline='') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            dest_idx = row['Index Name']
+            if dest_idx in INDEX_MAP:
+                print('Update {}'.format(dest_idx.strip()))
+                with open('./indices/'+INDEX_MAP[dest_idx.strip()], 'a', newline='') as f_object:
+                    # Pass the CSV  file object to the writer() function
+                    writer_object = writer(f_object)
+                    # Result - a writer object
+                    # Pass the data in the list as an argument into the writerow() function
+                    writer_object.writerow([date.strftime('%d-%b-%y'), 
+                                            row['Open Index Value'],
+                                            row['High Index Value'],
+                                            row['Low Index Value'],
+                                            row['Closing Index Value'],
+                                            row['Volume'],
+                                            row['Turnover (Rs. Cr.)'],])
+            else:
+                print(f'{dest_idx} is not mapped')
+            
+
+if __name__ == "__main__":
+    day = datetime.today()
+    import argparse
+    parser = argparse.ArgumentParser(description='Download stock data for stock/date')
+    parser.add_argument('-s', '--stock', help="Stock code")
+    parser.add_argument('-r', '--report', help="Index report", action='store_true', default=False)
+    parser.add_argument('-d', '--date', help="Date")
+    args = parser.parse_args()
+    stock_code = None
+    
+    if args.stock is not None and len(args.stock)>0:
+        print('Get data for stock {}'.format(args.stock))
+        stock_code = int(args.stock)
+    if args.date is not None and len(args.date)>0:
+        print('Get data for date: {}'.format(args.date))
+        day = datetime.strptime(args.date, "%d/%m/%y")
+    if args.report is True:
+        print('Download index report')
+        update_indices(date = day)
+        exit()
+    
+    if stock_code is None:
+        stock_iter = LockedIterator(get_next_stock())
+    
+        threads = []
+        num_threads = multiprocessing.cpu_count() * 2
+        try:
+          for thread_id in range(num_threads):
+              t = threading.Thread(target=work_loop, args=("Thread ID {id}".format(id=thread_id), thread_id))
+              threads.append(t)
+              t.start()
+    
+          for t in threads:
+              t.join()
+        except:
+          print(("Unable to start thread ({id})".format(id=thread_id)))
+    
+        with open(ERR_FILE, 'w') as fd:
+            fd.write(datetime.today().strftime("%d/%m/%y"))
+            for stock in error_stocks:
+                fd.write('\n{}'.format(stock.id))
+    else:
+        try:
+            stock = Stock.objects.get(security=stock_code)
+            get_data_for_date(stock, day)
+        except Stock.DoesNotExist:
+            print('Stock does not exist in DB')
+    
+
 
 
 

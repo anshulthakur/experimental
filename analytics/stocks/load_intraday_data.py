@@ -48,10 +48,7 @@ def load_intraday_data_to_db(first_time=False):
                                   traded = 0,
                                   trades = 0,
                                   turnover = 0,
-                                  deliverable = 0,
-                                  ratio = 0,
-                                  spread_high_low = 0,
-                                  spread_close_open = 0)
+                                  deliverable = 0)
                         try:
                             listings.append(listing)
                         except:
@@ -77,10 +74,7 @@ def load_intraday_data_to_db(first_time=False):
                                   traded = 0,
                                   trades = 0,
                                   turnover = 0,
-                                  deliverable = 0,
-                                  ratio = 0,
-                                  spread_high_low = 0,
-                                  spread_close_open = 0)
+                                  deliverable = 0)
                     try:
                         listings.append(listing)
                     except:

@@ -655,30 +655,30 @@ def main():
     #Whichever sectors are leading, find the strongest stock in those
     date = datetime.date.today()
     for column in JDK_RS_ratio.columns:
-        if JDK_RS_ratio.iloc[-1][column] > 100 and JDK_RS_momentum.iloc[-1][column] > 100:
-            members = load_index_members(column)
-            if len(members) ==0:
-                continue
-            df = load_members(column, members, date)
-            #print(df.head())
-            [ratio, momentum] = compute_jdk(benchmark=column, base_df = df)
-            save_scatter_plots(ratio, momentum, column)
-            if len(ratio) >0:
-                for col in ratio:
-                    if ratio.iloc[-1][col] > 100 and len(momentum) >0 and momentum.iloc[-1][col] > 100:
-                        print(f'{col} is leading [RS:{ratio.iloc[-1][col]} MOM:{momentum.iloc[-1][col]}]')
-                    elif ratio.iloc[-1][col] < 100 and len(momentum) >0 and momentum.iloc[-1][col] > 100:
-                        print(f'{col} is improving [RS:{ratio.iloc[-1][col]} MOM:{momentum.iloc[-1][col]}]')
-                    elif ratio.iloc[-1][col] < 100 and len(momentum) >0 and momentum.iloc[-1][col] < 100:
-                        print(f'{col} is weakening [RS:{ratio.iloc[-1][col]} MOM:{momentum.iloc[-1][col]}]')
-                    elif ratio.iloc[-1][col] > 100 and len(momentum) >0 and momentum.iloc[-1][col] < 100:
-                        print(f'{col} is lagging [RS:{ratio.iloc[-1][col]} MOM:{momentum.iloc[-1][col]}]')
-                    elif len(momentum)==0:
-                        print(f'{column} has NaN values')
-                    else:
-                        print(f'{col}')
-            else:
-                print(f'{column} has NaN values in ratio')
+        #if JDK_RS_ratio.iloc[-1][column] > 100 and JDK_RS_momentum.iloc[-1][column] > 100:
+        members = load_index_members(column)
+        if len(members) ==0:
+            continue
+        df = load_members(column, members, date)
+        #print(df.head())
+        [ratio, momentum] = compute_jdk(benchmark=column, base_df = df)
+        save_scatter_plots(ratio, momentum, column)
+        if len(ratio) >0:
+            for col in ratio:
+                if ratio.iloc[-1][col] > 100 and len(momentum) >0 and momentum.iloc[-1][col] > 100:
+                    print(f'{col} is leading [RS:{ratio.iloc[-1][col]} MOM:{momentum.iloc[-1][col]}]')
+                elif ratio.iloc[-1][col] < 100 and len(momentum) >0 and momentum.iloc[-1][col] > 100:
+                    print(f'{col} is improving [RS:{ratio.iloc[-1][col]} MOM:{momentum.iloc[-1][col]}]')
+                elif ratio.iloc[-1][col] < 100 and len(momentum) >0 and momentum.iloc[-1][col] < 100:
+                    print(f'{col} is weakening [RS:{ratio.iloc[-1][col]} MOM:{momentum.iloc[-1][col]}]')
+                elif ratio.iloc[-1][col] > 100 and len(momentum) >0 and momentum.iloc[-1][col] < 100:
+                    print(f'{col} is lagging [RS:{ratio.iloc[-1][col]} MOM:{momentum.iloc[-1][col]}]')
+                elif len(momentum)==0:
+                    print(f'{column} has NaN values')
+                else:
+                    print(f'{col}')
+        else:
+            print(f'{column} has NaN values in ratio')
                 
 if __name__ == "__main__":
     day = datetime.datetime.today()

@@ -1,5 +1,5 @@
 '''
-Created on 12-Apr-2022
+Created on 19-May-2022
 
 @author: anshul
 '''
@@ -19,6 +19,19 @@ from stocks.models import Listing, Stock
 from lib.retrieval import get_stock_listing
 from lib.patterns import detect_fractals, get_volume_signals, get_last_day_patterns, get_signals
 
+def rsi_scan(listing):
+    results = []
+    if listing.rsi[-1] < 30 and listing.rsi[-1] > 20:
+        results.append('Overbought')
+    elif listing.rsi[-1] <= 20:
+        results.append('Severely Overbought')
+    elif listing.rsi[-1] > 70 and listing.rsi[-1] < 80:
+        results.append('Oversold')
+    elif listing.rsi[-1] >= 80:
+        results.append('Severely Oversold')
+    
+    return results
+
 def do_stuff(stock, prefix='', date = None):
     if date is None:
         date = datetime.date.today()
@@ -35,36 +48,18 @@ def do_stuff(stock, prefix='', date = None):
     if datetime.date.today().weekday() in [5,6]: #If its saturday (5) or sunday (6)
         dateval = dateval - datetime.timedelta(days=abs(4-datetime.date.today().weekday()))
     #if listing.index[-1].date() != dateval.date():
-    if listing.index[-1].date() != dateval:
+    if listing.index[-1].date() != dateval.date():
         print('No data for {} on stock {}. Last date: {}'.format(dateval, stock, listing.index[-1].date()))
         return
     try:
-        patterns = get_last_day_patterns(listing)
-        signals = get_signals(listing)
-        vol_sigs = get_volume_signals(listing)
-        if len(patterns['bullish'])>0 or len(patterns['bearish'])>0:
-            print(f"{prefix}{stock.sid} \nBullish: {patterns['bullish']}\tBearish: {patterns['bearish']}")
-        else:
-            print(f"{prefix}{stock.sid}: No patterns")
-        if len(signals['proximity_short'])>0:
-            print(f"Bearish Proximity signals: {signals['proximity_short']}")
-        if len(signals['proximity_long'])>0:
-            print(f"Bullish Proximity signals: {signals['proximity_long']}")
-        if len(signals['price_crossover_short'])>0:
-            print(f"Bearish Crossover signals: {signals['price_crossover_short']}")
-        if len(signals['price_crossover_long'])>0:
-            print(f"Bullish Crossover signals: {signals['price_crossover_long']}")
-        for key in signals:
-            if key in ['volatility_expand', 'volatility_contract'] and signals[key] is not None:
-                print(f"{key}: {signals[key]}")
-        for key in vol_sigs:
-            if vol_sigs[key] is not None:
-                print(f"{key}: {vol_sigs[key]}")
+        result = rsi_scan(listing) 
+        if len(result) > 0:
+            print(f'{prefix}{stock.sid}:\n{result}')
     except:
         print(f'Exception occured in stock: {stock.sid}')
         traceback.print_exc()
 
-def main(stock_name=None, date=None):
+def main(stock_name=None, date=None, category = ''):
     #List of FnO stocks (where bullish and bearish signals are required)
     fno = []
     with open('fno.txt', 'r') as fd:
@@ -73,15 +68,16 @@ def main(stock_name=None, date=None):
     fno = sorted(fno)
     
     portfolio = []
-    with open('portfolio.txt', 'r') as fd:
-        for line in fd:
-            portfolio.append(line.strip())
-    portfolio = sorted(portfolio)
-    
     margin_stocks = []
-    with open('margin.txt', 'r') as fd:
-        for line in fd:
-            margin_stocks.append(line.strip())
+    if category != 'fno':
+        with open('portfolio.txt', 'r') as fd:
+            for line in fd:
+                portfolio.append(line.strip())
+        portfolio = sorted(portfolio)
+        
+        with open('margin.txt', 'r') as fd:
+            for line in fd:
+                margin_stocks.append(line.strip())
             
     if stock_name is None:
         for sname in fno:
@@ -90,21 +86,22 @@ def main(stock_name=None, date=None):
                 do_stuff(stock, prefix='[FnO]', date=date)
             except Stock.DoesNotExist:
                 print(f'{sname} name not present')
-        for sname in portfolio:
-            try:
-                stock = Stock.objects.get(sid=sname)
-                do_stuff(stock, prefix='[PF]', date=date)
-            except Stock.DoesNotExist:
-                print(f'{sname} name not present')
-        for stock in Stock.objects.all():
-            #listing = get_stock_listing(stock, duration=30, last_date = datetime.date(2020, 12, 31))
-            #print(stock)
-            if (stock.sid in fno) or (stock.sid in portfolio):
-                continue
-            if stock.sid in margin_stocks:
-                do_stuff(stock, prefix='[MG]', date=date)
-            else:
-                do_stuff(stock, date=date)
+        if category != 'fno':
+            for sname in portfolio:
+                try:
+                    stock = Stock.objects.get(sid=sname)
+                    do_stuff(stock, prefix='[PF]', date=date)
+                except Stock.DoesNotExist:
+                    print(f'{sname} name not present')
+            for stock in Stock.objects.all():
+                #listing = get_stock_listing(stock, duration=30, last_date = datetime.date(2020, 12, 31))
+                #print(stock)
+                if (stock.sid in fno) or (stock.sid in portfolio):
+                    continue
+                if stock.sid in margin_stocks:
+                    do_stuff(stock, prefix='[MG]', date=date)
+                else:
+                    do_stuff(stock, date=date)
     else:
         prefix = ''
         stock = Stock.objects.get(sid=stock_name)
@@ -121,9 +118,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Scan stock info')
     parser.add_argument('-s', '--stock', help="Stock code")
     parser.add_argument('-d', '--date', help="Date")
+    parser.add_argument('-f', '--fno', help="Scan FnO stocks only", action='store_true', default=False)
     args = parser.parse_args()
     stock_code = None
     day = None
+    
+    category = 'all'
     
     if args.stock is not None and len(args.stock)>0:
         print('Scan data for stock {}'.format(args.stock))
@@ -131,5 +131,8 @@ if __name__ == "__main__":
     if args.date is not None and len(args.date)>0:
         print('Scan data for date: {}'.format(args.date))
         day = datetime.datetime.strptime(args.date, "%d/%m/%y")
+    if args.fno is True:
+        category = 'fno'
     
-    main(stock_code, day)
+    print('Scan for {}'.format(category))
+    main(stock_code, day, category=category)

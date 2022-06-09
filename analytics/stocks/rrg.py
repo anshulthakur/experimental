@@ -115,6 +115,7 @@ def load_members(sector, members, date):
             s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume', 'delivery', 'trades'])
             #print(s_df.head())
             if len(s_df)==0:
+                print('Skip {}'.format(stock_obj))
                 continue
             s_df.rename(columns={'close': stock},
                        inplace = True)
@@ -130,19 +131,19 @@ def load_members(sector, members, date):
         except Stock.DoesNotExist:
             print(f'{stock} values do not exist')
     df = df[~df.index.duplicated(keep='first')]
+    
     return df
 
 def compute_jdk(benchmark = 'nifty50', base_df=None):
     #print(base_df.tail())
     df = base_df.copy(deep=True)
+    
     df.sort_values(by='date', inplace=True, ascending=True)
     #Calculate the 1-day Returns for the Indices
-    #print(df.head())
     df = df.pct_change(1)
     #print(df.tail())
     #Calculate the Indices' value on and Index-Base (100) considering the calculated returns
     df.iloc[0] = 100
-    
     for ticker in df.columns:
         for i in range(1, len(df[ticker])):
             df[ticker][i] = df[ticker][i-1]*(1+df[ticker][i])
@@ -151,17 +152,18 @@ def compute_jdk(benchmark = 'nifty50', base_df=None):
     benchmark_values = df[benchmark]
     #print(df.tail())
     df = df.drop(columns = benchmark)
-    
     #print(df.tail())
+    #print(len(df))
     #Calculate the relative Performance of the Index in relation to the Benchmark
     for ticker in df.columns:   
         df[ticker] = df[ticker]/benchmark_values - 1
-
+    
     #Normalize the Values considering a 14-days Window (Note: 10 weekdays)
-    for ticker in df.columns: 
+    for ticker in df.columns:
         df[ticker] = 100 + ((df[ticker] - df[ticker].rolling(10).mean())/df[ticker].rolling(10).std() + 1)
 
-    # Rouding and Exclusing NA's
+    # Rouding and Excluding NA's
+    #print(df.head())
     df = df.round(2).dropna()
     
     #print(df.tail())
@@ -208,7 +210,7 @@ def load_file_list(directory="./indices/"):
             file_list.append(f)
     return file_list
 
-def load_sectoral_indices():
+def load_sectoral_indices(date):
     from pathlib import Path
     df = pd.read_csv('./indices/nifty50.csv')
     df.rename(columns={'Date': 'date',
@@ -239,6 +241,8 @@ def load_sectoral_indices():
         #print(s_df[s_df.index.duplicated(keep=False)])
         df[index] = s_df[index]
     df = df[~df.index.duplicated(keep='first')]
+    if date is not None:
+        df = df[:date.strftime('%Y-%m-%d')]
     return df
 
 def load_index_members(name):
@@ -423,8 +427,8 @@ def save_scatter_plots(JDK_RS_ratio, JDK_RS_momentum, sector='unnamed'):
     
     
 
-def main():
-    df = load_sectoral_indices()
+def main(date=datetime.date.today()):
+    df = load_sectoral_indices(date)
     df.sort_values(by='date', inplace=True, ascending=True)
     #Calculate the 1-day Returns for the Indices
     df = df.pct_change(1)
@@ -653,7 +657,6 @@ def main():
     
     
     #Whichever sectors are leading, find the strongest stock in those
-    date = datetime.date.today()
     for column in JDK_RS_ratio.columns:
         #if JDK_RS_ratio.iloc[-1][column] > 100 and JDK_RS_momentum.iloc[-1][column] > 100:
         members = load_index_members(column)
@@ -681,10 +684,9 @@ def main():
             print(f'{column} has NaN values in ratio')
                 
 if __name__ == "__main__":
-    day = datetime.datetime.today()
+    day = datetime.date.today()
     import argparse
     parser = argparse.ArgumentParser(description='Compute RRG data for indices')
-    parser.add_argument('-r', '--report', help="Index report", action='store_true', default=False)
     parser.add_argument('-d', '--date', help="Date")
     #Can add options for weekly sampling and monthly sampling later
     args = parser.parse_args()
@@ -692,10 +694,7 @@ if __name__ == "__main__":
     
     if args.date is not None and len(args.date)>0:
         print('Get data for date: {}'.format(args.date))
-        day = datetime.strptime(args.date, "%d/%m/%y")
-    if args.report is True:
-        print('Download index report')
-        update_indices(date = day)
-    
-    main()
+        day = datetime.datetime.strptime(args.date, "%d/%m/%y")
+    pd.set_option("display.precision", 8)
+    main(date=day)
     

@@ -34,7 +34,7 @@ def rsi_scan(listing):
 
 def do_stuff(stock, prefix='', date = None):
     if date is None:
-        date = datetime.date.today()
+        date = datetime.datetime.now()
     listing = get_stock_listing(stock, duration=30, last_date = date, 
                                 studies={'daily': ['rsi', 'ema20', 'sma200'],})
                                          #'weekly':['rsi', 'ema20', 'ema10'],
@@ -119,6 +119,7 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--stock', help="Stock code")
     parser.add_argument('-d', '--date', help="Date")
     parser.add_argument('-f', '--fno', help="Scan FnO stocks only", action='store_true', default=False)
+    parser.add_argument('-c', '--category', help="Category:One of 'all', 'fno', 'margin', 'portfolio'")
     args = parser.parse_args()
     stock_code = None
     day = None
@@ -133,6 +134,8 @@ if __name__ == "__main__":
         day = datetime.datetime.strptime(args.date, "%d/%m/%y")
     if args.fno is True:
         category = 'fno'
-    
+    if args.category is not None:
+        category = args.category
+
     print('Scan for {}'.format(category))
     main(stock_code, day, category=category)

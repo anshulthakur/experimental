@@ -64,25 +64,30 @@ def do_stuff(stock, prefix='', date = None):
         print(f'Exception occured in stock: {stock.sid}')
         traceback.print_exc()
 
-def main(stock_name=None, date=None):
+def main(stock_name=None, date=None, category='all'):
     #List of FnO stocks (where bullish and bearish signals are required)
     fno = []
-    with open('fno.txt', 'r') as fd:
-        for line in fd:
-            fno.append(line.strip())
-    fno = sorted(fno)
-    
     portfolio = []
-    with open('portfolio.txt', 'r') as fd:
-        for line in fd:
-            portfolio.append(line.strip())
-    portfolio = sorted(portfolio)
-    
     margin_stocks = []
-    with open('margin.txt', 'r') as fd:
-        for line in fd:
-            margin_stocks.append(line.strip())
-            
+    
+    if category == 'fno' or category == 'all':
+        with open('fno.txt', 'r') as fd:
+            for line in fd:
+                fno.append(line.strip())
+        fno = sorted(fno)
+    
+    if category == 'portfolio' or category == 'all':
+        with open('portfolio.txt', 'r') as fd:
+            for line in fd:
+                portfolio.append(line.strip())
+        portfolio = sorted(portfolio)
+    
+    if category == 'margin' or category == 'all':
+        with open('margin.txt', 'r') as fd:
+            for line in fd:
+                margin_stocks.append(line.strip())
+        margin_stocks = sorted(margin_stocks)
+        
     if stock_name is None:
         for sname in fno:
             try:
@@ -96,15 +101,24 @@ def main(stock_name=None, date=None):
                 do_stuff(stock, prefix='[PF]', date=date)
             except Stock.DoesNotExist:
                 print(f'{sname} name not present')
-        for stock in Stock.objects.all():
-            #listing = get_stock_listing(stock, duration=30, last_date = datetime.date(2020, 12, 31))
-            #print(stock)
-            if (stock.sid in fno) or (stock.sid in portfolio):
-                continue
-            if stock.sid in margin_stocks:
+        
+        for sname in margin_stocks:
+            try:
+                stock = Stock.objects.get(sid=sname)
                 do_stuff(stock, prefix='[MG]', date=date)
-            else:
-                do_stuff(stock, date=date)
+            except Stock.DoesNotExist:
+                print(f'{sname} name not present')
+
+        if category=='all':
+            for stock in Stock.objects.all():
+                #listing = get_stock_listing(stock, duration=30, last_date = datetime.date(2020, 12, 31))
+                #print(stock)
+                if (stock.sid in fno) or (stock.sid in portfolio) or (stock.sid in margin_stocks):
+                    continue
+                if stock.sid in margin_stocks:
+                    do_stuff(stock, prefix='[MG]', date=date)
+                else:
+                    do_stuff(stock, date=date)
     else:
         prefix = ''
         stock = Stock.objects.get(sid=stock_name)
@@ -121,6 +135,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Scan stock info')
     parser.add_argument('-s', '--stock', help="Stock code")
     parser.add_argument('-d', '--date', help="Date")
+    parser.add_argument('-f', '--fno', help="Scan FnO stocks only", action='store_true', default=True)
+    parser.add_argument('-c', '--category', help="Category:One of 'all', 'fno', 'margin', 'portfolio'")
     args = parser.parse_args()
     stock_code = None
     day = None
@@ -131,5 +147,9 @@ if __name__ == "__main__":
     if args.date is not None and len(args.date)>0:
         print('Scan data for date: {}'.format(args.date))
         day = datetime.datetime.strptime(args.date, "%d/%m/%y")
+    if args.fno is True:
+        category = 'fno'
+    if args.category is not None:
+        category = args.category
     
-    main(stock_code, day)
+    main(stock_code, day, category)

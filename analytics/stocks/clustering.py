@@ -47,7 +47,7 @@ def get_stock_listing(stock):
 def get_stock_listing(stock):
     import datetime
     first_date = datetime.date(2020, 1, 1)
-    last_date = datetime.date(2020, 12, 31)
+    last_date = datetime.date(2022, 6, 15)
     listing = Listing.objects.filter(stock=stock, date__range=(first_date, last_date))
     df = read_frame(listing, fieldnames=['closing', 'date'], index_col='date')
     for column in df.columns:
@@ -73,7 +73,7 @@ def get_stock_listing(stock):
         df_weekly.rename(columns={"closing":stock.security}, inplace=True)
         df = df_weekly
     else:
-        df.rename(columns={"closing":stock.security}, inplace=True)
+        df.rename(columns={"closing":stock.sid}, inplace=True)
 
     #Optionally, filter out by date range
     #start_date = '2020-01-01'

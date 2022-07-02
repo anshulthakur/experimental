@@ -1,6 +1,13 @@
 from stocks.models import Industry, Market
 from django.db import models
 
+from random import randint
+
+class StockManager(models.Manager):
+    def random(self):
+        count = self.aggregate(count=models.Count('id'))['count']
+        random_index = randint(0, count - 1)
+        return self.all()[random_index]
 
 class Stock(models.Model):
     security = models.BigIntegerField(default=0)
@@ -25,6 +32,7 @@ class Stock(models.Model):
                                  null=True,
                                  default=None,
                                  on_delete = models.SET_NULL)
+    objects = StockManager()
     def __str__(self):
         return (self.name)
 

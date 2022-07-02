@@ -246,7 +246,7 @@ class TvDatafeed:
         options = Options()
 
         if self.__automatic_login:
-            #options.add_argument("--headless")
+            options.add_argument("--headless")
             logger.debug("edgedriver in headless mode")
 
         # options.add_argument("--start-maximized")

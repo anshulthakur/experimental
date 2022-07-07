@@ -379,16 +379,28 @@ class TvDatafeed:
             for xi in x:
                 xi = re.split("\[|:|,|\]", xi)
                 ts = datetime.datetime.fromtimestamp(float(xi[4]))
-                data.append(
-                    [
-                        ts,
-                        float(xi[5]),
-                        float(xi[6]),
-                        float(xi[7]),
-                        float(xi[8]),
-                        float(xi[9]),
-                    ]
-                )
+                if xi[9] not in ['}', '']:
+                    data.append(
+                        [
+                            ts,
+                            float(xi[5]),
+                            float(xi[6]),
+                            float(xi[7]),
+                            float(xi[8]),
+                            float(xi[9]),
+                        ]
+                    )
+                else:
+                    data.append(
+                        [
+                            ts,
+                            float(xi[5]),
+                            float(xi[6]),
+                            float(xi[7]),
+                            float(xi[8]),
+                            float(0),
+                        ]
+                    )
 
             data = pd.DataFrame(
                 data, columns=["datetime", "open", "high", "low", "close", "volume"]
@@ -397,6 +409,10 @@ class TvDatafeed:
             return data
         except AttributeError:
             logger.error("no data, please check the exchange and symbol")
+        except:
+            print(raw_data)
+            print(out)
+            print(xi)
 
     @staticmethod
     def __format_symbol(symbol, exchange, contract: int = None):

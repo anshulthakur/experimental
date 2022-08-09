@@ -38,6 +38,7 @@ from stocks.models import Listing, Stock
 
 import datetime
 from pandas.tseries.frequencies import to_offset
+
 def get_stock_listing(stock, duration=None, last_date = datetime.date.today(), studies=None, resample=False, monthly=False):
     requested_duration = duration
     if duration == None and studies==None:

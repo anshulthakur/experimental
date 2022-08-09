@@ -10,16 +10,8 @@ import shutil
 import string
 import time
 import pandas as pd
-from selenium import webdriver
-from selenium.webdriver.edge.service import Service
-from selenium.webdriver.edge.options import Options
-
-from selenium.webdriver.common.by import By
-
-
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
-
 from websocket import create_connection
+import requests
 import sys
 
 logger = logging.getLogger(__name__)
@@ -42,290 +34,60 @@ class Interval(enum.Enum):
 
 
 class TvDatafeed:
-    path = os.path.join(os.path.expanduser("~"), ".tv_datafeed/")
-    headers = json.dumps({"Origin": "https://data.tradingview.com"})
-
-    def __save_token(self, token):
-        tokenfile = os.path.join(self.path, "token")
-        contents = dict(
-            token=token,
-            date=self.token_date,
-            edgedriver_path=self.edgedriver_path,
-        )
-
-        with open(tokenfile, "wb") as f:
-            pickle.dump(contents, f)
-
-        logger.debug("auth saved")
-
-    def __load_token(self):
-        tokenfile = os.path.join(self.path, "token")
-        token = None
-        #print('Anshul::', tokenfile)
-        if os.path.exists(tokenfile):
-            with open(tokenfile, "rb") as f:
-                contents = pickle.load(f)
-                #print('Anshul::', contents)
-
-            if contents["token"] not in [
-                "unauthorized_user_token",
-                None,
-            ]:
-                token = contents["token"]
-                self.token_date = contents["date"]
-                logger.debug("auth loaded")
-
-            self.edgedriver_path = contents["edgedriver_path"]
-
-        return token
-
-    def __assert_dir(self):
-        if not os.path.exists(self.path):
-            os.mkdir(self.path)
-            if self.edgedriver_path is None:
-                if (
-                    input(
-                        "\n\ndo you want to install edgedriver automatically?? y/n\t"
-                    ).lower()
-                    == "y"
-                ):
-                    self.__install_edgedriver()
-
-            else:
-                self.__save_token(token=None)
-                logger.info(
-                    "will use specified edgedriver path, no to specify this path again"
-                )
-
-        if not os.path.exists(self.profile_dir):
-            os.mkdir(self.profile_dir)
-            logger.debug("created edge user dir")
-
-    def __install_edgedriver(self):
-
-        os.system("pip install edgedriver-autoinstaller")
-
-        import edgedriver_autoinstaller
-
-        path = edgedriver_autoinstaller.install(cwd=True)
-
-        if path is not None:
-            self.edgedriver_path = os.path.join(
-                self.path, "edgedriver" + (".exe" if ".exe" in path else "")
-            )
-            shutil.copy(path, self.edgedriver_path)
-            self.__save_token(token=None)
-
-            try:
-                time.sleep(1)
-                os.remove(path)
-            except:
-                logger.info(
-                    f"unable to remove file '{path}', you may want to remove it manually"
-                )
-
-        else:
-            logger.error(" unable to download edgedriver automatically.")
-
-    def clear_cache(self):
-
-        import shutil
-
-        shutil.rmtree(self.path)
-        logger.info("cache cleared")
+    sign_in_url = 'https://www.tradingview.com/accounts/signin/'
+    ws_headers = json.dumps({"Origin": "https://data.tradingview.com"})
+    signin_headers = {'Referer': 'https://www.tradingview.com'}
+    ws_timeout = 5
 
     def __init__(
         self,
-        username=None,
-        password=None,
-        edgedriver_path=None,
-        auto_login=True,
+        username: str = None,
+        password: str = None,
     ) -> None:
+        """Create TvDatafeed object
+
+        Args:
+            username (str, optional): tradingview username. Defaults to None.
+            password (str, optional): tradingview password. Defaults to None.
+        """
 
         self.ws_debug = False
-        self.__automatic_login = auto_login
-        self.edgedriver_path = edgedriver_path
-        self.profile_dir = os.path.join(self.path, "edge")
-        self.token_date = datetime.date.today() - datetime.timedelta(days=1)
-        self.__assert_dir()
 
-        token = None
-        token = self.auth(username, password)
+        self.token = self.__auth(username, password)
 
-        if token is None:
-            token = "unauthorized_user_token"
+        if self.token is None:
+            self.token = "unauthorized_user_token"
             logger.warning(
                 "you are using nologin method, data you access may be limited"
             )
 
-        self.token = token
         self.ws = None
         self.session = self.__generate_session()
         self.chart_session = self.__generate_chart_session()
 
-    def __login(self, username, password):
+    def __auth(self, username, password):
 
-        driver = self.__webdriver_init()
-
-        if not self.__automatic_login:
-            input()
+        if (username is None or password is None):
+            token = None
 
         else:
+            data = {"username": username,
+                    "password": password,
+                    "remember": "on"}
             try:
-                logger.debug("click sign in")
-                #print('click sign in')
-                driver.find_element(By.CLASS_NAME, "tv-header__user-menu-button").click()
-                time.sleep(1)
-                driver.find_element("xpath",
-                    '//*[@id="overlap-manager-root"]/div/span/div[1]/div/div/div[1]/div[2]/div'
-                ).click()
-
-                time.sleep(3)
-                logger.debug("click email")
-                embutton = driver.find_element(By.CLASS_NAME,
-                    "tv-signin-dialog__toggle-email"
-                )
-                embutton.click()
-                time.sleep(1)
-
-                logger.debug("entering credentials")
-                username_input = driver.find_element(By.NAME, "username")
-                username_input.send_keys(username)
-                password_input = driver.find_element(By.NAME, "password")
-                password_input.send_keys(password)
-
-                logger.debug("click login")
-                submit_button = driver.find_element(By.CLASS_NAME, "tv-button__loader")
-                submit_button.click()
-                time.sleep(2)
+                response = requests.post(
+                    url=self.sign_in_url, data=data, headers=self.signin_headers)
+                token = response.json()['user']['auth_token']
             except Exception as e:
-                logger.error(f"{e}, {e.args}")
-                logger.error(
-                    "automatic login failed\n Reinitialize tvdatafeed with auto_login=False "
-                )
-
-        return driver
-
-    def auth(self, username, password):
-        token = self.__load_token()
-
-        if (
-            token is None
-            and (username is None or password is None)
-            and self.__automatic_login
-        ):
-            pass
-
-        elif self.token_date == datetime.date.today():
-            pass
-
-        elif token is not None and (username is None or password is None):
-            driver = self.__webdriver_init()
-            if driver is not None:
-                token = self.__get_token(driver)
-                self.token_date = datetime.date.today()
-                self.__save_token(token)
-
-        else:
-            driver = self.__login(username, password)
-            if driver is not None:
-                token = self.__get_token(driver)
-                self.token_date = datetime.date.today()
-                self.__save_token(token)
-
-        return token
-
-    def __webdriver_init(self):
-        caps = DesiredCapabilities.EDGE
-
-        caps["ms:loggingPrefs"] = {"performance": "ALL"}
-        #caps["ms:edgeOptions"] = {"args": ["--no-sandbox", "--disable-dev-shm-usage"]}
-
-        logger.info("refreshing tradingview token using selenium")
-        logger.debug("launching edge")
-        options = Options()
-
-        if self.__automatic_login:
-            options.add_argument("--headless")
-            logger.debug("edgedriver in headless mode")
-
-        # options.add_argument("--start-maximized")
-        # options.add_argument("--disable-gpu")
-
-        # # special workaround for linux
-        # if sys.platform == "linux":
-        #     options.add_argument(
-        #         f'--user-data-dir={os.path.expanduser("~")}/snap/chromium/common/chromium/Default'
-        #     )
-        # # special workaround for macos. Credits "Ambooj"
-        # elif sys.platform == "darwin":
-        #     options.add_argument(
-        #         f'--user-data-dir={os.path.expanduser("~")}/Library/Application Support/Google/Chrome'
-        #     )
-        # else:
-        #options.add_argument(f"user-data-dir={self.profile_dir}")
-        driver = None
-        try:
-            if not self.__automatic_login:
-                print(
-                    "\n\n\nYou need to login manually\n\n Press 'enter' to open the browser "
-                )
-                input()
-                print(
-                    "opening browser. Press enter once logged in return back and press 'enter'. \n\nDO NOT CLOSE THE BROWSER"
-                )
-                time.sleep(5)
-            service = Service(verbose = False)
-            driver = webdriver.Edge(
-                service = service, capabilities=caps, options=options
-            )
-
-            logger.debug("opening https://in.tradingview.com ")
-            driver.set_window_size(1920, 1080)
-            driver.get("https://in.tradingview.com")
-            time.sleep(5)
-
-            return driver
-
-        except Exception as e:
-            print(e)
-            if driver is not None:
-                driver.quit()
-            logger.error(e)
-
-    @staticmethod
-    def __get_token(driver: webdriver.Edge):
-        driver.get("https://www.tradingview.com/chart/")
-
-        def process_browser_logs_for_network_events(logs):
-            for entry in logs:
-                log = json.loads(entry["message"])["message"]
-
-                if "Network.webSocketFrameSent" in log["method"]:
-                    if (
-                        "set_auth_token" in log["params"]["response"]["payloadData"]
-                        and "unauthorized_user_token"
-                        not in log["params"]["response"]["payloadData"]
-                    ):
-                        yield log
-
-        logs = driver.get_log("performance")
-        events = process_browser_logs_for_network_events(logs)
-        token = None
-        for event in events:
-            x = event
-            token = json.loads(x["params"]["response"]["payloadData"].split("~")[-1])[
-                "p"
-            ][0]
-
-        driver.quit()
+                logger.error('error while signin')
+                token = None
 
         return token
 
     def __create_connection(self):
         logging.debug("creating websocket connection")
         self.ws = create_connection(
-            "wss://data.tradingview.com/socket.io/websocket", headers=self.headers
+            "wss://data.tradingview.com/socket.io/websocket", headers=self.ws_headers, timeout=self.ws_timeout
         )
 
     @staticmethod
@@ -342,14 +104,16 @@ class TvDatafeed:
     def __generate_session():
         stringLength = 12
         letters = string.ascii_lowercase
-        random_string = "".join(random.choice(letters) for i in range(stringLength))
+        random_string = "".join(random.choice(letters)
+                                for i in range(stringLength))
         return "qs_" + random_string
 
     @staticmethod
     def __generate_chart_session():
         stringLength = 12
         letters = string.ascii_lowercase
-        random_string = "".join(random.choice(letters) for i in range(stringLength))
+        random_string = "".join(random.choice(letters)
+                                for i in range(stringLength))
         return "cs_" + random_string
 
     @staticmethod
@@ -375,44 +139,38 @@ class TvDatafeed:
             out = re.search('"s":\[(.+?)\}\]', raw_data).group(1)
             x = out.split(',{"')
             data = list()
+            volume_data = True
 
             for xi in x:
                 xi = re.split("\[|:|,|\]", xi)
                 ts = datetime.datetime.fromtimestamp(float(xi[4]))
-                if xi[9] not in ['}', '']:
-                    data.append(
-                        [
-                            ts,
-                            float(xi[5]),
-                            float(xi[6]),
-                            float(xi[7]),
-                            float(xi[8]),
-                            float(xi[9]),
-                        ]
-                    )
-                else:
-                    data.append(
-                        [
-                            ts,
-                            float(xi[5]),
-                            float(xi[6]),
-                            float(xi[7]),
-                            float(xi[8]),
-                            float(0),
-                        ]
-                    )
+
+                row = [ts]
+
+                for i in range(5, 10):
+
+                    # skip converting volume data if does not exists
+                    if not volume_data and i == 9:
+                        row.append(0.0)
+                        continue
+                    try:
+                        row.append(float(xi[i]))
+
+                    except ValueError:
+                        volume_data = False
+                        row.append(0.0)
+                        logger.debug('no volume data')
+
+                data.append(row)
 
             data = pd.DataFrame(
-                data, columns=["datetime", "open", "high", "low", "close", "volume"]
+                data, columns=["datetime", "open",
+                               "high", "low", "close", "volume"]
             ).set_index("datetime")
             data.insert(0, "symbol", value=symbol)
             return data
         except AttributeError:
             logger.error("no data, please check the exchange and symbol")
-        except:
-            print(raw_data)
-            print(out)
-            print(xi)
 
     @staticmethod
     def __format_symbol(symbol, exchange, contract: int = None):
@@ -494,7 +252,8 @@ class TvDatafeed:
         )
 
         self.__send_message(
-            "quote_add_symbols", [self.session, symbol, {"flags": ["force_permission"]}]
+            "quote_add_symbols", [self.session, symbol,
+                                  {"flags": ["force_permission"]}]
         )
         self.__send_message("quote_fast_symbols", [self.session, symbol])
 
@@ -514,7 +273,8 @@ class TvDatafeed:
             "create_series",
             [self.chart_session, "s1", "s1", "symbol_1", interval, n_bars],
         )
-        self.__send_message("switch_timezone", [self.chart_session, "exchange"])
+        self.__send_message("switch_timezone", [
+                            self.chart_session, "exchange"])
 
         raw_data = ""
 
@@ -536,17 +296,16 @@ class TvDatafeed:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     tv = TvDatafeed(
-         auto_login=True,
-         username="blasphemous_aesthete",
-         password="anshulthakur@123"
+            username='AnshulBot',
+            password='@nshulthakur123'
     )
-    #print(tv.get_hist("CRUDEOIL", "MCX", fut_contract=1))
-    #print(tv.get_hist("NIFTY", "NSE", fut_contract=1))
+    print(tv.get_hist("CRUDEOIL", "MCX", fut_contract=1))
+    print(tv.get_hist("NIFTY", "NSE", fut_contract=1))
     print(
         tv.get_hist(
             "EICHERMOT",
             "NSE",
-            interval=Interval.in_15_minute,
+            interval=Interval.in_1_hour,
             n_bars=500,
             extended_session=False,
         )

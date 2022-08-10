@@ -250,7 +250,7 @@ def main(stock_name=None, exchange = 'NSE', timeframe= '15m', date=None, categor
                 margin_stocks.append(line.strip())
     after = None
     if date is not None:
-        after = date.strftime('%Y-%m-%d 00:00:00')
+        after = date.strftime('%Y-%m-%d %H:%M:00')
         
     if stock_name is None:
         for sname in fno:
@@ -344,7 +344,14 @@ if __name__ == "__main__":
         stock_code = args.stock
     if args.date is not None and len(args.date)>0:
         print('Scan data for date: {}'.format(args.date))
-        day = datetime.datetime.strptime(args.date, "%d/%m/%y")
+        try:
+            day = datetime.datetime.strptime(args.date, "%d/%m/%y %H:%M")
+        except:
+            try:
+                day = datetime.datetime.strptime(args.date, "%d/%m/%y")
+            except:
+                print('Error parsing date')
+                day = None
     if args.exchange is not None and len(args.exchange)>0:
         exchange=args.exchange
     if args.timeframe is not None and len(args.timeframe)>0:

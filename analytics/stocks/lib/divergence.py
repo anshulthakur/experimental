@@ -56,3 +56,23 @@ def detect_divergence(df=None, indicator='RSI', after = datetime.datetime.today(
             #print(neg.tail())
             pass
     return [pos, neg]
+
+def is_diverging(df=None, indicator='RSI', after = datetime.datetime.today().strftime('%Y-%m-%d 00:00:00')):
+    method = ta.RSI
+    
+    ind_df = method(df.close, timeperiod=14)
+    ind_df.dropna(inplace=True)
+    
+    order = 1
+    close_highs = getPeaks(df, key='close', order=order)
+    close_lows = getValleys(df, key='close', order=order)
+    
+    ind_highs = getPeaks(ind_df, key=indicator.lower(), order=order)
+    ind_lows = getValleys(ind_df, key=indicator.lower(), order=order)
+    
+    if close_lows[-1] == 1 and (ind_lows[-1] == -1):
+        return 1
+    elif close_highs[-1] == 1 and (ind_highs[-1] == -1):
+        return -1
+    else:
+        return 0

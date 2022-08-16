@@ -120,25 +120,25 @@ def getLowerLows(data: np.array, order=5, K=2):
 
 def getHHIndex(data: np.array, order=5, K=2):
     extrema = getHigherHighs(data, order, K)
-    idx = np.array([i[-1] + order for i in extrema])
+    idx = np.array([i[-1] for i in extrema])
     return idx[np.where(idx < len(data))]
 
 
 def getLHIndex(data: np.array, order=5, K=2):
     extrema = getLowerHighs(data, order, K)
-    idx = np.array([i[-1] + order for i in extrema])
+    idx = np.array([i[-1] for i in extrema])
     return idx[np.where(idx < len(data))]
 
 
 def getLLIndex(data: np.array, order=5, K=2):
     extrema = getLowerLows(data, order, K)
-    idx = np.array([i[-1] + order for i in extrema])
+    idx = np.array([i[-1] for i in extrema])
     return idx[np.where(idx < len(data))]
 
 
 def getHLIndex(data: np.array, order=5, K=2):
     extrema = getHigherLows(data, order, K)
-    idx = np.array([i[-1] + order for i in extrema])
+    idx = np.array([i[-1] for i in extrema])
     return idx[np.where(idx < len(data))]
 
 

@@ -113,7 +113,7 @@ def convert_timeframe_to_quant(timeframe):
         print(f'Unknown timeframe {timeframe}')
         return Interval.in_15_minute
 
-def divergence_scan(symbol=None, exchange = 'NSE', timeframe= '1h', after=None):
+def divergence_scan(symbol=None, exchange = 'NSE', timeframe= convert_timeframe_to_quant('1h'), after=None):
     username = 'AnshulBot'
     password = '@nshulthakur123'
     

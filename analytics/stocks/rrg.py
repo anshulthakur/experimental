@@ -25,7 +25,8 @@ import talib
 from talib.abstract import *
 from talib import MA_Type
 
-plotpath = './indices/'
+from tvDatafeed_edge import TvDatafeed, Interval
+
 #Prepare to load stock data as pandas dataframe from source. In this case, prepare django
 import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'rest.settings')
@@ -39,6 +40,7 @@ from bokeh.plotting import figure
 from bokeh.io import show, save, output_file
 from bokeh.models import ColumnDataSource
 from bokeh.models.widgets import DataTable, TableColumn
+from pandas.tseries.frequencies import to_offset
 
 import holoviews as hv
 from holoviews import opts, dim
@@ -46,6 +48,95 @@ from holoviews import opts, dim
 import panel as pn
 
 import csv
+INDICES = ["Nifty_50",
+           "Nifty_Auto",
+           "Nifty_Next_50",
+           "Nifty_100",
+           "Nifty_200",
+           "Nifty_500",
+           "Nifty_Midcap_50",
+           "NIFTY_Midcap_100",
+           "NIFTY_Smallcap_100",
+           "Nifty_Bank",
+           "Nifty_Energy",
+           "Nifty_Financial_Services",
+           "Nifty_FMCG",
+           "Nifty_IT",
+           "Nifty_Media",
+           "Nifty_Metal",
+           "Nifty_MNC",
+           "Nifty_Pharma",
+           "Nifty_PSU_Bank",
+           "Nifty_Realty",
+           "Nifty_India_Consumption",
+           "Nifty_Commodities",
+           #"Nifty_Dividend_Opportunities_50",
+           "Nifty_Infrastructure",
+           "Nifty_PSE",
+           "Nifty_Services_Sector",
+           #"Nifty_Low_Volatility_50",
+           #"Nifty_Alpha_50",
+           #"Nifty_High_Beta_50",
+           "Nifty100_Equal_Weight",
+           "Nifty100_Liquid_15",
+           "Nifty_CPSE",
+           "Nifty50_Value_20",
+           "Nifty_Midcap_Liquid_15",
+           "Nifty_Growth_Sectors_15",
+           "NIFTY100_Quality_30",
+           "Nifty_Private_Bank",
+           "Nifty_Smallcap_250",
+           "Nifty_Smallcap_50",
+           "Nifty_MidSmallcap_400",
+           "Nifty_Midcap_150",
+           "Nifty_Midcap_Select",
+           "NIFTY_LargeMidcap_250",
+           "NIFTY_SME_EMERGE",
+           "Nifty_Oil_&_Gas",
+           "Nifty_Financial_Services_25_50",
+           "Nifty_Healthcare_Index",
+           "Nifty500_Multicap_50_25_25",
+           "Nifty_Microcap_250",
+           "Nifty_Total_Market",
+           "Nifty_India_Digital",
+           "Nifty_Mobility",
+           "Nifty_India_Defence",
+           "Nifty_Financial_Services_Ex_Bank",
+           "Nifty_Housing",
+           "Nifty_Transportation_&_Logistics",
+           "Nifty_MidSmall_Financial_Services",
+           "Nifty_MidSmall_Healthcare",
+           "Nifty_MidSmall_IT_&_Telecom",
+           "Nifty_Consumer_Durables",
+           "Nifty_Non_Cyclical_Consumer",
+           "Nifty200_Momentum_30",
+           "NIFTY100_Alpha_30",
+           "NIFTY500_Value_50",
+           "Nifty100_Low_Volatility_30",
+           "NIFTY_Alpha_Low_Volatility_30",
+           "NIFTY_Quality_Low_Volatility_30",
+           "NIFTY_Alpha_Quality_Low_Volatility_30",
+           "NIFTY_Alpha_Quality_Value_Low_Volatility_30",
+           "NIFTY200_Quality_30",
+           "NIFTY_Midcap150_Quality_50",
+           "Nifty_India_Manufacturing",
+           "Nifty200_Alpha_30",
+           "Nifty_Midcap150_Momentum_50",
+           "NIFTY50_Equal_Weight",
+           ]
+index_data_dir = './reports/'
+
+member_dir = './reports/members/'
+plotpath = index_data_dir+'plots/'
+
+tvfeed_instance = None
+
+def get_tvfeed_instance(username, password):
+    global tvfeed_instance
+    if tvfeed_instance is None:
+        tvfeed_instance = TvDatafeed(username, password)
+    return tvfeed_instance
+        
 MEMBER_MAP = {
     "auto":"ind_niftyautolist.csv",
     "healthcare":"ind_niftyhealthcarelist.csv",
@@ -75,6 +166,7 @@ MEMBER_MAP = {
     "finexbank":"ind_niftyfinancialservicesexbank_list.csv",
 }
 
+
 hv.extension('bokeh')
 
 # format price data
@@ -87,58 +179,145 @@ import csv
 
 from lib.retrieval import get_stock_listing
 
-def load_members(sector, members, date):
+def convert_timeframe_to_quant(timeframe):
+    if timeframe[-1].lower()=='m':
+        tf = int(timeframe[0:-1])
+        if tf in [1,3,5,15,30,45]:
+            return eval(f'Interval.in_{tf}_minute')
+        else:
+            return Interval.in_15_minute
+    elif timeframe[-1].lower()=='h':
+        tf = int(timeframe[0:-1])
+        if tf in [1,2,3,4]:
+            return eval(f'Interval.in_{tf}_hour')
+        else:
+            return Interval.in_1_hour
+    elif timeframe[-1].lower()=='d':
+        return Interval.in_daily
+    elif timeframe[-1].lower()=='w':
+        return Interval.in_weekly
+    elif timeframe[-1].lower()=='m':
+        return Interval.in_monthly
+    else:
+        print(f'Unknown timeframe {timeframe}')
+        return Interval.in_15_minute
+    
+def load_members(sector, members, date, sampling='w', entries=50, online=True):
     print('========================')
     print(f'Loading for {sector}')
     print('========================')
-    df = pd.read_csv(f'./indices/{sector}.csv')
-    df.rename(columns={'Date': 'date',
-                       'Close': sector},
+    
+    df = pd.read_csv(f'{index_data_dir}{sector}.csv')
+    df.rename(columns={'Index Date': 'date',
+                       'Closing Index Value': sector},
                inplace = True)
-    df['date'] = pd.to_datetime(df['date'], format='%d-%b-%Y', infer_datetime_format=True)
+    df['date'] = pd.to_datetime(df['date'], format='%d-%m-%Y')
     df.set_index('date', inplace = True)
     df = df.sort_index()
     df = df.reindex(columns = [sector])
-    #Truncate to last 30 days
-    df = df.iloc[-30:]
+    df = df[~df.index.duplicated(keep='first')]
+    
+    if date is not None:
+        df = df[:date.strftime('%Y-%m-%d')]
+    if sampling=='w':
+        #Resample weekly
+        logic = {}
+        for cols in df.columns:
+            if cols != 'date':
+                logic[cols] = 'last'
+        #Resample on weekly levels
+        df = df.resample('W').apply(logic)
+        #df = df.resample('W-FRI', closed='left').apply(logic)
+        df.index -= to_offset("6D")
+    #Truncate to last n days
+    df = df.iloc[-entries:]
     #print(date)
     start_date = df.index.values[0]
     #print(start_date, type(start_date))
     #print(np.datetime64(date))
     duration = np.datetime64(date)-start_date
     duration = duration.astype('timedelta64[D]')/np.timedelta64(1, 'D')
+    
+    username = 'AnshulBot'
+    password = '@nshulthakur123'
+    tv = None
+    interval = convert_timeframe_to_quant(sampling)
+    if online:
+        tv = get_tvfeed_instance(username, password)
     #print(duration, type(duration))
     for stock in members:
         try:
-            stock_obj = Stock.objects.get(sid=stock)
-            s_df = get_stock_listing(stock_obj, duration=duration, last_date = date)
-            s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume', 'delivery', 'trades'])
-            #print(s_df.head())
-            if len(s_df)==0:
-                print('Skip {}'.format(stock_obj))
-                continue
-            s_df.rename(columns={'close': stock},
-                       inplace = True)
-            s_df.reset_index(inplace = True)
-            s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%b-%Y', infer_datetime_format=True)
-            #s_df.drop_duplicates(inplace = True, subset='date')
-            s_df.set_index('date', inplace = True)
-            s_df = s_df.sort_index()
-            s_df = s_df.reindex(columns = [stock])
-            s_df = s_df[~s_df.index.duplicated(keep='first')]
-            #print(s_df[s_df.index.duplicated(keep=False)])
-            df[stock] = s_df[stock]
+            if not online:
+                stock_obj = Stock.objects.get(sid=stock)
+                s_df = get_stock_listing(stock_obj, duration=duration, last_date = date)
+                s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume', 'delivery', 'trades'])
+                #print(s_df.head())
+                if len(s_df)==0:
+                    print('Skip {}'.format(stock_obj))
+                    continue
+                s_df.rename(columns={'close': stock},
+                           inplace = True)
+                s_df.reset_index(inplace = True)
+                s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y')
+                #s_df.drop_duplicates(inplace = True, subset='date')
+                s_df.set_index('date', inplace = True)
+                s_df = s_df.sort_index()
+                s_df = s_df.reindex(columns = [stock])
+                s_df = s_df[~s_df.index.duplicated(keep='first')]
+                #print(s_df[s_df.index.duplicated(keep=False)])
+                df[stock] = s_df[stock]
+            else:
+                print(stock)
+                symbol = stock.strip().replace('&', '_')
+                symbol = symbol.replace('-', '_')
+                nse_map = {'UNITDSPR': 'MCDOWELL_N',
+                           'MOTHERSUMI': 'MSUMI'}
+                if symbol in nse_map:
+                    symbol = nse_map[symbol]
+                s_df = tv.get_hist(
+                            symbol,
+                            'NSE',
+                            interval=interval,
+                            n_bars=entries,
+                            extended_session=False,
+                        )
+                if s_df is None:
+                    print(f'Error fetching information on {symbol}')
+                else:
+                    s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume'])
+                    #print(s_df.head())
+                    if len(s_df)==0:
+                        print('Skip {}'.format(symbol))
+                        continue
+                    s_df.reset_index(inplace = True)
+                    s_df.rename(columns={'close': stock, 'datetime': 'date'},
+                               inplace = True)
+                    #print(s_df.columns)
+                    s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y')
+                    #s_df.drop_duplicates(inplace = True, subset='date')
+                    s_df.set_index('date', inplace = True)
+                    s_df = s_df.sort_index()
+                    s_df = s_df.reindex(columns = [stock])
+                    s_df = s_df[~s_df.index.duplicated(keep='first')]
+                    #print(s_df[s_df.index.duplicated(keep=False)])
+                    df[stock] = s_df[stock]
         except Stock.DoesNotExist:
             print(f'{stock} values do not exist')
     df = df[~df.index.duplicated(keep='first')]
     
     return df
 
-def compute_jdk(benchmark = 'nifty50', base_df=None):
-    #print(base_df.tail())
+def compute_jdk(benchmark = 'Nifty_50', base_df=None):
+    print(base_df.head(10))
     df = base_df.copy(deep=True)
     
     df.sort_values(by='date', inplace=True, ascending=True)
+    #Drop all columns which don't have a valid first row
+    for cols in df.columns:
+        #print(f'{cols}: {df[cols].isnull().sum()}')
+        if np.isnan(df[cols].iloc[0]):
+            print('Drop {}'.format(cols))
+            df = df.drop(columns = cols)
     #Calculate the 1-day Returns for the Indices
     df = df.pct_change(1)
     #print(df.tail())
@@ -172,7 +351,7 @@ def compute_jdk(benchmark = 'nifty50', base_df=None):
     JDK_RS_ratio = df.iloc[-25:]
     
     #Calculate the Momentum of the RS-ratio
-    JDK_RS_momentum = JDK_RS_ratio.pct_change(1)
+    JDK_RS_momentum = JDK_RS_ratio.pct_change(10)
     #Normalize the Values considering a 14-days Window (Note: 10 weekdays)
     for ticker in JDK_RS_momentum.columns: 
         JDK_RS_momentum[ticker] = 100 + ((JDK_RS_momentum[ticker] - JDK_RS_momentum[ticker].rolling(10).mean())/JDK_RS_momentum[ticker].rolling(10).std() + 1)
@@ -182,15 +361,15 @@ def compute_jdk(benchmark = 'nifty50', base_df=None):
     JDK_RS_momentum = JDK_RS_momentum.round(2).dropna()
     
     #Adjust DataFrames to be shown in Monthly terms
-    JDK_RS_ratio = JDK_RS_ratio.reset_index()
-    JDK_RS_ratio['date'] = pd.to_datetime(JDK_RS_ratio['date'], format='%Y-%m-%d')
-    JDK_RS_ratio = JDK_RS_ratio.set_index('date')
+    #JDK_RS_ratio = JDK_RS_ratio.reset_index()
+    #JDK_RS_ratio['date'] = pd.to_datetime(JDK_RS_ratio['date'], format='%Y-%m-%d')
+    #JDK_RS_ratio = JDK_RS_ratio.set_index('date')
     #JDK_RS_ratio = JDK_RS_ratio.resample('M').ffill()
 
     #... now for JDK_RS Momentum
-    JDK_RS_momentum = JDK_RS_momentum.reset_index()
-    JDK_RS_momentum['date'] = pd.to_datetime(JDK_RS_momentum['date'], format='%Y-%m-%d')
-    JDK_RS_momentum = JDK_RS_momentum.set_index('date')
+    #JDK_RS_momentum = JDK_RS_momentum.reset_index()
+    #JDK_RS_momentum['date'] = pd.to_datetime(JDK_RS_momentum['date'], format='%Y-%m-%d')
+    #JDK_RS_momentum = JDK_RS_momentum.set_index('date')
     #JDK_RS_momentum = JDK_RS_momentum.resample('M').ffill()
     
     #print('JDK')
@@ -210,29 +389,30 @@ def load_file_list(directory="./indices/"):
             file_list.append(f)
     return file_list
 
-def load_sectoral_indices(date):
+def load_sectoral_indices(date, sampling, entries=50):
     from pathlib import Path
-    df = pd.read_csv('./indices/nifty50.csv')
-    df.rename(columns={'Date': 'date',
-                       'Close': 'nifty50'},
+    df = pd.read_csv(index_data_dir+'Nifty_50.csv')
+    df.rename(columns={'Index Date': 'date',
+                       'Closing Index Value': 'Nifty_50'},
                inplace = True)
-    df['date'] = pd.to_datetime(df['date'], format='%d-%b-%Y', infer_datetime_format=True)
+    df['date'] = pd.to_datetime(df['date'], format='%d-%m-%Y')
     df.set_index('date', inplace = True)
     df = df.sort_index()
-    df = df.reindex(columns = ['nifty50'])
-    filelist = load_file_list()
+    df = df.reindex(columns = ['Nifty_50'])
+    #filelist = load_file_list()
 
     #print(df.head())
-    for f in filelist:
-        print('Reading: {}'.format(f))
-        index = Path(f).stem.strip().lower()
-        if index == "nifty50":
+    for index in INDICES:
+        f = '{}{}.csv'.format(index_data_dir, index)
+        #print('Reading: {}'.format(f))
+        #index = Path(f).stem.strip().lower()
+        if index == "Nifty_50":
             continue
         s_df = pd.read_csv(f)
-        s_df.rename(columns={'Date': 'date',
-                             'Close': index},
+        s_df.rename(columns={'Index Date': 'date',
+                             'Closing Index Value': index},
                    inplace = True)
-        s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%b-%Y', infer_datetime_format=True)
+        s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y')
         #s_df.drop_duplicates(inplace = True, subset='date')
         s_df.set_index('date', inplace = True)
         s_df = s_df.sort_index()
@@ -243,14 +423,25 @@ def load_sectoral_indices(date):
     df = df[~df.index.duplicated(keep='first')]
     if date is not None:
         df = df[:date.strftime('%Y-%m-%d')]
-    return df
+    if sampling=='w':
+        #Resample weekly
+        logic = {}
+        for cols in df.columns:
+            if cols != 'date':
+                logic[cols] = 'last'
+        #Resample on weekly levels
+        df = df.resample('W').apply(logic)
+        #df = df.resample('W-FRI', closed='left').apply(logic)
+        df.index -= to_offset("6D")
+    return df.tail(entries)
 
 def load_index_members(name):
     members = []
-    if name not in MEMBER_MAP:
+    if name not in INDICES:#MEMBER_MAP:
         print(f'{name} not in list')
         return members
-    with open('./indices/members/'+MEMBER_MAP[name], 'r', newline='') as csvfile:
+    #with open('./indices/members/'+MEMBER_MAP[name], 'r', newline='') as csvfile:
+    with open(f'{member_dir}{name}.csv', 'r', newline='') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             members.append(row['Symbol'].strip())
@@ -427,12 +618,20 @@ def save_scatter_plots(JDK_RS_ratio, JDK_RS_momentum, sector='unnamed'):
     
     
 
-def main(date=datetime.date.today()):
-    df = load_sectoral_indices(date)
+def main(date=datetime.date.today(), sampling = 'w', online=True):
+    df = load_sectoral_indices(date, sampling, entries=33)
     df.sort_values(by='date', inplace=True, ascending=True)
-    #Calculate the 1-day Returns for the Indices
+    
+    #Drop all columns which don't have a valid first row
+    for cols in df.columns:
+        #print(f'{cols}: {df[cols].isnull().sum()}')
+        if np.isnan(df[cols].iloc[0]):
+            print('Drop {}'.format(cols))
+            df = df.drop(columns = cols)
+    #Calculate the 1-period Returns for the Indices
     df = df.pct_change(1)
     
+    #print(df.head(5))
     #Calculate the Indices' value on and Index-Base (100) considering the calculated returns
     df.iloc[0] = 100
     for ticker in df.columns:
@@ -440,21 +639,23 @@ def main(date=datetime.date.today()):
             df[ticker][i] = df[ticker][i-1]*(1+df[ticker][i])
             
     #Define the Index for comparison (Benchamrk Index): Nifty50
-    benchmark = 'nifty50'
+    benchmark = 'Nifty_50'
     benchmark_values = df[benchmark]
     
     df = df.drop(columns = benchmark)
     
+    #print(df.columns)
     #Calculate the relative Performance of the Index in relation to the Benchmark
     for ticker in df.columns:   
         df[ticker] = df[ticker]/benchmark_values - 1
-    
+    #print(df.head(50))
     #Normalize the Values considering a 14-days Window (Note: 10 weekdays)
     for ticker in df.columns: 
         df[ticker] = 100 + ((df[ticker] - df[ticker].rolling(10).mean())/df[ticker].rolling(10).std() + 1)
-        
+    
     # Rouding and Exclusing NA's
     df = df.round(2).dropna()
+    #print(df.head(50))
     
     #Compute on the last few dates only (last 5 days)
     JDK_RS_ratio = df.iloc[-25:]
@@ -469,16 +670,17 @@ def main(date=datetime.date.today()):
     # Rounding and Excluding NA's
     JDK_RS_momentum = JDK_RS_momentum.round(2).dropna()
     
+    #print(JDK_RS_momentum.tail(20))
     #Adjust DataFrames to be shown in Monthly terms
-    JDK_RS_ratio = JDK_RS_ratio.reset_index()
-    JDK_RS_ratio['date'] = pd.to_datetime(JDK_RS_ratio['date'], format='%Y-%m-%d')
-    JDK_RS_ratio = JDK_RS_ratio.set_index('date')
+    #JDK_RS_ratio = JDK_RS_ratio.reset_index()
+    #JDK_RS_ratio['date'] = pd.to_datetime(JDK_RS_ratio['date'], format='%Y-%m-%d')
+    #JDK_RS_ratio = JDK_RS_ratio.set_index('date')
     #JDK_RS_ratio = JDK_RS_ratio.resample('M').ffill()
     
     #... now for JDK_RS Momentum
-    JDK_RS_momentum = JDK_RS_momentum.reset_index()
-    JDK_RS_momentum['date'] = pd.to_datetime(JDK_RS_momentum['date'], format='%Y-%m-%d')
-    JDK_RS_momentum = JDK_RS_momentum.set_index('date')
+    #JDK_RS_momentum = JDK_RS_momentum.reset_index()
+    #JDK_RS_momentum['date'] = pd.to_datetime(JDK_RS_momentum['date'], format='%Y-%m-%d')
+    #JDK_RS_momentum = JDK_RS_momentum.set_index('date')
     #JDK_RS_momentum = JDK_RS_momentum.resample('M').ffill()
     
     # Create the DataFrames for Creating the ScaterPlots
@@ -653,6 +855,7 @@ def main(date=datetime.date.today()):
     p = pn.panel(dmap)
     p.save(plotpath+'ScatterPlot_Multiple_Period.html', embed = True) 
     
+    #return
     #Sector level RRGs
     
     
@@ -662,7 +865,7 @@ def main(date=datetime.date.today()):
         members = load_index_members(column)
         if len(members) ==0:
             continue
-        df = load_members(column, members, date)
+        df = load_members(sector=column, members=members, date=date, sampling=sampling, entries=33, online=online)
         #print(df.head())
         [ratio, momentum] = compute_jdk(benchmark=column, base_df = df)
         save_scatter_plots(ratio, momentum, column)
@@ -687,14 +890,20 @@ if __name__ == "__main__":
     day = datetime.date.today()
     import argparse
     parser = argparse.ArgumentParser(description='Compute RRG data for indices')
-    parser.add_argument('-d', '--date', help="Date")
+    parser.add_argument('-d', '--daily', action='store_true', default = False, help="Compute RRG on daily TF")
+    parser.add_argument('-w', '--weekly', action='store_true', default = True, help="Compute RRG on weekly TF")
+    parser.add_argument('-o', '--online', action='store_true', default = True, help="Compute RRG on weekly TF")
+    parser.add_argument('-f', '--for', dest='date', help="Compute RRG for date")
     #Can add options for weekly sampling and monthly sampling later
     args = parser.parse_args()
     stock_code = None
-    
+    sampling = 'w'
+    if args.daily:
+        sampling='d'
     if args.date is not None and len(args.date)>0:
         print('Get data for date: {}'.format(args.date))
         day = datetime.datetime.strptime(args.date, "%d/%m/%y")
+    
     pd.set_option("display.precision", 8)
-    main(date=day)
+    main(date=day, sampling=sampling, online=args.online)
     

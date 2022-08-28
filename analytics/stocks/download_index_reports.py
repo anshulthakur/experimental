@@ -18,7 +18,7 @@ fields = ['Index Name', 'Index Date', 'Open Index Value',
               'High Index Value', 'Low Index Value', 'Closing Index Value',
               'Points Change', 'Change(%)', 'Volume', 'Turnover (Rs. Cr.)',
               'P/E', 'P/B', 'Div Yield']
-replacement_symbols = ['-', '/', ' ', ':', '(', ')']
+replacement_symbols = ['-', '/', ' ', ':', '(', ')', '%']
 
 def download_daily_data(day):
     import os.path

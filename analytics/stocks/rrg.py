@@ -231,6 +231,7 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
         df.index -= to_offset("6D")
     #Truncate to last n days
     df = df.iloc[-entries:]
+    #print(df.head(10))
     #print(date)
     start_date = df.index.values[0]
     #print(start_date, type(start_date))
@@ -293,22 +294,25 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
                     s_df.rename(columns={'close': stock, 'datetime': 'date'},
                                inplace = True)
                     #print(s_df.columns)
-                    s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y')
+                    #pd.to_datetime(df['DateTime']).dt.date
+                    s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y').dt.date
                     #s_df.drop_duplicates(inplace = True, subset='date')
                     s_df.set_index('date', inplace = True)
                     s_df = s_df.sort_index()
                     s_df = s_df.reindex(columns = [stock])
                     s_df = s_df[~s_df.index.duplicated(keep='first')]
+                    #print(s_df.head(10))
                     #print(s_df[s_df.index.duplicated(keep=False)])
                     df[stock] = s_df[stock]
         except Stock.DoesNotExist:
             print(f'{stock} values do not exist')
     df = df[~df.index.duplicated(keep='first')]
     
+    #print(df.head(10))
     return df
 
 def compute_jdk(benchmark = 'Nifty_50', base_df=None):
-    print(base_df.head(10))
+    #print(base_df.head(10))
     df = base_df.copy(deep=True)
     
     df.sort_values(by='date', inplace=True, ascending=True)
@@ -892,7 +896,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Compute RRG data for indices')
     parser.add_argument('-d', '--daily', action='store_true', default = False, help="Compute RRG on daily TF")
     parser.add_argument('-w', '--weekly', action='store_true', default = True, help="Compute RRG on weekly TF")
-    parser.add_argument('-o', '--online', action='store_true', default = True, help="Compute RRG on weekly TF")
+    parser.add_argument('-o', '--online', action='store_false', default = True, help="Compute RRG on weekly TF")
     parser.add_argument('-f', '--for', dest='date', help="Compute RRG for date")
     #Can add options for weekly sampling and monthly sampling later
     args = parser.parse_args()

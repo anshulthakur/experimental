@@ -124,12 +124,48 @@ INDICES = ["Nifty_50",
            "Nifty_Midcap150_Momentum_50",
            "NIFTY50_Equal_Weight",
            ]
-index_data_dir = './reports/'
 
+index_data_dir = './reports/'
 member_dir = './reports/members/'
 plotpath = index_data_dir+'plots/'
 
 tvfeed_instance = None
+
+def load_progress():
+    import json
+    progress_file = '.progress.json'
+    
+    try:
+        with open(progress_file, 'r') as fd:
+            progress = json.load(fd)
+            try:
+                date = datetime.datetime.strptime(progress['date'], '%d-%m-%Y')
+                if date.day == datetime.datetime.today().day and \
+                    date.month == datetime.datetime.today().month and \
+                    date.year == datetime.datetime.today().year:
+                    return progress['index']
+            except:
+                #Doesn't look like a proper date time
+                pass
+    except:
+        pass
+    
+    return []
+
+def save_progress(index):
+    import json
+    progress_file = '.progress.json'
+    
+    processed = load_progress()
+    if len(processed) == 0:
+        processed = [index]
+    else:
+        processed.append(index)
+    with open(progress_file, 'w') as fd:
+            fd.write(json.dumps({'date':datetime.datetime.today().strftime('%d-%m-%Y'),
+                                 'index': processed}))
+    return
+
 
 def get_tvfeed_instance(username, password):
     global tvfeed_instance
@@ -635,6 +671,8 @@ def save_scatter_plots(JDK_RS_ratio, JDK_RS_momentum, sector='unnamed'):
     
 
 def main(date=datetime.date.today(), sampling = 'w', online=True):
+    processed = load_progress()
+    
     df = load_sectoral_indices(date, sampling, entries=33)
     df.sort_values(by='date', inplace=True, ascending=True)
     
@@ -878,6 +916,8 @@ def main(date=datetime.date.today(), sampling = 'w', online=True):
     #Whichever sectors are leading, find the strongest stock in those
     for column in JDK_RS_ratio.columns:
         #if JDK_RS_ratio.iloc[-1][column] > 100 and JDK_RS_momentum.iloc[-1][column] > 100:
+        if column in processed:
+            print(f'Skip {column}. Already processed for the day')
         members = load_index_members(column)
         if len(members) ==0:
             continue
@@ -901,6 +941,7 @@ def main(date=datetime.date.today(), sampling = 'w', online=True):
                     print(f'{col}')
         else:
             print(f'{column} has NaN values in ratio')
+        save_progress(column)
                 
 if __name__ == "__main__":
     day = datetime.date.today()

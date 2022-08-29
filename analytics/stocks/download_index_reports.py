@@ -80,7 +80,7 @@ def update_daily_data(day):
     filepath = download_path+'ind_close_all_{date}.csv'.format(date=day.strftime("%d%m%Y"))
     reports = {}
     
-    with open(filepath, 'a') as csvfile:
+    with open(filepath, 'r') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             index = row['Index Name'].strip()
@@ -92,7 +92,6 @@ def update_daily_data(day):
     for index in reports:
         with open(index_files_path+index+'.csv', 'a') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fields)
-            writer.writeheader()
             for r in reports[index]:
                 writer.writerow(r)
 

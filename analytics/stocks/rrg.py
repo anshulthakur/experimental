@@ -50,13 +50,6 @@ import panel as pn
 import csv
 INDICES = ["Nifty_50",
            "Nifty_Auto",
-           "Nifty_Next_50",
-           "Nifty_100",
-           "Nifty_200",
-           "Nifty_500",
-           "Nifty_Midcap_50",
-           "NIFTY_Midcap_100",
-           "NIFTY_Smallcap_100",
            "Nifty_Bank",
            "Nifty_Energy",
            "Nifty_Financial_Services",
@@ -70,33 +63,13 @@ INDICES = ["Nifty_50",
            "Nifty_Realty",
            "Nifty_India_Consumption",
            "Nifty_Commodities",
-           #"Nifty_Dividend_Opportunities_50",
            "Nifty_Infrastructure",
            "Nifty_PSE",
            "Nifty_Services_Sector",
-           #"Nifty_Low_Volatility_50",
-           #"Nifty_Alpha_50",
-           #"Nifty_High_Beta_50",
-           "Nifty100_Equal_Weight",
-           "Nifty100_Liquid_15",
-           "Nifty_CPSE",
-           "Nifty50_Value_20",
-           "Nifty_Midcap_Liquid_15",
            "Nifty_Growth_Sectors_15",
-           "NIFTY100_Quality_30",
-           "Nifty_Private_Bank",
-           "Nifty_Smallcap_250",
-           "Nifty_Smallcap_50",
-           "Nifty_MidSmallcap_400",
-           "Nifty_Midcap_150",
-           "Nifty_Midcap_Select",
-           "NIFTY_LargeMidcap_250",
            "NIFTY_SME_EMERGE",
            "Nifty_Oil_&_Gas",
-           "Nifty_Financial_Services_25_50",
            "Nifty_Healthcare_Index",
-           "Nifty500_Multicap_50_25_25",
-           "Nifty_Microcap_250",
            "Nifty_Total_Market",
            "Nifty_India_Digital",
            "Nifty_Mobility",
@@ -109,6 +82,34 @@ INDICES = ["Nifty_50",
            "Nifty_MidSmall_IT_&_Telecom",
            "Nifty_Consumer_Durables",
            "Nifty_Non_Cyclical_Consumer",
+           "Nifty_India_Manufacturing",
+           "Nifty_Next_50",
+           "Nifty_100",
+           "Nifty_200",
+           "Nifty_500",
+           "Nifty_Midcap_50",
+           "NIFTY_Midcap_100",
+           "NIFTY_Smallcap_100",
+           #"Nifty_Dividend_Opportunities_50",
+           #"Nifty_Low_Volatility_50",
+           #"Nifty_Alpha_50",
+           #"Nifty_High_Beta_50",
+           "Nifty100_Equal_Weight",
+           "Nifty100_Liquid_15",
+           "Nifty_CPSE",
+           "Nifty50_Value_20",
+           "Nifty_Midcap_Liquid_15",
+           "NIFTY100_Quality_30",
+           "Nifty_Private_Bank",
+           "Nifty_Smallcap_250",
+           "Nifty_Smallcap_50",
+           "Nifty_MidSmallcap_400",
+           "Nifty_Midcap_150",
+           "Nifty_Midcap_Select",
+           "NIFTY_LargeMidcap_250",
+           "Nifty_Financial_Services_25_50",
+           "Nifty500_Multicap_50_25_25",
+           "Nifty_Microcap_250",
            "Nifty200_Momentum_30",
            "NIFTY100_Alpha_30",
            "NIFTY500_Value_50",
@@ -119,7 +120,6 @@ INDICES = ["Nifty_50",
            "NIFTY_Alpha_Quality_Value_Low_Volatility_30",
            "NIFTY200_Quality_30",
            "NIFTY_Midcap150_Quality_50",
-           "Nifty_India_Manufacturing",
            "Nifty200_Alpha_30",
            "Nifty_Midcap150_Momentum_50",
            "NIFTY50_Equal_Weight",
@@ -672,252 +672,34 @@ def save_scatter_plots(JDK_RS_ratio, JDK_RS_momentum, sector='unnamed'):
 
 def main(date=datetime.date.today(), sampling = 'w', online=True):
     processed = load_progress()
-    
+    #print(processed)
     df = load_sectoral_indices(date, sampling, entries=33)
-    df.sort_values(by='date', inplace=True, ascending=True)
-    
-    #Drop all columns which don't have a valid first row
-    for cols in df.columns:
-        #print(f'{cols}: {df[cols].isnull().sum()}')
-        if np.isnan(df[cols].iloc[0]):
-            print('Drop {}'.format(cols))
-            df = df.drop(columns = cols)
-    #Calculate the 1-period Returns for the Indices
-    df = df.pct_change(1)
-    
-    #print(df.head(5))
-    #Calculate the Indices' value on and Index-Base (100) considering the calculated returns
-    df.iloc[0] = 100
-    for ticker in df.columns:
-        for i in range(1, len(df[ticker])):
-            df[ticker][i] = df[ticker][i-1]*(1+df[ticker][i])
-            
-    #Define the Index for comparison (Benchamrk Index): Nifty50
     benchmark = 'Nifty_50'
-    benchmark_values = df[benchmark]
-    
-    df = df.drop(columns = benchmark)
-    
-    #print(df.columns)
-    #Calculate the relative Performance of the Index in relation to the Benchmark
-    for ticker in df.columns:   
-        df[ticker] = df[ticker]/benchmark_values - 1
-    #print(df.head(50))
-    #Normalize the Values considering a 14-days Window (Note: 10 weekdays)
-    for ticker in df.columns: 
-        df[ticker] = 100 + ((df[ticker] - df[ticker].rolling(10).mean())/df[ticker].rolling(10).std() + 1)
-    
-    # Rouding and Exclusing NA's
-    df = df.round(2).dropna()
-    #print(df.head(50))
-    
-    #Compute on the last few dates only (last 5 days)
-    JDK_RS_ratio = df.iloc[-25:]
-    
-    #Calculate the Momentum of the RS-ratio
-    JDK_RS_momentum = JDK_RS_ratio.pct_change(10)
-    
-    #Normalize the Values considering a 14-days Window (Note: 10 weekdays)
-    for ticker in JDK_RS_momentum.columns: 
-        JDK_RS_momentum[ticker] = 100 + ((JDK_RS_momentum[ticker] - JDK_RS_momentum[ticker].rolling(10).mean())/JDK_RS_momentum[ticker].rolling(10).std() + 1)
-    
-    # Rounding and Excluding NA's
-    JDK_RS_momentum = JDK_RS_momentum.round(2).dropna()
-    
-    #print(JDK_RS_momentum.tail(20))
-    #Adjust DataFrames to be shown in Monthly terms
-    #JDK_RS_ratio = JDK_RS_ratio.reset_index()
-    #JDK_RS_ratio['date'] = pd.to_datetime(JDK_RS_ratio['date'], format='%Y-%m-%d')
-    #JDK_RS_ratio = JDK_RS_ratio.set_index('date')
-    #JDK_RS_ratio = JDK_RS_ratio.resample('M').ffill()
-    
-    #... now for JDK_RS Momentum
-    #JDK_RS_momentum = JDK_RS_momentum.reset_index()
-    #JDK_RS_momentum['date'] = pd.to_datetime(JDK_RS_momentum['date'], format='%Y-%m-%d')
-    #JDK_RS_momentum = JDK_RS_momentum.set_index('date')
-    #JDK_RS_momentum = JDK_RS_momentum.resample('M').ffill()
-    
-    # Create the DataFrames for Creating the ScaterPlots
-    #Create a Sub-Header to the DataFrame: 'JDK_RS_ratio' -> As later both RS_ratio and RS_momentum will be joint
-    JDK_RS_ratio_subheader = pd.DataFrame(np.zeros((1,JDK_RS_ratio.columns.shape[0])),columns=JDK_RS_ratio.columns)
-    JDK_RS_ratio_subheader.iloc[0] = 'JDK_RS_ratio'
-    
-    JDK_RS_ratio_total = pd.concat([JDK_RS_ratio_subheader, JDK_RS_ratio], axis=0)
-    
-    #... same for JDK_RS Momentum
-    JDK_RS_momentum_subheader = pd.DataFrame(np.zeros((1,JDK_RS_momentum.columns.shape[0])),columns=JDK_RS_momentum.columns)
-    JDK_RS_momentum_subheader.iloc[0] = 'JDK_RS_momentum'
-    
-    JDK_RS_momentum_total = pd.concat([JDK_RS_momentum_subheader, JDK_RS_momentum], axis=0)
-    
-    #Join both DataFrames
-    RRG_df = pd.concat([JDK_RS_ratio_total, JDK_RS_momentum_total], axis=1, sort=True)
-    RRG_df = RRG_df.sort_index(axis=1)
-    
-    
-    #Create a DataFrame Just with the Last Period Metrics for Plotting the Scatter plot
-    ##Reduce JDK_RS_ratio to 1 (Last) Period
-    JDK_RS_ratio_1P = pd.DataFrame(JDK_RS_ratio.iloc[-1].transpose())
-    JDK_RS_ratio_1P = JDK_RS_ratio_1P.rename(columns= {JDK_RS_ratio_1P.columns[0]: 'JDK_RS_ratio'})
-    
-    ##Reduce JDK_RS_momentum to 1 (Last) Period
-    JDK_RS_momentum_1P = pd.DataFrame(JDK_RS_momentum.iloc[-1].transpose())
-    JDK_RS_momentum_1P = JDK_RS_momentum_1P.rename(columns= {JDK_RS_momentum_1P.columns[0]: 'JDK_RS_momentum'})
-    
-    #Joining the 2 Dataframes
-    JDK_RS_1P = pd.concat([JDK_RS_ratio_1P,JDK_RS_momentum_1P], axis=1)
-    
-    ##Reset the Index so the Index's names are in the Scatter
-    JDK_RS_1P = JDK_RS_1P.reset_index() 
-    order = [1,2,0] # setting column's order
-    JDK_RS_1P = JDK_RS_1P[[JDK_RS_1P.columns[i] for i in order]]
-    
-    ##Create a New Column with the Quadrants Indication
-    JDK_RS_1P['Quadrant'] = JDK_RS_1P['index']
-    for row in JDK_RS_1P['Quadrant'].index:
-        if JDK_RS_1P['JDK_RS_ratio'][row] > 100 and JDK_RS_1P['JDK_RS_momentum'][row] > 100:
-            JDK_RS_1P['Quadrant'][row] = 'Leading'
-        elif JDK_RS_1P['JDK_RS_ratio'][row] > 100 and JDK_RS_1P['JDK_RS_momentum'][row] < 100:
-            JDK_RS_1P['Quadrant'][row] = 'Lagging'
-        elif JDK_RS_1P['JDK_RS_ratio'][row] < 100 and JDK_RS_1P['JDK_RS_momentum'][row] < 100:
-            JDK_RS_1P['Quadrant'][row] = 'Weakening'
-        elif JDK_RS_1P['JDK_RS_ratio'][row] < 100 and JDK_RS_1P['JDK_RS_momentum'][row] > 100:
-            JDK_RS_1P['Quadrant'][row] = 'Improving'
-            
-    #Scatter Plot
-    #scatter = hv.Scatter(JDK_RS_1P, kdims = ['JDK_RS_ratio', 'JDK_RS_momentum'])
-    scatter = hv.Scatter(JDK_RS_1P, kdims = ['JDK_RS_momentum'])
-    #scatter = JDK_RS_1P.plot.scatter('JDK_RS_ratio', 'JDK_RS_momentum')
-    
-    ##Colors
-    explicit_mapping = {'Leading': 'green', 'Lagging': 'yellow', 'Weakening': 'red', 'Improving': 'blue'}
-    
-    ##Defining the Charts's Area
-    x_max_distance = max(abs(int(JDK_RS_1P['JDK_RS_ratio'].min())-100), int(JDK_RS_1P['JDK_RS_ratio'].max())-100,
-                        abs(int(JDK_RS_1P['JDK_RS_momentum'].min())-100), int(JDK_RS_1P['JDK_RS_momentum'].max())-100)
-    x_y_range = (100 - 1 - x_max_distance, 100 + 1 + x_max_distance)
-    
-    ##Plot Joining all together
-    scatter = scatter.opts(opts.Scatter(tools=['hover'], height = 500, width=500, size = 10, xlim = x_y_range, ylim = x_y_range,
-                                       color = 'Quadrant', cmap=explicit_mapping, legend_position = 'top'))
-    
-    ##Vertical and Horizontal Lines
-    vline = hv.VLine(100).opts(color = 'black', line_width = 1)
-    hline = hv.HLine(100).opts(color = 'black', line_width = 1)
-    
-    #All Together
-    
-    full_scatter = scatter * vline * hline
-    
-    #Let's use the Panel library to be able to save the Table generated
-    p = pn.panel(full_scatter)
-    p.save(plotpath+'ScatterPlot_1Period.html') 
-    
-    #For multiple period we need to create a DataFrame with 3-dimensions 
-    #-> to do this we create a dictionary and include each DataFrame with the assigned dictionary key being the Index
-    
-    indices =  RRG_df.columns.unique()
-    
-    multi_df = dict()
-    for index in indices:
-        #For each of the Index will do the following procedure
-        
-        chosen_columns = []
-        #This loop is to filter each variable's varlue in the big-dataframe and create a create a single Dataframe
-        for column in RRG_df[index].columns:
-            chosen_columns.append(RRG_df[index][column])
-        joint_table = pd.concat(chosen_columns, axis=1)
-        
-        #Change the DataFrame's Header
-        new_header = joint_table.iloc[0] 
-        joint_table = joint_table[1:] 
-        joint_table.columns = new_header
-        joint_table = joint_table.loc[:,~joint_table.columns.duplicated()]
-        
-        #Remove the first 3 entries
-        joint_table = joint_table[2:]
-        
-        #Create a column for the Index
-        joint_table['index'] = index
-        
-        ##Reset the Index so the Datess are observable the Scatter
-        joint_table = joint_table.reset_index()
-        order = [1,2,3,0] # setting column's order
-        joint_table = joint_table[[joint_table.columns[i] for i in order]]
-        joint_table = joint_table.rename(columns={"level_0": "Date"})
-        joint_table['Date'] = joint_table['Date'].apply(lambda x: x.strftime('%Y-%m-%d'))
-        
-        ##Create a New Column with the Quadrants Indication
-        joint_table['Quadrant'] = joint_table['index']
-        for row in joint_table['Quadrant'].index:
-            if joint_table['JDK_RS_ratio'][row] >= 100 and joint_table['JDK_RS_momentum'][row] >= 100:
-                joint_table['Quadrant'][row] = 'Leading'
-            elif joint_table['JDK_RS_ratio'][row] >= 100 and joint_table['JDK_RS_momentum'][row] <= 100:
-                joint_table['Quadrant'][row] = 'Lagging'
-            elif joint_table['JDK_RS_ratio'][row] <= 100 and joint_table['JDK_RS_momentum'][row] <= 100:
-                joint_table['Quadrant'][row] = 'Weakening'
-            elif joint_table['JDK_RS_ratio'][row] <= 100 and joint_table['JDK_RS_momentum'][row] >= 100:
-                joint_table['Quadrant'][row] = 'Improving'
-                
-        #Joining the obtained Single Dataframes into the Dicitonary
-        multi_df.update({index: joint_table})  
-    #Defining the Charts's Area
-    x_y_max = []
-    for Index in multi_df.keys():
-        x_y_max_ = max(abs(int(multi_df[Index]['JDK_RS_ratio'].min())-100), int(multi_df[Index]['JDK_RS_ratio'].max())-100,
-                        abs(int(multi_df[Index]['JDK_RS_momentum'].min())-100), int(multi_df[Index]['JDK_RS_momentum'].max())-100)
-        x_y_max.append(x_y_max_)
-        
-    x_range = (100 - 1 - max(x_y_max), 100 + 1 + max(x_y_max))
-    y_range = (100 - 1 - max(x_y_max), 100 + 1.25 + max(x_y_max))
-    #Note: y_range has .25 extra on top because legend stays on top and option "legend_position" doesn't exist for Overlay graphs
-    
-    #Include Dropdown List
-    def load_indices(Index): 
-        #scatter = hv.Scatter(multi_df[Index], kdims = ['JDK_RS_ratio', 'JDK_RS_momentum'])
-        scatter = hv.Scatter(multi_df[Index], kdims = ['JDK_RS_momentum'])
-        
-        ##Colors
-        explicit_mapping = {'Leading': 'green', 'Lagging': 'yellow', 'Weakening': 'red', 'Improving': 'blue'}
-        ##Plot Joining all together
-        scatter = scatter.opts(opts.Scatter(tools=['hover'], height = 500, width=500, size = 10, xlim = x_range, ylim = y_range,
-                                            color = 'Quadrant', cmap=explicit_mapping,
-                                           ))
-        
-        ##Line connecting the dots
-        #curve = hv.Curve(multi_df[Index], kdims = ['JDK_RS_ratio', 'JDK_RS_momentum'])
-        curve = hv.Curve(multi_df[Index], kdims = [ 'JDK_RS_momentum'])
-        curve = curve.opts(opts.Curve(color = 'black', line_width = 1))
-    
-        ##Vertical and Horizontal Lines
-        vline = hv.VLine(100).opts(color = 'black', line_width = 1)
-        hline = hv.HLine(100).opts(color = 'black', line_width = 1)    
-    
-    
-        #All Together
-    
-        full_scatter = scatter * vline * hline * curve
-        full_scatter = full_scatter.opts(legend_cols= True)
-    
-        return full_scatter
-            
-    indices_name = RRG_df.columns.drop_duplicates().tolist()
-    
-    #Instantiation the Dynamic Map object
-    dmap = hv.DynamicMap(load_indices, kdims='Index').redim.values(Index=indices_name)
-    #Let's use the Panel library to be able to save the Table generated
-    p = pn.panel(dmap)
-    p.save(plotpath+'ScatterPlot_Multiple_Period.html', embed = True) 
-    
-    #return
-    #Sector level RRGs
-    
+    [JDK_RS_ratio, JDK_RS_momentum] = compute_jdk(benchmark=benchmark, base_df = df)
+    save_scatter_plots(JDK_RS_ratio, JDK_RS_momentum, benchmark)
+    if len(JDK_RS_ratio) >0:
+        for col in JDK_RS_ratio:
+            if JDK_RS_ratio.iloc[-1][col] > 100 and len(JDK_RS_momentum) >0 and JDK_RS_momentum.iloc[-1][col] > 100:
+                print(f'{col} is leading [RS:{JDK_RS_ratio.iloc[-1][col]} MOM:{JDK_RS_momentum.iloc[-1][col]}]')
+            elif JDK_RS_ratio.iloc[-1][col] < 100 and len(JDK_RS_momentum) >0 and JDK_RS_momentum.iloc[-1][col] > 100:
+                print(f'{col} is improving [RS:{JDK_RS_ratio.iloc[-1][col]} MOM:{JDK_RS_momentum.iloc[-1][col]}]')
+            elif JDK_RS_ratio.iloc[-1][col] < 100 and len(JDK_RS_momentum) >0 and JDK_RS_momentum.iloc[-1][col] < 100:
+                print(f'{col} is weakening [RS:{JDK_RS_ratio.iloc[-1][col]} MOM:{JDK_RS_momentum.iloc[-1][col]}]')
+            elif JDK_RS_ratio.iloc[-1][col] > 100 and len(JDK_RS_momentum) >0 and JDK_RS_momentum.iloc[-1][col] < 100:
+                print(f'{col} is lagging [RS:{JDK_RS_ratio.iloc[-1][col]} MOM:{JDK_RS_momentum.iloc[-1][col]}]')
+            elif len(JDK_RS_momentum)==0:
+                print(f'{benchmark} has NaN values')
+            else:
+                print(f'{col}')
+    else:
+        print(f'{benchmark} has NaN values in ratio')
     
     #Whichever sectors are leading, find the strongest stock in those
     for column in JDK_RS_ratio.columns:
         #if JDK_RS_ratio.iloc[-1][column] > 100 and JDK_RS_momentum.iloc[-1][column] > 100:
         if column in processed:
             print(f'Skip {column}. Already processed for the day')
+            continue
         members = load_index_members(column)
         if len(members) ==0:
             continue

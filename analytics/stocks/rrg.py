@@ -234,11 +234,18 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
     #print(df.head(10))
     #print(date)
     start_date = df.index.values[0]
+    end_date = df.index.values[-1]
     #print(start_date, type(start_date))
+
     #print(np.datetime64(date))
-    duration = np.datetime64(date)-start_date
-    duration = duration.astype('timedelta64[D]')/np.timedelta64(1, 'D')
+    duration = np.datetime64(datetime.datetime.today())-start_date
+    if sampling=='w':
+        duration = duration.astype('timedelta64[W]')/np.timedelta64(1, 'W')
+    else:
+        duration = duration.astype('timedelta64[D]')/np.timedelta64(1, 'D')
     
+    duration = max(int(duration.astype(int))+1, entries)
+
     username = 'AnshulBot'
     password = '@nshulthakur123'
     tv = None
@@ -266,6 +273,7 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
                 s_df = s_df.reindex(columns = [stock])
                 s_df = s_df[~s_df.index.duplicated(keep='first')]
                 #print(s_df[s_df.index.duplicated(keep=False)])
+                s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
                 df[stock] = s_df[stock]
             else:
                 print(stock)
@@ -279,7 +287,7 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
                             symbol,
                             'NSE',
                             interval=interval,
-                            n_bars=entries,
+                            n_bars=duration,
                             extended_session=False,
                         )
                 if s_df is None:
@@ -301,6 +309,10 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
                     s_df = s_df.sort_index()
                     s_df = s_df.reindex(columns = [stock])
                     s_df = s_df[~s_df.index.duplicated(keep='first')]
+                    #print(s_df.index.values[0], type(s_df.index.values[0]))
+                    #print(pd.to_datetime(start_date).date(), type(pd.to_datetime(start_date).date()))
+                    s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
+                    #print(s_df.loc[start_date:end_date])
                     #print(s_df.head(10))
                     #print(s_df[s_df.index.duplicated(keep=False)])
                     df[stock] = s_df[stock]
@@ -312,7 +324,7 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
     return df
 
 def compute_jdk(benchmark = 'Nifty_50', base_df=None):
-    #print(base_df.head(10))
+    print(base_df.head(10))
     df = base_df.copy(deep=True)
     
     df.sort_values(by='date', inplace=True, ascending=True)

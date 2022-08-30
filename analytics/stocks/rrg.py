@@ -46,8 +46,9 @@ import holoviews as hv
 from holoviews import opts, dim
 
 import panel as pn
-
 import csv
+
+
 INDICES = ["Nifty_50",
            "Nifty_Auto",
            "Nifty_Bank",
@@ -128,6 +129,7 @@ INDICES = ["Nifty_50",
 index_data_dir = './reports/'
 member_dir = './reports/members/'
 plotpath = index_data_dir+'plots/'
+cache_dir = index_data_dir+'cache/'
 
 tvfeed_instance = None
 
@@ -166,7 +168,19 @@ def save_progress(index):
                                  'index': processed}))
     return
 
-
+def cached(name, df=None):
+    f = cache_dir+name+'.csv'
+    if df is None:
+        if os.path.isfile(f):
+            #Get from cache if it exists
+            df = pd.read_csv(f)
+            df['datetime'] = pd.to_datetime(df['datetime'], format='%Y-%m-%d %H:%M:%S')
+            return df
+        return None
+    else:
+        #Cache the results
+        df.to_csv(f)
+        return None
 def get_tvfeed_instance(username, password):
     global tvfeed_instance
     if tvfeed_instance is None:
@@ -319,13 +333,20 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
                            'MOTHERSUMI': 'MSUMI'}
                 if symbol in nse_map:
                     symbol = nse_map[symbol]
-                s_df = tv.get_hist(
-                            symbol,
-                            'NSE',
-                            interval=interval,
-                            n_bars=duration,
-                            extended_session=False,
-                        )
+                
+                s_df = cached(symbol)
+                if s_df is not None:
+                    pass
+                else:
+                    s_df = tv.get_hist(
+                                symbol,
+                                'NSE',
+                                interval=interval,
+                                n_bars=duration,
+                                extended_session=False,
+                            )
+                    if s_df is not None:
+                        cached(symbol, s_df)
                 if s_df is None:
                     print(f'Error fetching information on {symbol}')
                 else:
@@ -360,7 +381,7 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
     return df
 
 def compute_jdk(benchmark = 'Nifty_50', base_df=None):
-    print(base_df.head(10))
+    #print(base_df.head(10))
     df = base_df.copy(deep=True)
     
     df.sort_values(by='date', inplace=True, ascending=True)
@@ -403,7 +424,9 @@ def compute_jdk(benchmark = 'Nifty_50', base_df=None):
     JDK_RS_ratio = df.iloc[-25:]
     
     #Calculate the Momentum of the RS-ratio
-    JDK_RS_momentum = JDK_RS_ratio.pct_change(10)
+    #JDK_RS_momentum = JDK_RS_ratio.pct_change(10)
+    JDK_RS_momentum = JDK_RS_ratio.pct_change(4)
+    
     #Normalize the Values considering a 14-days Window (Note: 10 weekdays)
     for ticker in JDK_RS_momentum.columns: 
         JDK_RS_momentum[ticker] = 100 + ((JDK_RS_momentum[ticker] - JDK_RS_momentum[ticker].rolling(10).mean())/JDK_RS_momentum[ticker].rolling(10).std() + 1)

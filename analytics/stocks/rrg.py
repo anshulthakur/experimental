@@ -169,6 +169,34 @@ def save_progress(index):
     return
 
 def cached(name, df=None):
+    import json
+    cache_file = '.cache.json'
+    overwrite = False
+    try:
+        with open(cache_dir+cache_file, 'r') as fd:
+            progress = json.load(fd)
+            try:
+                date = datetime.datetime.strptime(progress['date'], '%d-%m-%Y')
+                if date.day == datetime.datetime.today().day and \
+                    date.month == datetime.datetime.today().month and \
+                    date.year == datetime.datetime.today().year:
+                    pass #Cache hit
+                else:
+                    if df is None:#Cache is outdated. Clear it first
+                        for f in os.listdir(cache_dir):
+                            if f != 'cache_dir+cache_file':
+                                os.remove(os.path.join(cache_dir, f))
+                    overwrite = True
+            except:
+                #Doesn't look like a proper date time
+                pass
+    except:
+        overwrite=True
+    
+    if overwrite:
+        with open(cache_dir+cache_file, 'w') as fd:
+            fd.write(json.dumps({'date':datetime.datetime.today().strftime('%d-%m-%Y')}))
+    
     f = cache_dir+name+'.csv'
     if df is None:
         if os.path.isfile(f):

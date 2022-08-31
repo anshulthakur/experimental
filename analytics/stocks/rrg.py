@@ -26,6 +26,7 @@ from talib.abstract import *
 from talib import MA_Type
 
 from tvDatafeed_edge import TvDatafeed, Interval
+from download_index_reports import download_historical_data
 
 #Prepare to load stock data as pandas dataframe from source. In this case, prepare django
 import django
@@ -795,5 +796,6 @@ if __name__ == "__main__":
         day = datetime.datetime.strptime(args.date, "%d/%m/%y")
     
     pd.set_option("display.precision", 8)
+    download_historical_data(day, silent=True)
     main(date=day, sampling=sampling, online=args.online)
     

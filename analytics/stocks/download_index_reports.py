@@ -20,12 +20,13 @@ fields = ['Index Name', 'Index Date', 'Open Index Value',
               'P/E', 'P/B', 'Div Yield']
 replacement_symbols = ['-', '/', ' ', ':', '(', ')', '%']
 
-def download_daily_data(day):
+def download_daily_data(day, silent=False):
     import os.path
     
     filepath = download_path+'ind_close_all_{date}.csv'.format(date=day.strftime("%d%m%Y"))
     if os.path.isfile(filepath):
-        print(f'File: {filepath} exists. Skip download')
+        if not silent:
+            print(f'File: {filepath} exists. Skip download')
         return filepath
     url = url_base_path.format(date=day.strftime("%d%m%Y"))
     headers = {
@@ -38,13 +39,14 @@ def download_daily_data(day):
         response.raise_for_status()
         open(filepath, 'wb').write(response.content)
     except Exception as e:
-        print ('ERR:: Exception occurred while fetching data.')
-        print(e)
+        print (f'ERR:: Exception occurred while fetching data foor day: {day}')
+        if not silent:
+            print(e)
         return False
     
     return filepath
 
-def download_historical_data(day):
+def download_historical_data(day, silent=False):
     '''
     Will download past 52 weeks data. That's 52*5 calls
     '''
@@ -76,7 +78,7 @@ def download_historical_data(day):
             for r in reports[index]:
                 writer.writerow(r)
 
-def update_daily_data(day):
+def update_daily_data(day, silent=False):
     filepath = download_path+'ind_close_all_{date}.csv'.format(date=day.strftime("%d%m%Y"))
     reports = {}
     
@@ -109,7 +111,7 @@ if __name__ == "__main__":
         day = datetime.datetime.strptime(args.date, "%d/%m/%y")
     
     if args.all:
-        download_historical_data(day)
+        download_historical_data(day, silent=False)
         exit(0)
     
     download_daily_data(day)

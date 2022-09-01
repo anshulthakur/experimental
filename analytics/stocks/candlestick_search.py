@@ -134,13 +134,13 @@ for candle in candles:
 import datetime
 from dateutil.relativedelta import relativedelta
 
-last_candle_date = '01/07/22'
+last_candle_date = '01/08/22'
 day = datetime.datetime.strptime(last_candle_date, "%d/%m/%y").date()
 print(day)
 #download_date = day - datetime.timedelta(days=delta)
 with open('./images/1.csv', 'w') as fd:
     ii=0
-    fd.write('Index,Candle Color,Candle Length,Open, Close, Change\n')
+    fd.write('date,Candle Color,Candle Length,open,close,change\n')
     for candle in candles:
         dayval = (day - relativedelta(months=len(candles)-ii-1)).strftime('%d/%m/%Y')
         if ii==0:

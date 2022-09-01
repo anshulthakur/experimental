@@ -185,7 +185,7 @@ def cached(name, df=None):
                 else:
                     if df is None:#Cache is outdated. Clear it first
                         for f in os.listdir(cache_dir):
-                            if f != 'cache_dir+cache_file':
+                            if f != cache_dir+cache_file:
                                 os.remove(os.path.join(cache_dir, f))
                     overwrite = True
             except:

@@ -57,7 +57,7 @@ def download_historical_data(day, silent=False):
         download_date = day - datetime.timedelta(days=delta)
         if download_date.weekday() in [5,6]:
             continue
-        f = download_daily_data(download_date)
+        f = download_daily_data(download_date, silent)
         if f is not False:
             files.append(f)
     reports = {}

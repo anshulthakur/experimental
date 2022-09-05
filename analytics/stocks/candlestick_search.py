@@ -9,7 +9,7 @@ from math import floor
 
 # load the image and convert into 
 # numpy array
-img = Image.open('images/1.png').convert('RGB')
+img = Image.open('images/2_crop.png').convert('RGB')
 numpydata = asarray(img)
 
 [rows, cols, colors]= numpydata.shape
@@ -138,7 +138,7 @@ last_candle_date = '01/08/22'
 day = datetime.datetime.strptime(last_candle_date, "%d/%m/%y").date()
 print(day)
 #download_date = day - datetime.timedelta(days=delta)
-with open('./images/1.csv', 'w') as fd:
+with open('./images/2.csv', 'w') as fd:
     ii=0
     fd.write('date,Candle Color,Candle Length,open,close,change\n')
     for candle in candles:

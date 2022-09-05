@@ -19,7 +19,7 @@ from stocks.models import Listing, Stock
 from lib.retrieval import get_stock_listing
 from lib.patterns import detect_fractals, get_volume_signals, get_last_day_patterns, get_signals
 
-from tvDatafeed_edge import TvDatafeed, Interval
+from lib.tradingview import TvDatafeed, Interval
 from lib.divergence import detect_divergence
 
 import json

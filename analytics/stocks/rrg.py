@@ -25,7 +25,7 @@ import talib
 from talib.abstract import *
 from talib import MA_Type
 
-from tvDatafeed_edge import TvDatafeed, Interval
+from lib.tradingview import TvDatafeed, Interval
 from download_index_reports import download_historical_data
 
 #Prepare to load stock data as pandas dataframe from source. In this case, prepare django

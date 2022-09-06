@@ -8,7 +8,7 @@ import os
 import sys
 import csv
 
-from lib.tradingview import TvDatafeed, Interval
+from lib.tradingview import TvDatafeed, Interval, convert_timeframe_to_quant
 import datetime
 from dateutil.relativedelta import relativedelta
 import pandas as pd
@@ -17,26 +17,6 @@ nse_list = 'NSE_list.csv'
 bse_list = 'BSE_list.csv'
 img_dir = './images/'
 cache_dir = './images/cache/'
-try:
-    os.mkdir(cache_dir)
-except FileExistsError:
-    pass
-except:
-    print('Error creating folder')
-
-indices = []
-b_indices = []
-with open(nse_list, 'r') as csvfile:
-    reader = csv.DictReader(csvfile)
-    for row in reader:
-        indices.append(row['SYMBOL'].strip())
-
-with open(bse_list, 'r') as csvfile:
-    reader = csv.DictReader(csvfile)
-    for row in reader:
-        if row['Security Id'].strip() not in indices:
-            b_indices.append(row['Security Id'].strip())
-
 
 tvfeed_instance = None
 
@@ -89,145 +69,190 @@ def cached(name, df=None):
         df.to_csv(f)
         return None
 
-# Load the reference candlestick chart
-r_df = pd.read_csv(img_dir+'2.csv')
-r_df = r_df.drop(columns = ['Candle Color','Candle Length','open','close'])
-#print(s_df.head())
-r_df.reset_index(inplace = True)
-r_df['date'] = pd.to_datetime(r_df['date'], format='%d/%m/%Y').dt.date
-r_df.set_index('date', inplace = True)
-r_df = r_df.sort_index()
-r_df = r_df.reindex(columns = ['change'])
-
-print(len(r_df))
-r_df.drop(r_df.iloc[len(r_df)-1].name, inplace=True) #Last entry is the month which may still be running
-
-start_date = r_df.index.values[0]
-end_date = r_df.index.values[-1]
-
-r_df.drop(r_df.iloc[0].name, inplace=True) #First entry is not the change, just the baseline
-
-username = 'AnshulBot'
-password = '@nshulthakur123'
-tv = get_tvfeed_instance(username, password)
-
-cutoff_date = datetime.datetime.strptime('01-Aug-2013', "%d-%b-%Y")
-d = relativedelta(datetime.datetime.today(), cutoff_date)
-n_bars = (d.years*12) + d.months
-
-correlations = []
-bse_correlations = []
-ii=0
-max_corr = 0
-max_corr_idx = None
-for stock in indices:
-    print(f'{stock} Max: {max_corr_idx}({max_corr})')
-    symbol = stock.strip().replace('&', '_')
-    symbol = symbol.replace('-', '_')
-    symbol = symbol.replace('*', '')
-    nse_map = {'UNITDSPR': 'MCDOWELL_N',
-               'MOTHERSUMI': 'MSUMI'}
-    if symbol in nse_map:
-        symbol = nse_map[symbol]
-    
-    s_df = cached(symbol)
-    if s_df is not None:
-        #print('Found in Cache')
+def main(reference, timeframe):
+    try:
+        os.mkdir(cache_dir)
+    except FileExistsError:
         pass
-    else:
-        s_df = tv.get_hist(
-                    symbol,
-                    'NSE',
-                    interval=Interval.in_monthly,
-                    n_bars=n_bars,
-                    extended_session=False,
-                )
-        if s_df is not None:
-            cached(symbol, s_df)
-    if s_df is not None:
-        s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume'])
-        #print(s_df.head())
-        if len(s_df)==0:
-            print('Skip {}'.format(symbol))
-            continue
-        s_df.reset_index(inplace = True)
-        s_df.rename(columns={'datetime': 'date', 'close': 'change'},
-                   inplace = True)
-        s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y').dt.date
-        s_df.set_index('date', inplace = True)
-        s_df = s_df.sort_index()
-        s_df = s_df.reindex(columns = ['change'])
-        s_df = s_df[~s_df.index.duplicated(keep='first')]
-        s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
-        s_df = s_df.pct_change(1)
-        
-        if len(s_df)<len(r_df)+1:
-            #print('Skip')
-            correlations.append(0)
-        else:
-            s_df.drop(s_df.iloc[0].name, inplace=True) #First entry is going to be NaN
-            c = r_df.iloc[:,0].corr(s_df.iloc[:,0])
-            #print(f'Correlation: {c}')
-            correlations.append(c)
-            if c>=max_corr:
-                max_corr=c
-                max_corr_idx = symbol
-
-for stock in b_indices:
-    print(f'{stock} Max: {max_corr_idx}({max_corr})')
-    symbol = stock.strip().replace('&', '_')
-    symbol = symbol.replace('-', '_')
-    symbol = symbol.replace('*', '')
+    except:
+        print('Error creating folder')
     
-    s_df = cached(symbol)
-    if s_df is not None:
-        #print('Found in Cache')
-        pass
-    else:
-        s_df = tv.get_hist(
-                    symbol,
-                    'BSE',
-                    interval=Interval.in_monthly,
-                    n_bars=n_bars,
-                    extended_session=False,
-                )
-        if s_df is not None:
-            cached(symbol, s_df)
-    if s_df is not None:
-        s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume'])
-        #print(s_df.head())
-        if len(s_df)==0:
-            print('Skip {}'.format(symbol))
-            continue
-        s_df.reset_index(inplace = True)
-        s_df.rename(columns={'datetime': 'date', 'close': 'change'},
-                   inplace = True)
-        s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y').dt.date
-        s_df.set_index('date', inplace = True)
-        s_df = s_df.sort_index()
-        s_df = s_df.reindex(columns = ['change'])
-        s_df = s_df[~s_df.index.duplicated(keep='first')]
-        s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
-        s_df = s_df.pct_change(1)
-        
-        if len(s_df)<len(r_df)+1:
-            #print('Skip')
-            bse_correlations.append(0)
-        else:
-            s_df.drop(s_df.iloc[0].name, inplace=True) #First entry is going to be NaN
-            c = r_df.iloc[:,0].corr(s_df.iloc[:,0])
-            #print(f'Correlation: {c}')
-            bse_correlations.append(c)
-            if c>=max_corr:
-                max_corr=c
-                max_corr_idx = symbol
-val = max(correlations)
-max_idx = [index for index, item in enumerate(correlations) if item == max(correlations)]
-names = [indices[idx] for idx in max_idx]
-print(f'Maximum correlation (NSE):{val}: {names}')
+    indices = []
+    b_indices = []
+    with open(nse_list, 'r') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            indices.append(row['SYMBOL'].strip())
+    
+    with open(bse_list, 'r') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            if row['Security Id'].strip() not in indices:
+                b_indices.append(row['Security Id'].strip())
+    
+    # Load the reference candlestick chart
+    r_df = pd.read_csv(reference)
+    r_df = r_df.drop(columns = ['Candle Color','Candle Length','open','close'])
+    #print(s_df.head())
+    r_df.reset_index(inplace = True)
+    r_df['date'] = pd.to_datetime(r_df['date'], format='%d/%m/%Y').dt.date
+    r_df.set_index('date', inplace = True)
+    r_df = r_df.sort_index()
+    r_df = r_df.reindex(columns = ['change'])
+    
+    print(len(r_df))
+    r_df.drop(r_df.iloc[len(r_df)-1].name, inplace=True) #Last entry is the month which may still be running
+    
+    start_date = r_df.index.values[0]
+    end_date = r_df.index.values[-1]
+    
+    r_df.drop(r_df.iloc[0].name, inplace=True) #First entry is not the change, just the baseline
+    
+    username = 'AnshulBot'
+    password = '@nshulthakur123'
+    tv = get_tvfeed_instance(username, password)
+    
+    cutoff_date = datetime.datetime.strptime('01-Aug-2013', "%d-%b-%Y")
+    #cutoff_date = r_df.index.values[0]
+    d = relativedelta(datetime.datetime.today(), cutoff_date)
+    n_bars = (d.years*12) + d.months+1
+    
+    correlations = []
+    bse_correlations = []
 
-val = max(bse_correlations)
-max_idx = [index for index, item in enumerate(bse_correlations) if item == max(bse_correlations)]
-names = [b_indices[idx] for idx in max_idx]
-print(f'Maximum correlation (BSE):{val}: {names}')
-print(f'NSE: {len(indices)}. BSE: {len(b_indices)}')
+    max_corr = 0
+    max_corr_idx = None
+    for stock in indices:
+        print(f'{stock} Max: {max_corr_idx}({max_corr})')
+        symbol = stock.strip().replace('&', '_')
+        symbol = symbol.replace('-', '_')
+        symbol = symbol.replace('*', '')
+        nse_map = {'UNITDSPR': 'MCDOWELL_N',
+                   'MOTHERSUMI': 'MSUMI'}
+        if symbol in nse_map:
+            symbol = nse_map[symbol]
+        
+        s_df = cached(symbol)
+        if s_df is not None:
+            #print('Found in Cache')
+            pass
+        else:
+            s_df = tv.get_hist(
+                        symbol,
+                        'NSE',
+                        interval=timeframe,
+                        n_bars=n_bars,
+                        extended_session=False,
+                    )
+            if s_df is not None:
+                cached(symbol, s_df)
+        if s_df is not None:
+            s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume'])
+            #print(s_df.head())
+            if len(s_df)==0:
+                print('Skip {}'.format(symbol))
+                continue
+            s_df.reset_index(inplace = True)
+            s_df.rename(columns={'datetime': 'date', 'close': 'change'},
+                       inplace = True)
+            s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y').dt.date
+            s_df.set_index('date', inplace = True)
+            s_df = s_df.sort_index()
+            s_df = s_df.reindex(columns = ['change'])
+            s_df = s_df[~s_df.index.duplicated(keep='first')]
+            s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
+            s_df = s_df.pct_change(1)
+            
+            if len(s_df)<len(r_df)+1:
+                #print(f'{len(s_df)},{len(r_df)}Skip')
+                correlations.append(0)
+            else:
+                s_df.drop(s_df.iloc[0].name, inplace=True) #First entry is going to be NaN
+                c = r_df.iloc[:,0].corr(s_df.iloc[:,0])
+                #print(f'Correlation: {c}')
+                correlations.append(c)
+                if c>max_corr:
+                    max_corr=c
+                    max_corr_idx = [symbol]
+                elif c==max_corr:
+                    max_corr_idx.append(symbol)
+    
+    for stock in b_indices:
+        print(f'{stock} Max: {max_corr_idx}({max_corr})')
+        symbol = stock.strip().replace('&', '_')
+        symbol = symbol.replace('-', '_')
+        symbol = symbol.replace('*', '')
+        
+        s_df = cached(symbol)
+        if s_df is not None:
+            #print('Found in Cache')
+            pass
+        else:
+            s_df = tv.get_hist(
+                        symbol,
+                        'BSE',
+                        interval=timeframe,
+                        n_bars=n_bars,
+                        extended_session=False,
+                    )
+            if s_df is not None:
+                cached(symbol, s_df)
+        if s_df is not None:
+            s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume'])
+            #print(s_df.head())
+            if len(s_df)==0:
+                print('Skip {}'.format(symbol))
+                continue
+            s_df.reset_index(inplace = True)
+            s_df.rename(columns={'datetime': 'date', 'close': 'change'},
+                       inplace = True)
+            s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y').dt.date
+            s_df.set_index('date', inplace = True)
+            s_df = s_df.sort_index()
+            s_df = s_df.reindex(columns = ['change'])
+            s_df = s_df[~s_df.index.duplicated(keep='first')]
+            s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
+            s_df = s_df.pct_change(1)
+            
+            if len(s_df)<len(r_df)+1:
+                #print('Skip')
+                bse_correlations.append(0)
+            else:
+                s_df.drop(s_df.iloc[0].name, inplace=True) #First entry is going to be NaN
+                c = r_df.iloc[:,0].corr(s_df.iloc[:,0])
+                #print(f'Correlation: {c}')
+                bse_correlations.append(c)
+                if c>max_corr:
+                    max_corr=c
+                    max_corr_idx = [symbol]
+                elif c==max_corr:
+                    max_corr_idx.append(symbol)
+    val = max(correlations)
+    max_idx = [index for index, item in enumerate(correlations) if item == max(correlations)]
+    names = [indices[idx] for idx in max_idx]
+    print(f'Maximum correlation (NSE):{val}: {names}')
+    
+    val = max(bse_correlations)
+    max_idx = [index for index, item in enumerate(bse_correlations) if item == max(bse_correlations)]
+    names = [b_indices[idx] for idx in max_idx]
+    print(f'Maximum correlation (BSE):{val}: {names}')
+    print(f'NSE: {len(indices)}. BSE: {len(b_indices)}')
+
+if __name__ == "__main__":
+    day = datetime.date.today()
+    import argparse
+    parser = argparse.ArgumentParser(description='Compute RRG data for indices')
+    parser.add_argument('-t', '--timeframe', help="Timeframe")
+    parser.add_argument('-f', '--file', help="CSV file of the candlesticks to search for")
+    
+    timeframe = '1M'
+    reference = None
+    #Can add options for weekly sampling and monthly sampling later
+    args = parser.parse_args()
+    if args.file is not None and len(args.file)>0:
+        print('Search stock for file: {}'.format(args.file))
+        reference = args.file
+    if args.timeframe is not None and len(args.timeframe)>0:
+        timeframe=args.timeframe
+
+    main(reference, timeframe=convert_timeframe_to_quant(timeframe))

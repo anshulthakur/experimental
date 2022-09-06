@@ -19,7 +19,7 @@ from stocks.models import Listing, Stock
 from lib.retrieval import get_stock_listing
 from lib.patterns import detect_fractals, get_volume_signals, get_last_day_patterns, get_signals
 
-from lib.tradingview import TvDatafeed, Interval
+from lib.tradingview import TvDatafeed, Interval, convert_timeframe_to_quant
 from lib.divergence import detect_divergence
 
 import json
@@ -90,28 +90,6 @@ def do_stuff(stock, prefix='', date = None):
         print(f'Exception occured in stock: {stock.sid}')
         traceback.print_exc()
 
-def convert_timeframe_to_quant(timeframe):
-    if timeframe[-1].lower()=='m':
-        tf = int(timeframe[0:-1])
-        if tf in [1,3,5,15,30,45]:
-            return eval(f'Interval.in_{tf}_minute')
-        else:
-            return Interval.in_15_minute
-    elif timeframe[-1].lower()=='h':
-        tf = int(timeframe[0:-1])
-        if tf in [1,2,3,4]:
-            return eval(f'Interval.in_{tf}_hour')
-        else:
-            return Interval.in_1_hour
-    elif timeframe[-1].lower()=='d':
-        return Interval.in_daily
-    elif timeframe[-1].lower()=='w':
-        return Interval.in_weekly
-    elif timeframe[-1].lower()=='m':
-        return Interval.in_monthly
-    else:
-        print(f'Unknown timeframe {timeframe}')
-        return Interval.in_15_minute
 
 def divergence_scan(symbol=None, exchange = 'NSE', timeframe= convert_timeframe_to_quant('1h'), after=None):
     username = 'AnshulBot'

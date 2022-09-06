@@ -134,7 +134,7 @@ for candle in candles:
 import datetime
 from dateutil.relativedelta import relativedelta
 
-last_candle_date = '01/08/22'
+last_candle_date = '01/09/22'
 day = datetime.datetime.strptime(last_candle_date, "%d/%m/%y").date()
 print(day)
 #download_date = day - datetime.timedelta(days=delta)

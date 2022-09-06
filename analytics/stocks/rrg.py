@@ -25,7 +25,7 @@ import talib
 from talib.abstract import *
 from talib import MA_Type
 
-from lib.tradingview import TvDatafeed, Interval
+from lib.tradingview import TvDatafeed, Interval, convert_timeframe_to_quant
 from download_index_reports import download_historical_data
 
 #Prepare to load stock data as pandas dataframe from source. In this case, prepare django
@@ -258,29 +258,6 @@ import csv
 
 from lib.retrieval import get_stock_listing
 
-def convert_timeframe_to_quant(timeframe):
-    if timeframe[-1].lower()=='m':
-        tf = int(timeframe[0:-1])
-        if tf in [1,3,5,15,30,45]:
-            return eval(f'Interval.in_{tf}_minute')
-        else:
-            return Interval.in_15_minute
-    elif timeframe[-1].lower()=='h':
-        tf = int(timeframe[0:-1])
-        if tf in [1,2,3,4]:
-            return eval(f'Interval.in_{tf}_hour')
-        else:
-            return Interval.in_1_hour
-    elif timeframe[-1].lower()=='d':
-        return Interval.in_daily
-    elif timeframe[-1].lower()=='w':
-        return Interval.in_weekly
-    elif timeframe[-1].lower()=='m':
-        return Interval.in_monthly
-    else:
-        print(f'Unknown timeframe {timeframe}')
-        return Interval.in_15_minute
-    
 def load_members(sector, members, date, sampling='w', entries=50, online=True):
     print('========================')
     print(f'Loading for {sector}')

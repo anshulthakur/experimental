@@ -33,6 +33,29 @@ class Interval(enum.Enum):
     in_monthly = "1M"
 
 
+def convert_timeframe_to_quant(timeframe):
+    if timeframe[-1]=='m':
+        tf = int(timeframe[0:-1])
+        if tf in [1,3,5,15,30,45]:
+            return eval(f'Interval.in_{tf}_minute')
+        else:
+            return Interval.in_15_minute
+    elif timeframe[-1].lower()=='h':
+        tf = int(timeframe[0:-1])
+        if tf in [1,2,3,4]:
+            return eval(f'Interval.in_{tf}_hour')
+        else:
+            return Interval.in_1_hour
+    elif timeframe[-1].lower()=='d':
+        return Interval.in_daily
+    elif timeframe[-1].lower()=='w':
+        return Interval.in_weekly
+    elif timeframe[-1]=='M':
+        return Interval.in_monthly
+    else:
+        print(f'Unknown timeframe {timeframe}')
+        return Interval.in_15_minute
+
 class TvDatafeed:
     sign_in_url = 'https://www.tradingview.com/accounts/signin/'
     ws_headers = json.dumps({"Origin": "https://data.tradingview.com"})

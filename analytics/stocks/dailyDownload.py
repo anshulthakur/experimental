@@ -4,13 +4,13 @@ import settings
 import csv
 from datetime import datetime
 
-from stocks.models import Listing, Industry, Stock
+from stocks.models import Listing, Stock
 
 from bs4 import BeautifulSoup
 
 import threading
 import multiprocessing
-import urllib.request, urllib.parse, urllib.error
+import urllib.request
 
 import time
 import brotli
@@ -21,19 +21,20 @@ import traceback
 
 error_stocks = []
 ERR_FILE = '/tmp/failed_stocks'
+
+def fix_float(value):
+    if value.string is not None and len(value.string)>0 and value.string.strip()!='-':
+        return float(value.string.replace(',', ''))
+    else:
+        return 0
+    
 #function to parse stock data from URL
 def get_data_for_today(obj):
     return get_data_for_date(obj, datetime.today().date())
 
 def get_data_for_date(stock, dateObj):
 
-    def fix_float(value):
-        if value.string is not None and len(value.string)>0:
-            return float(value.string.replace(',', ''))
-        else:
-            return 0
-    from bs4 import BeautifulSoup
-    import urllib.request, urllib.parse, urllib.error
+    
     time.sleep(0.5)
     try:
         listing = Listing.objects.filter(date__contains = dateObj.date(), stock=stock)
@@ -69,7 +70,6 @@ def get_data_for_date(stock, dateObj):
                     soup.find('span', id='ContentPlaceHolder1_lblCompanyValue').find('a') is None:
                     print('Content object not found.')
                     return False
-                company_name = soup.find('span', id='ContentPlaceHolder1_lblCompanyValue').find('a').string
                 stockdata = soup.find('div', id='ContentPlaceHolder1_divStkData')
                 table = stockdata.find('table')
                 if table is not None:
@@ -124,19 +124,91 @@ def get_data_for_date(stock, dateObj):
             print(("Unexpected error:", sys.exc_info()[i]))
         return False
 
+def get_bulk(stock):
+    time.sleep(0.5)
+    try:
+        header = {
+                    'authority': 'api.bseindia.com',
+                    'method': 'GET',
+                    'scheme': 'https',
+                    'accept': 'application/json, text/plain, */*',
+                    'accept-encoding': 'gzip, deflate, br',
+                    'accept-language': 'en-IN,en;q=0.9,en-GB;q=0.8,en-US;q=0.7,hi;q=0.6',
+                    'dnt': '1',
+                    'origin': 'https://www.bseindia.com',
+                    'referer': stock.get_quote_url(),
+                    'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.135 Safari/537.36',
+                    }
+        req = urllib.request.Request(stock.get_quote_url(), headers=header)
+        response = urllib.request.urlopen(req)
+        coder = response.headers.get('Content-Encoding', 'utf-8')
+        #print('Coder: {}'.format(coder))
+        if coder=='br':
+            html_page = brotli.decompress(response.read()).decode('utf-8')
+        elif coder=='gzip':
+            buf = BytesIO(response.read())
+            html_page = gzip.GzipFile(fileobj=buf).read().decode('utf-8')
+        else:
+            html_page = response.read().decode('utf-8')
+        soup = BeautifulSoup(html_page, "html.parser")
+        if soup.find('span', id='ContentPlaceHolder1_lblCompanyValue') is None or \
+            soup.find('span', id='ContentPlaceHolder1_lblCompanyValue').find('a') is None:
+            print('Content object not found.')
+            return False
+        stockdata = soup.find('div', id='ContentPlaceHolder1_divStkData')
+        table = stockdata.find('table')
+        if table is not None:
+            table_vals = table.findAll('tr',{'class':'TTRow'})
+            for row in table_vals:
+                tds = row('td')
+                if tds is not None:
+                    listing = Listing.objects.filter(date__contains = datetime.strptime(tds[0].string, "%-d/%m/%y").date(), stock=stock)
+                    #print(('{da} exists'.format(da = stock.security)))
+                    if len(listing) == 0:
+                        listing = Listing()
+                        listing.stock = stock
+                        listing.date = datetime.strptime(tds[0].string, "%-d/%m/%y")
+                        listing.opening = fix_float(tds[1])
+                        listing.high = fix_float(tds[2])
+                        listing.low = fix_float(tds[3])
+                        listing.closing = fix_float(tds[4])
+                        listing.wap = fix_float(tds[5])
+                        listing.traded = fix_float(tds[6])
+                        listing.trades = fix_float(tds[7])
+                        listing.turnover = fix_float(tds[8])
+                        listing.deliverable = fix_float(tds[9])
+                        #listing.ratio = fix_float(tds[10])
+                        #listing.spread_high_low = fix_float(tds[11])
+                        #listing.spread_close_open = fix_float(tds[12])
+                        listing.save()
+                        print(("{code} OK[{d}] [{id}]".format(code=stock.security, d=listing.date, id=listing.id)))
+                    else:
+                        if fix_float(tds[9])>0 and listing[0].deliverable==0:
+                            #Update the delivery data
+                            print('Update delivery data')
+                            listing[0].deliverable = fix_float(tds[9])
+                            listing[0].save()
+                        else:
+                            print('Listing exists for the date')
+                else:
+                    print(("{code} No data available for the days".format(code=stock.security)))
+                    return True
+    except Exception as e:
+        print(("{code} Failed".format(code=stock.security)))
+        print(e)
+        le = len(sys.exc_info())
+        #print(le)
+        for i in range(0,le):
+            print(("Unexpected error:", sys.exc_info()[i]))
+        return False
+
+
 #For thread safe operation using locks
 class LockedIterator(object):
     def __init__(self, it):
         self.lock = threading.Lock()
         self.it = it.__iter__()
     def __iter__(self): return self
-    #Python2
-    def __next__(self):
-        self.lock.acquire()
-        try:
-            return next(self.it)
-        finally:
-            self.lock.release()
     #Python3
     def __next__(self):
         self.lock.acquire()
@@ -145,27 +217,30 @@ class LockedIterator(object):
         finally:
             self.lock.release()
 
-def get_next_stock():
+def get_next_stock(override=False):
     """
     First try to read off IDs from a failure list in case we've run this before
     If file does not exist, then parse entire DB list
     """
     try:
-        with open(ERR_FILE, 'r') as fd:
-            first = True
-            ids = []
-            for line in fd:
-                if first:
-                    if datetime.strptime(line.strip(), "%d/%m/%y").day != datetime.today().day:
-                        raise(ReferenceError('Old file'))
-                    first = False
-                    continue
-                ids.append(int(line.strip()))
-            if len(ids)==0:
-                return
-            stocks = Stock.objects.filter(id__in=ids)
-            for stock in stocks:
-                yield stock
+        if not override:
+            with open(ERR_FILE, 'r') as fd:
+                first = True
+                ids = []
+                for line in fd:
+                    if first:
+                        if datetime.strptime(line.strip(), "%d/%m/%y").day != datetime.today().day:
+                            raise(ReferenceError('Old file'))
+                        first = False
+                        continue
+                    ids.append(int(line.strip()))
+                if len(ids)==0:
+                    return
+                stocks = Stock.objects.filter(id__in=ids)
+                for stock in stocks:
+                    yield stock
+        else:
+            raise(ReferenceError('Override set'))
     except FileNotFoundError:
         print('Error file not found')
         stocks = Stock.objects.all()
@@ -185,16 +260,16 @@ def work_loop(thread_name, tid):
     global stock_iter
     for stock in stock_iter:
         #print(day)
-        if get_data_for_date(stock, day) is False:
-            error_stocks.append(stock)
-
-import os
+        if bulk:
+            get_bulk(stock)
+        else:
+            if get_data_for_date(stock, day) is False:
+                error_stocks.append(stock)
 
 def read_bhav_file(filename, dateval):
     try:
         with open(filename, 'r') as fd:
             csv_reader = csv.DictReader(fd, delimiter=',')
-            i = 0
             for row in csv_reader:
                 try:
                     stock = Stock.objects.get(security=row['SC_CODE'])
@@ -230,31 +305,29 @@ def download_bhav_copy(url: str, dest_folder: str):
     file_path = os.path.join(dest_folder, filename)
 
     header = {
-                            'authority': 'api.bseindia.com',
-                            'method': 'GET',
-                            'scheme': 'https',
-                            'accept': 'application/json, text/plain, */*',
-                            'accept-encoding': 'gzip, deflate, br',
-                            'accept-language': 'en-IN,en;q=0.9,en-GB;q=0.8,en-US;q=0.7,hi;q=0.6',
-                            'dnt': '1',
-                            'origin': 'https://www.bseindia.com',
-                            'referer': url,
-                            'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.135 Safari/537.36',
-                            }
+                'authority': 'api.bseindia.com',
+                'method': 'GET',
+                'scheme': 'https',
+                'accept': 'application/json, text/plain, */*',
+                'accept-encoding': 'gzip, deflate, br',
+                'accept-language': 'en-IN,en;q=0.9,en-GB;q=0.8,en-US;q=0.7,hi;q=0.6',
+                'dnt': '1',
+                'origin': 'https://www.bseindia.com',
+                'referer': url,
+                'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.135 Safari/537.36',
+                }
     req = urllib.request.Request(url, headers=header)
     response = urllib.request.urlopen(req)
-    coder = response.headers.get('Content-Encoding', 'utf-8')
     import shutil
     with open(file_path, 'wb') as f:
         shutil.copyfileobj(response, f)
     
-    with ZipFile(filename, 'r') as zip:
+    with ZipFile(filename, 'r') as zipf:
         # printing all the contents of the zip file
-        #zip.printdir()
-  
+        #zipf.printdir()
         # extracting all the files
         print('Extracting all the files now...')
-        zip.extractall()
+        zipf.extractall()
         print('Done!')
 
 bhav_url  = 'https://www.bseindia.com/download/BhavCopy/Equity/EQ{datestr}_CSV.ZIP'
@@ -362,11 +435,13 @@ def update_indices(date=datetime.today()):
 
 if __name__ == "__main__":
     day = datetime.today()
+    bulk  = False
     import argparse
     parser = argparse.ArgumentParser(description='Download stock data for stock/date')
     parser.add_argument('-s', '--stock', help="Stock code")
     parser.add_argument('-r', '--report', help="Index report", action='store_true', default=False)
     parser.add_argument('-d', '--date', help="Date")
+    parser.add_argument('-b', '--bulk', help="Get bulk data for stock(s)", action="store_true", default=False)
     args = parser.parse_args()
     stock_code = None
     
@@ -380,22 +455,24 @@ if __name__ == "__main__":
         print('Download index report')
         update_indices(date = day)
         exit()
-    
+    if args.bulk:
+        bulk = True
+        
     if stock_code is None:
-        stock_iter = LockedIterator(get_next_stock())
+        stock_iter = LockedIterator(get_next_stock(args.bulk))
     
         threads = []
         num_threads = multiprocessing.cpu_count() * 2
         try:
-          for thread_id in range(num_threads):
-              t = threading.Thread(target=work_loop, args=("Thread ID {id}".format(id=thread_id), thread_id))
-              threads.append(t)
-              t.start()
+            for thread_id in range(num_threads):
+                t = threading.Thread(target=work_loop, args=("Thread ID {id}".format(id=thread_id), thread_id))
+                threads.append(t)
+                t.start()
     
-          for t in threads:
-              t.join()
+            for t in threads:
+                t.join()
         except:
-          print(("Unable to start thread ({id})".format(id=thread_id)))
+            print(("Unable to start thread ({id})".format(id=thread_id)))
     
         with open(ERR_FILE, 'w') as fd:
             fd.write(datetime.today().strftime("%d/%m/%y"))
@@ -404,7 +481,10 @@ if __name__ == "__main__":
     else:
         try:
             stock = Stock.objects.get(security=stock_code)
-            get_data_for_date(stock, day)
+            if args.bulk:
+                get_bulk(stock)
+            else:
+                get_data_for_date(stock, day)
         except Stock.DoesNotExist:
             print('Stock does not exist in DB')
     

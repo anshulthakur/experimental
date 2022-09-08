@@ -165,12 +165,13 @@ def main(reference, timeframe):
             
             if len(s_df)<len(r_df)+1:
                 #print(f'{len(s_df)},{len(r_df)}Skip')
-                correlations.append(0)
+                #correlations.append(0)
+                pass
             else:
                 s_df.drop(s_df.iloc[0].name, inplace=True) #First entry is going to be NaN
                 c = r_df.iloc[:,0].corr(s_df.iloc[:,0])
                 #print(f'Correlation: {c}')
-                correlations.append(c)
+                #correlations.append(c)
                 if c>max_corr:
                     max_corr=c
                     max_corr_idx = [symbol]
@@ -216,26 +217,28 @@ def main(reference, timeframe):
             
             if len(s_df)<len(r_df)+1:
                 #print('Skip')
-                bse_correlations.append(0)
+                #bse_correlations.append(0)
+                pass
             else:
                 s_df.drop(s_df.iloc[0].name, inplace=True) #First entry is going to be NaN
                 c = r_df.iloc[:,0].corr(s_df.iloc[:,0])
                 #print(f'Correlation: {c}')
-                bse_correlations.append(c)
+                #bse_correlations.append(c)
                 if c>max_corr:
                     max_corr=c
                     max_corr_idx = [symbol]
                 elif c==max_corr:
                     max_corr_idx.append(symbol)
-    val = max(correlations)
-    max_idx = [index for index, item in enumerate(correlations) if item == max(correlations)]
-    names = [indices[idx] for idx in max_idx]
-    print(f'Maximum correlation (NSE):{val}: {names}')
+    #val = max(correlations)
+    #max_idx = [index for index, item in enumerate(correlations) if item == max(correlations)]
+    #names = [indices[idx] for idx in max_idx]
+    #print(f'Maximum correlation (NSE):{val}: {names}')
     
-    val = max(bse_correlations)
-    max_idx = [index for index, item in enumerate(bse_correlations) if item == max(bse_correlations)]
-    names = [b_indices[idx] for idx in max_idx]
-    print(f'Maximum correlation (BSE):{val}: {names}')
+    #val = max(bse_correlations)
+    #max_idx = [index for index, item in enumerate(bse_correlations) if item == max(bse_correlations)]
+    #names = [b_indices[idx] for idx in max_idx]
+    #print(f'Maximum correlation (BSE):{val}: {names}')
+    print(f'Maximum correlation:{max_corr}: {max_corr_idx}')
     print(f'NSE: {len(indices)}. BSE: {len(b_indices)}')
 
 if __name__ == "__main__":

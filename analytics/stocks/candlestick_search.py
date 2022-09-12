@@ -9,7 +9,8 @@ from math import floor
 
 # load the image and convert into 
 # numpy array
-img = Image.open('images/2_crop.png').convert('RGB')
+img_name = '3_crop'
+img = Image.open('images/'+img_name+'.png').convert('RGB')
 numpydata = asarray(img)
 
 [rows, cols, colors]= numpydata.shape
@@ -134,18 +135,19 @@ for candle in candles:
 import datetime
 from dateutil.relativedelta import relativedelta
 
-last_candle_date = '01/09/22'
+last_candle_date = '05/09/22'
 day = datetime.datetime.strptime(last_candle_date, "%d/%m/%y").date()
 print(day)
 #download_date = day - datetime.timedelta(days=delta)
-with open('./images/2.csv', 'w') as fd:
+with open('./images/'+img_name+'.csv', 'w') as fd:
     ii=0
-    fd.write('date,Candle Color,Candle Length,open,close,change\n')
+    fd.write('index,Candle Color,Candle Length,open,close,change\n')
     for candle in candles:
-        dayval = (day - relativedelta(months=len(candles)-ii-1)).strftime('%d/%m/%Y')
+        #dayval = (day - relativedelta(months=len(candles)-ii-1)).strftime('%d/%m/%Y')
+        dayval = (day - relativedelta(weeks=len(candles)-ii-1)).strftime('%d/%m/%Y')
         if ii==0:
-            fd.write(f"{dayval},{candle['color']},{candle['body_end_left'][0] - candle['body_start_left'][0]},{candle['open']},{candle['close']},{(candle['close']-candle['open'])/candle['close']}\n")
+            fd.write(f"{ii},{candle['color']},{candle['body_end_left'][0] - candle['body_start_left'][0]},{candle['open']},{candle['close']},{(candle['close']-candle['open'])/candle['close']}\n")
         else:
-            fd.write(f"{dayval},{candle['color']},{candle['body_end_left'][0] - candle['body_start_left'][0]},{candle['open']},{candle['close']},{(candles[ii]['close']-candles[ii-1]['close'])/candles[ii-1]['close']}\n")
+            fd.write(f"{ii},{candle['color']},{candle['body_end_left'][0] - candle['body_start_left'][0]},{candle['open']},{candle['close']},{(candles[ii]['close']-candles[ii-1]['close'])/candles[ii-1]['close']}\n")
         ii+=1
     

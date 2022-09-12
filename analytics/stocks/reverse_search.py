@@ -7,6 +7,7 @@ Created on 01-Sep-2022
 import os
 import sys
 import csv
+import json
 
 from lib.tradingview import TvDatafeed, Interval, convert_timeframe_to_quant
 import datetime
@@ -95,16 +96,16 @@ def main(reference, timeframe):
     r_df = r_df.drop(columns = ['Candle Color','Candle Length','open','close'])
     #print(s_df.head())
     r_df.reset_index(inplace = True)
-    r_df['date'] = pd.to_datetime(r_df['date'], format='%d/%m/%Y').dt.date
-    r_df.set_index('date', inplace = True)
+    #r_df['date'] = pd.to_datetime(r_df['date'], format='%d/%m/%Y').dt.date
+    r_df.set_index('index', inplace = True)
     r_df = r_df.sort_index()
     r_df = r_df.reindex(columns = ['change'])
     
     print(len(r_df))
-    r_df.drop(r_df.iloc[len(r_df)-1].name, inplace=True) #Last entry is the month which may still be running
+    #r_df.drop(r_df.iloc[len(r_df)-1].name, inplace=True) #Last entry is the month which may still be running
     
-    start_date = r_df.index.values[0]
-    end_date = r_df.index.values[-1]
+    #start_date = r_df.index.values[0]
+    #end_date = r_df.index.values[-1]
     
     r_df.drop(r_df.iloc[0].name, inplace=True) #First entry is not the change, just the baseline
     
@@ -112,14 +113,25 @@ def main(reference, timeframe):
     password = '@nshulthakur123'
     tv = get_tvfeed_instance(username, password)
     
-    cutoff_date = datetime.datetime.strptime('01-Aug-2013', "%d-%b-%Y")
+    cutoff_date = datetime.datetime.strptime('01-Aug-2018', "%d-%b-%Y")
     #cutoff_date = r_df.index.values[0]
     d = relativedelta(datetime.datetime.today(), cutoff_date)
-    n_bars = (d.years*12) + d.months+1
+    if timeframe == Interval.in_monthly:
+        print('Monthly')
+        n_bars = max((d.years*12) + d.months+1, len(r_df))+10
+    elif timeframe == Interval.in_weekly:
+        print('Weekly')
+        n_bars = max((d.years*52) + (d.months*5) + d.weeks+1, len(r_df))+10
+    else:
+        print('Daily')
+        n_bars = max(500, len(r_df))+10
     
+    print(f'Get {n_bars} candles')
     correlations = []
     bse_correlations = []
 
+    shortlist = {}
+    c_thresh = 0.85
     max_corr = 0
     max_corr_idx = None
     for stock in indices:
@@ -153,25 +165,34 @@ def main(reference, timeframe):
                 print('Skip {}'.format(symbol))
                 continue
             s_df.reset_index(inplace = True)
-            s_df.rename(columns={'datetime': 'date', 'close': 'change'},
+            s_df = s_df.drop(columns='datetime')
+            #s_df.rename(columns={'close': 'change', 'datetime':'date'},
+            s_df.rename(columns={'close': 'change'},
                        inplace = True)
-            s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y').dt.date
-            s_df.set_index('date', inplace = True)
+            #s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y').dt.date
+            #s_df.set_index('date', inplace = True)
             s_df = s_df.sort_index()
             s_df = s_df.reindex(columns = ['change'])
             s_df = s_df[~s_df.index.duplicated(keep='first')]
-            s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
+            #s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
+            #s_df = s_df.iloc[-len(r_df)-2:-1]
+
+            #print(s_df.tail(10))
             s_df = s_df.pct_change(1)
             
             if len(s_df)<len(r_df)+1:
-                #print(f'{len(s_df)},{len(r_df)}Skip')
+                print(f'{len(s_df)},{len(r_df)}Skip')
                 #correlations.append(0)
                 pass
             else:
                 s_df.drop(s_df.iloc[0].name, inplace=True) #First entry is going to be NaN
-                c = r_df.iloc[:,0].corr(s_df.iloc[:,0])
-                #print(f'Correlation: {c}')
-                #correlations.append(c)
+                c = 0
+                for ii in range(0, len(s_df) - len(r_df)):
+                    c = max(r_df.iloc[:,0].corr(s_df.iloc[-(len(r_df)-ii):-1,0]), c)
+                    #print(f'Correlation: {c}')
+                    #correlations.append(c)
+                if c >= c_thresh:
+                    shortlist[symbol] = c
                 if c>max_corr:
                     max_corr=c
                     max_corr_idx = [symbol]
@@ -205,14 +226,17 @@ def main(reference, timeframe):
                 print('Skip {}'.format(symbol))
                 continue
             s_df.reset_index(inplace = True)
-            s_df.rename(columns={'datetime': 'date', 'close': 'change'},
+            s_df = s_df.drop(columns='datetime')
+            #s_df.rename(columns={'close': 'change', 'datetime':'date'},
+            s_df.rename(columns={'close': 'change'},
                        inplace = True)
-            s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y').dt.date
-            s_df.set_index('date', inplace = True)
+            #s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y').dt.date
+            #s_df.set_index('date', inplace = True)
             s_df = s_df.sort_index()
             s_df = s_df.reindex(columns = ['change'])
             s_df = s_df[~s_df.index.duplicated(keep='first')]
-            s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
+            #s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
+            #s_df = s_df.iloc[-len(r_df)-2:-1]
             s_df = s_df.pct_change(1)
             
             if len(s_df)<len(r_df)+1:
@@ -221,9 +245,13 @@ def main(reference, timeframe):
                 pass
             else:
                 s_df.drop(s_df.iloc[0].name, inplace=True) #First entry is going to be NaN
-                c = r_df.iloc[:,0].corr(s_df.iloc[:,0])
-                #print(f'Correlation: {c}')
-                #bse_correlations.append(c)
+                c = 0
+                for ii in range(0, len(s_df) - len(r_df)):
+                    c = max(r_df.iloc[:,0].corr(s_df.iloc[-(len(r_df)-ii):-1,0]), c)
+                    #print(f'Correlation: {c}')
+                    #correlations.append(c)
+                if c > c_thresh:
+                    shortlist[symbol] = c
                 if c>max_corr:
                     max_corr=c
                     max_corr_idx = [symbol]
@@ -241,10 +269,11 @@ def main(reference, timeframe):
     print(f'Maximum correlation:{max_corr}: {max_corr_idx}')
     print(f'NSE: {len(indices)}. BSE: {len(b_indices)}')
 
+    print(f'Shortlist: {json.dumps(shortlist, indent=2)}')
 if __name__ == "__main__":
     day = datetime.date.today()
     import argparse
-    parser = argparse.ArgumentParser(description='Compute RRG data for indices')
+    parser = argparse.ArgumentParser(description='Perform reverse search for indices')
     parser.add_argument('-t', '--timeframe', help="Timeframe")
     parser.add_argument('-f', '--file', help="CSV file of the candlesticks to search for")
     

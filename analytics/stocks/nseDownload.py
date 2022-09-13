@@ -16,6 +16,7 @@ import time
 import brotli
 import gzip
 from io import BytesIO
+from zipfile import ZipFile
 
 import traceback
 
@@ -36,13 +37,16 @@ else:
 
 
 raw_data_dir = './nseData/'
+delivery_data_dir = raw_data_dir+'delivery/'
 
 archive_url = 'https://www1.nseindia.com/products/content/equities/equities/archieve_eq.htm'
 
 months = ['', 'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
-def handle_download(session, url, filename):
+def handle_download(session, url, filename, path=raw_data_dir):
     print(url)
-    
+    if os.path.isfile(path+filename):
+        #Skip file download
+        return
     response = session.get(url)
     #print(response.headers)
     text = False
@@ -64,20 +68,22 @@ def handle_download(session, url, filename):
                 except:
                     result = response.content
         if text:
-            with open(raw_data_dir+filename, 'w') as fd:
+            with open(path+filename, 'w') as fd:
                 fd.write(result)
         else:
-            with open(raw_data_dir+filename, 'wb') as fd:
+            with open(path+filename, 'wb') as fd:
                 fd.write(result)
+            
     else:
         print(response.content.decode('utf-8'))
 
-def download_archive(driver):
-    driver.get(archive_url)
+def download_archive(date = datetime.strptime('01-01-2005', "%d-%m-%Y").date()):
+    #driver.get(archive_url)
 
     session = requests.Session()
     # Set correct user agent
-    selenium_user_agent = driver.execute_script("return navigator.userAgent;")
+    #selenium_user_agent = driver.execute_script("return navigator.userAgent;")
+    selenium_user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36'
     #print(selenium_user_agent)
     session.headers.update({"user-agent": selenium_user_agent})
     session.headers.update({"accept-encoding": "gzip, deflate, br",
@@ -87,9 +93,9 @@ def download_archive(driver):
             "host": "www1.nseindia.com",
             "referer": "https://www1.nseindia.com/products/content/equities/equities/archieve_eq.htm"})
 
-    for cookie in driver.get_cookies():
-        #print(cookie)
-        session.cookies.set(cookie['name'], cookie['value'], domain=cookie['domain'])
+    #for cookie in driver.get_cookies():
+    #    #print(cookie)
+    #    session.cookies.set(cookie['name'], cookie['value'], domain=cookie['domain'])
     
     #time.sleep(2)
     #search = driver.find_element(by=By.CLASS_NAME, value='archive_search')
@@ -106,25 +112,37 @@ def download_archive(driver):
     #print(search.find_element(by=By.CLASS_NAME, value="getdata-button"))
     #search.find_element(by=By.CLASS_NAME, value="getdata-button").click()
     time.sleep(2)
+    session.get(archive_url)
     base_bhav_file = 'cm{day:02}{month}{year:04}bhav.csv.zip'
     base_url_bhav = 'https://www1.nseindia.com/content/historical/EQUITIES/{year:04}/{month}/'+base_bhav_file
 
     base_delivery_file = 'MTO_{day:02}{month:02}{year:04}.DAT'
     base_delivery_url = 'https://www1.nseindia.com/archives/equities/mto/'+base_delivery_file
-    date = datetime.strptime('01-01-2005', "%d-%m-%Y").date()
+    
 
     #el = driver.find_element(by = By.XPATH, value='//*[@id="spanDisplayBox"]/table/tbody/tr/td/a')
     #if el is not None:
     #   url = el.get_attribute('href')
     while date <= datetime.today().date():
+
         if date.weekday()<=4:
             print(f'Downloading for {date}')
             #Download bhavcopy
             handle_download(session, url = base_url_bhav.format(day=date.day, month=months[date.month], year=date.year), 
                                     filename = base_bhav_file.format(day=date.day, month=months[date.month], year=date.year))
             #Download delivery data
-            #handle_download(session, url = base_delivery_url.format(day=date.day, month=date.month, year=date.year), 
-            #                        filename = base_delivery_file.format(day=date.day, month=date.month, year=date.year))
+            handle_download(session, url = base_delivery_url.format(day=date.day, month=date.month, year=date.year), 
+                                    filename = base_delivery_file.format(day=date.day, month=date.month, year=date.year),
+                                    path=delivery_data_dir)
+            #Bhavcopy is zip file, so handle that
+            if os.path.isfile(raw_data_dir+base_bhav_file.format(day=date.day, month=months[date.month], year=date.year)):
+                with ZipFile(raw_data_dir+base_bhav_file.format(day=date.day, month=months[date.month], year=date.year), 'r') as zipf:
+                    # printing all the contents of the zip file
+                    #zipf.printdir()
+                    # extracting all the files
+                    #print('Extracting all the files now...')
+                    zipf.extractall(raw_data_dir)
+                    #print('Done!')
         date = date + timedelta(days=1)
     
 
@@ -145,13 +163,16 @@ if __name__ == "__main__":
     if args.bulk:
         bulk = True
 
-    options = Options()
-    preferences = {"download.default_directory" : raw_data_dir}
-    options.add_experimental_option("prefs", preferences)
+    #options = Options()
+    #preferences = {"download.default_directory" : raw_data_dir}
+    #options.add_experimental_option("prefs", preferences)
+    #options.add_argument("--headless")
 
-    service = Service(executable_path=DriverManager().install())
-    driver = Browser(service=service, options=options)
-    driver.implicitly_wait(wait_period)
-    download_archive(driver)
-    
-    driver.quit()
+    #service = Service(executable_path=DriverManager().install())
+    #driver = Browser(service=service, options=options)
+    #driver.implicitly_wait(wait_period)
+    #driver = None
+    if args.bulk:    
+        download_archive()
+    else:
+        download_archive(date=day.date())

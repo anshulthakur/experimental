@@ -162,12 +162,12 @@ def get_bulk(stock):
             for row in table_vals:
                 tds = row('td')
                 if tds is not None:
-                    listing = Listing.objects.filter(date__contains = datetime.strptime(tds[0].string, "%-d/%m/%y").date(), stock=stock)
+                    listing = Listing.objects.filter(date__contains = datetime.strptime(tds[0].string, "%d/%m/%y").date(), stock=stock)
                     #print(('{da} exists'.format(da = stock.security)))
                     if len(listing) == 0:
                         listing = Listing()
                         listing.stock = stock
-                        listing.date = datetime.strptime(tds[0].string, "%-d/%m/%y")
+                        listing.date = datetime.strptime(tds[0].string, "%d/%m/%y")
                         listing.opening = fix_float(tds[1])
                         listing.high = fix_float(tds[2])
                         listing.low = fix_float(tds[3])

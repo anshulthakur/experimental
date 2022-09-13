@@ -19,6 +19,7 @@ import threading
 import multiprocessing
 
 num_threads = multiprocessing.cpu_count()
+#num_threads = 1
 thread_busy = [1 for i in range(0,num_threads)]
 
 download_dir = "/home/anshul/web/analytics/analytics/stocks/bsedata/"
@@ -99,13 +100,18 @@ def download_data(driver, url):
                 month_el.find_element(by=By.CSS_SELECTOR, value='option[value="0"]').click()
                 year_el = driver.find_element(by=By.CSS_SELECTOR, value='select[class="ui-datepicker-year"]')
                 year_el.click()
-                year_el.find_element(by=By.CSS_SELECTOR, value='option[value="2012"]').click()
+                time.sleep(0.1)
+                print(1)
+                year_el.find_element(by=By.CSS_SELECTOR, value='option[value="2012]').click()
                 year_el = driver.find_element(by=By.CSS_SELECTOR, value='select[class="ui-datepicker-year"]')
                 year_el.click()
+                time.sleep(0.1)
+                print(2)
                 year_el.find_element(by=By.CSS_SELECTOR, value='option[value="2007"]').click()
                 date_el = driver.find_element(by=By.CSS_SELECTOR, value='table[class="ui-datepicker-calendar"]').find_elements(by=By.TAG_NAME, value='tbody')[0]
                 date_elem = date_el.find_element(by=By.XPATH, value=".//*[contains(text(), '1')]")
                 date_elem.click()
+                print(3)
             else:
                 print ('Returned Empty results')
                 return True
@@ -114,6 +120,8 @@ def download_data(driver, url):
             time.sleep(1)
             submit_btn.click()
 
+            print('Sleep')
+            time.sleep(5)
             if not error_occured(driver.find_element(by=By.TAG_NAME, value='body').text):
                 download_link = driver.find_element(by=By.ID, value='ContentPlaceHolder1_btnDownload')
                 download_link.click()
@@ -125,7 +133,7 @@ def download_data(driver, url):
             return False
     except Exception as e:
     	print(e)
-    	print ('Exception Geting URL')
+    	print('Exception Geting URL')
     	return True
 
 def work_loop(thread_name, tid):

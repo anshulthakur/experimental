@@ -17,7 +17,7 @@ import multiprocessing
 num_threads = multiprocessing.cpu_count()
 thread_busy = [1 for i in range(0,num_threads)]
 
-download_dir = "/home/craft/tests/experimental/analytics/stocks/bsedata/"
+download_dir = "/home/anshul/tests/experimental/analytics/stocks/bsedata/"
 preferences = {"download.default_directory" : download_dir}
 
 base_url = "http://www.bseindia.com/markets/equity/EQReports/StockPrcHistori.aspx?expandable=7&scripcode=%s&flag=sp&Submit=G"
@@ -106,7 +106,7 @@ def work_loop(thread_name, tid):
 	
 	#options.add_argument("")
 	options.add_experimental_option("prefs", preferences)
-	driver = webdriver.Chrome('/home/craft/tests/experimental/analytics/stocks/chromedriver',chrome_options=options)
+	driver = webdriver.Chrome('/home/anshul/web/analytics/analytics/stocks/chromedriver',chrome_options=options)
 	driver.implicitly_wait(10) #seconds: After page load, some classes may load up by JS. So, wait if not available
 
 

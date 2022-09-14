@@ -20,20 +20,20 @@ from zipfile import ZipFile
 
 import traceback
 
-from selenium import webdriver
-from selenium.webdriver.common.by import By
+#from selenium import webdriver
+#from selenium.webdriver.common.by import By
 
-use_chrome = True
-if use_chrome:
-    from selenium.webdriver.chrome.options import Options
-    
-    from selenium.webdriver.chrome.service import Service
-    from webdriver_manager.chrome import ChromeDriverManager as DriverManager
-    from selenium.webdriver import Chrome as Browser
-else:
-    from selenium.webdriver.edge.service import Service
-    from webdriver_manager.microsoft import EdgeChromiumDriverManager  as DriverManager
-    from selenium.webdriver import Edge as Browser
+#use_chrome = True
+#if use_chrome:
+#    from selenium.webdriver.chrome.options import Options
+#    
+#    from selenium.webdriver.chrome.service import Service
+#    from webdriver_manager.chrome import ChromeDriverManager as DriverManager
+#    from selenium.webdriver import Chrome as Browser
+#else:
+#    from selenium.webdriver.edge.service import Service
+#    from webdriver_manager.microsoft import EdgeChromiumDriverManager  as DriverManager
+#    from selenium.webdriver import Edge as Browser
 
 
 raw_data_dir = './nseData/'
@@ -143,9 +143,61 @@ def download_archive(date = datetime.strptime('01-01-2005', "%d-%m-%Y").date()):
                     #print('Extracting all the files now...')
                     zipf.extractall(raw_data_dir)
                     #print('Done!')
+                os.remove(raw_data_dir+base_bhav_file.format(day=date.day, month=months[date.month], year=date.year))
         date = date + timedelta(days=1)
-    
 
+def populate_scrips():
+    scrip_list = 'NSE_list.csv'
+    with open(scrip_list, 'r') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            try:
+                market = Market.objects.get(name = 'NSE')
+                industry = None
+                try:
+                    stock = Stock.objects.get(isin=row.get('ISIN NUMBER'))
+                except Stock.DoesNotExist:
+                    stock = Stock(sid = row.get('SYMBOL'),
+                                  name = row.get('NAME OF COMPANY').strip(),
+                                  group = row.get('SERIES').strip(),
+                                  face_value = row.get('FACE VALUE').strip(),
+                                  isin = row.get('ISIN NUMBER').strip(),
+                                  industry = industry,
+                                  market = market)
+                    stock.save()
+                    print('Created {}'.format(stock.sid))
+                    
+def add_data_to_db(date = datetime.strptime('01-01-2005', "%d-%m-%Y").date()):
+    base_bhav_file = 'cm{day:02}{month}{year:04}bhav.csv'
+    base_delivery_file = 'MTO_{day:02}{month:02}{year:04}.DAT'
+
+    while date <= datetime.today().date():
+        stocks = []
+        listings = []
+        bhav_name = raw_data_dir+base_bhav_file.format(day=date.day, month=months[date.month], year=date.year)
+        if os.path.isfile(bhav_name):
+            with open(bhav_name, 'r') as bhavfile:
+                reader = csv.DictReader(bhavfile)
+                for row in reader:
+                    try:
+                        stock = Stock.objects.get(isin=row.get('ISIN'))
+                    except Stock.DoesNotExist:
+                        stock = Stock(isin = row.get('ISIN'),
+                                      sid = row.get('SYMBOL'))
+                    listing = Listing(stock=stock,
+                                          date=datetime.strptime(row.get('Date').strip(), '%d-%B-%Y'),
+                                          opening=float(row.get('Open Price').strip()),
+                                          high = float(row.get('High Price').strip()),
+                                          low = float(row.get('Low Price').strip()),
+                                          closing = float(row.get('Close Price').strip()),
+                                          wap = float(row.get('WAP').strip()),
+                                          traded = int(row.get('No.of Shares').strip()),
+                                          trades = int(row.get('No. of Trades').strip()),
+                                          turnover = float(row.get('Total Turnover (Rs.)').strip()),
+                                          deliverable = float(row.get('Deliverable Quantity').strip()) if len(row.get('Deliverable Quantity').strip()) > 0 else 0,
+                                          )
+                    listings += [listing]
+    pass
 
 if __name__ == "__main__":
     day = datetime.today()
@@ -163,6 +215,14 @@ if __name__ == "__main__":
     if args.bulk:
         bulk = True
 
+    try:
+        os.mkdir(raw_data_dir)
+        os.mkdir(delivery_data_dir)
+    except FileExistError:
+        pass
+    except:
+        print('Error creating raw data folder')
+        exit(0)
     #options = Options()
     #preferences = {"download.default_directory" : raw_data_dir}
     #options.add_experimental_option("prefs", preferences)

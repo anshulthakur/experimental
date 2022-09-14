@@ -1,4 +1,4 @@
-from stocks.models import Industry, Market
+from stocks.models import Industry
 from django.db import models
 
 from random import randint
@@ -10,7 +10,6 @@ class StockManager(models.Manager):
         return self.all()[random_index]
 
 class Stock(models.Model):
-    security = models.BigIntegerField(default=0)
     sid = models.CharField(blank=False,
                             null=False,
                             max_length=15)
@@ -25,10 +24,6 @@ class Stock(models.Model):
                             null=False,
                             max_length=15)
     industry = models.ForeignKey(Industry,
-                                 null=True,
-                                 default=None,
-                                 on_delete = models.SET_NULL)
-    market = models.ForeignKey(Market,
                                  null=True,
                                  default=None,
                                  on_delete = models.SET_NULL)

@@ -13,6 +13,7 @@ from lib.tradingview import TvDatafeed, Interval, convert_timeframe_to_quant
 import datetime
 from dateutil.relativedelta import relativedelta
 import pandas as pd
+import matplotlib.pyplot as plt
  
 nse_list = 'NSE_list.csv'
 bse_list = 'BSE_list.csv'
@@ -20,6 +21,8 @@ img_dir = './images/'
 cache_dir = './images/cache/'
 
 tvfeed_instance = None
+
+max_depth = 5
 
 def get_tvfeed_instance(username, password):
     global tvfeed_instance
@@ -35,6 +38,9 @@ def calc_correlation(actual, predic):
     numerator = np.sum(a_diff * p_diff)
     denominator = np.sqrt(np.sum(a_diff ** 2)) * np.sqrt(np.sum(p_diff ** 2))
     return numerator / denominator
+
+def calc_mape(actual, predic):
+    return np.mean(np.abs((actual - predic) / actual))
 
 def cached(name, df=None):
     import json
@@ -78,7 +84,87 @@ def cached(name, df=None):
         df.to_csv(f)
         return None
 
-def main(reference, timeframe, delta):
+def emit_plot(a,b):
+    plt.figure(figsize=(16, 8), dpi=150)
+    print(len(a[0]), len(b[0]))
+    a[0].reset_index()
+    ax = (a[0]-a[0].mean()).plot(y=a[1], label='a', color='orange')
+    (b[0]-b[0].mean()).plot(ax=ax, y=b[1], label='b', color='blue')
+    plt.savefig('./images/compare_lines.png')
+
+def compare_stock_info(r_df, s_df, delta, emit=False, logscale=False):
+    s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume'])
+    s_df = s_df.sort_index()
+       
+    s_df.reset_index(inplace = True)
+    #print(s_df.head(10))
+    s_df = s_df.drop(columns='datetime')
+    #s_df.rename(columns={'close': 'change', 'datetime':'date'},
+    s_df.rename(columns={'close': 'change'},
+                inplace = True)
+    #s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y').dt.date
+    #s_df.set_index('date', inplace = True)
+    #s_df = s_df.sort_index()
+    s_df = s_df.reindex(columns = ['change'])
+    s_df = s_df[~s_df.index.duplicated(keep='first')]
+    #s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
+    #s_df = s_df.iloc[-len(r_df)-2:-1]
+    #print(s_df.head(10))
+    #print(s_df.tail(10))
+    
+    #r_df = r_df - r_df.mean()
+    r_df = r_df.reset_index()
+    if len(s_df)<len(r_df)+1:
+        print(f'{len(s_df)},{len(r_df)}Skip')
+        #correlations.append(0)
+        c = -1
+        pass
+    else:
+        #s_df.drop(s_df.iloc[0].name, inplace=True) #First entry is going to be NaN
+        c = 0
+        #print('Window slide length {}'.format(len(s_df) - len(r_df)))
+        for ii in range(0, max(len(s_df) - len(r_df), max_depth)):
+            #print(-(len(r_df)-ii)-1, -ii)
+            if ii==0:
+                temp_df = s_df.iloc[-(len(r_df)+ii):].copy(deep=True).reset_index()
+                if logscale:
+                    temp_df = np.log10(temp_df)
+                    #temp_df = temp_df - temp_df.mean()
+            else:
+                temp_df = s_df.iloc[-(len(r_df)+ii):-ii].copy(deep=True).reset_index()
+                if logscale:
+                    temp_df = np.log10(temp_df)
+                    #temp_df = temp_df - temp_df.mean()
+            
+            #print(temp_df.tail(10))
+            #print(max(temp_df['change']))
+            #print(min(temp_df['change']))
+            
+            temp_df['change'] = temp_df['change']/(max(temp_df['change'] - min(temp_df['change'])))
+            
+            #print(temp_df.tail(10))
+            if delta:
+                temp_df = temp_df.pct_change(1)
+                temp_df.drop(temp_df.iloc[0].name, inplace=True) #First entry is going to be NaN
+            
+            if ii==0:
+                #print(temp_df.head(10))
+                #print(r_df.iloc[:,0])
+                #print(temp_df.iloc[:,0])
+                #print(r_df.head(10))
+                if emit:
+                    emit_plot([r_df, 'change'], [temp_df, 'change'])
+                pass
+            #print(len(r_df), len(temp_df))
+            #cval = r_df.iloc[:,0].corr(temp_df.iloc[:,0])
+            cval = calc_correlation(r_df.iloc[:,0], temp_df.iloc[:,0])
+            mcval = calc_mape(r_df.iloc[:,0], temp_df.iloc[:,0])
+            c = max(cval, c)
+            
+            print(f'{ii} Correlation: {cval},{mcval}')
+    return c
+
+def main(reference, timeframe, delta, stock=None, logscale=False):
     if delta:
         print('Use delta')
     try:
@@ -118,7 +204,7 @@ def main(reference, timeframe, delta):
         r_df = r_df.reindex(columns = ['close'])
         r_df.rename(columns={'close': 'change'},
                            inplace = True)
-    r_df.drop(r_df.iloc[len(r_df)-1].name, inplace=True) #Last entry is the month which may still be running
+    #r_df.drop(r_df.iloc[len(r_df)-1].name, inplace=True) #Last entry is the month which may still be running
     
     #start_date = r_df.index.values[0]
     #end_date = r_df.index.values[-1]
@@ -149,16 +235,15 @@ def main(reference, timeframe, delta):
     bse_correlations = []
 
     shortlist = {}
-    c_thresh = 0.75
+    c_thresh = 0.99
     max_corr = 0
     max_corr_idx = None
-    for stock in indices:
-        print(f'{stock} Max: {max_corr_idx}({max_corr})')
+    if stock is not None:
         symbol = stock.strip().replace('&', '_')
         symbol = symbol.replace('-', '_')
         symbol = symbol.replace('*', '')
         nse_map = {'UNITDSPR': 'MCDOWELL_N',
-                   'MOTHERSUMI': 'MSUMI'}
+                'MOTHERSUMI': 'MSUMI'}
         if symbol in nse_map:
             symbol = nse_map[symbol]
         
@@ -176,67 +261,46 @@ def main(reference, timeframe, delta):
                     )
             if s_df is not None:
                 cached(symbol, s_df)
-        if s_df is not None:
-            s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume'])
-            s_df = s_df.sort_index()
-            #print(s_df.head())
-            if len(s_df)==0:
-                print('Skip {}'.format(symbol))
-                continue
-            s_df.reset_index(inplace = True)
-            #print(s_df.head(10))
-            s_df = s_df.drop(columns='datetime')
-            #s_df.rename(columns={'close': 'change', 'datetime':'date'},
-            s_df.rename(columns={'close': 'change'},
-                       inplace = True)
-            #s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y').dt.date
-            #s_df.set_index('date', inplace = True)
-            #s_df = s_df.sort_index()
-            s_df = s_df.reindex(columns = ['change'])
-            s_df = s_df[~s_df.index.duplicated(keep='first')]
-            #s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
-            #s_df = s_df.iloc[-len(r_df)-2:-1]
-            #print(s_df.head(10))
-            #print(s_df.tail(10))
+            else:
+                s_df = tv.get_hist(
+                        symbol,
+                        'BSE',
+                        interval=timeframe,
+                        n_bars=n_bars,
+                        extended_session=False,
+                        )
+                if s_df is not None:
+                    cached(symbol, s_df)
+        if s_df is not None and len(s_df)>0:
+            c = compare_stock_info(r_df, s_df, delta, emit=True, logscale=logscale)
+            print(f'{stock} Max: {max_corr_idx}({max_corr})')
+            print(f'Correlation: {c}')
+    else:
+        for stock in indices:
+            symbol = stock.strip().replace('&', '_')
+            symbol = symbol.replace('-', '_')
+            symbol = symbol.replace('*', '')
+            nse_map = {'UNITDSPR': 'MCDOWELL_N',
+                    'MOTHERSUMI': 'MSUMI'}
+            if symbol in nse_map:
+                symbol = nse_map[symbol]
             
-            if len(s_df)<len(r_df)+1:
-                print(f'{len(s_df)},{len(r_df)}Skip')
-                #correlations.append(0)
+            s_df = cached(symbol)
+            if s_df is not None:
+                #print('Found in Cache')
                 pass
             else:
-                #s_df.drop(s_df.iloc[0].name, inplace=True) #First entry is going to be NaN
-                c = 0
-                #print('Window slide length {}'.format(len(s_df) - len(r_df)))
-                for ii in range(0, len(s_df) - len(r_df)):
-                    #print(-(len(r_df)-ii)-1, -ii)
-                    if ii==0:
-                        temp_df = s_df.iloc[-(len(r_df)+ii)-1:].copy(deep=True)
-                    else:
-                        temp_df = s_df.iloc[-(len(r_df)+ii)-1:-ii].copy(deep=True)
-                    
-                    # if symbol=='ADANIPOWER' and ii==0:
-                    #     print(temp_df.tail(10))
-                    #     print(max(temp_df['change']))
-                    #     print(min(temp_df['change']))
-                    temp_df['change'] = temp_df['change']/(max(temp_df['change'] - min(temp_df['change'])))
-                    # if symbol=='ADANIPOWER' and ii==0:
-                    #     print(temp_df.tail(10))
-                    if delta:
-                        temp_df = temp_df.pct_change(1)
-                        temp_df.drop(temp_df.iloc[0].name, inplace=True) #First entry is going to be NaN
-                    # if symbol=='ADANIPOWER' and ii==0:
-                    #     print(temp_df.head(10))
-                    #     print(temp_df.tail(10))
-                    #     print(len(r_df), len(temp_df))
-                    #cval = r_df.iloc[:,0].corr(temp_df.iloc[:,0])
-                    cval = calc_correlation(r_df.iloc[:,0], temp_df.iloc[:,0])
-                    c = max(cval, c)
-                    
-                    # if symbol=='ADANIPOWER' :
-                    #     print(f'{ii} Correlation: {cval}, {type(cval)}')
-                    #correlations.append(c)
-                # if symbol=='ADANIPOWER' :
-                #     print('Correlation:{}'.format(c))
+                s_df = tv.get_hist(
+                            symbol,
+                            'NSE',
+                            interval=timeframe,
+                            n_bars=n_bars,
+                            extended_session=False,
+                        )
+                if s_df is not None:
+                    cached(symbol, s_df)
+            if s_df is not None and len(s_df)>0:
+                c = compare_stock_info(r_df, s_df, delta, logscale=logscale)
                 if c >= c_thresh:
                     shortlist[symbol] = c
                 if c>max_corr:
@@ -244,88 +308,50 @@ def main(reference, timeframe, delta):
                     max_corr_idx = [symbol]
                 elif c>0 and c==max_corr:
                     max_corr_idx.append(symbol)
-    
-    for stock in b_indices:
-        print(f'{stock} Max: {max_corr_idx}({max_corr})')
-        symbol = stock.strip().replace('&', '_')
-        symbol = symbol.replace('-', '_')
-        symbol = symbol.replace('*', '')
+            print(f'{stock}[{c}] Max: {max_corr_idx}({max_corr})')
         
-        s_df = cached(symbol)
-        if s_df is not None:
-            #print('Found in Cache')
-            pass
-        else:
-            s_df = tv.get_hist(
-                        symbol,
-                        'BSE',
-                        interval=timeframe,
-                        n_bars=n_bars,
-                        extended_session=False,
-                    )
-            if s_df is not None:
-                cached(symbol, s_df)
-        if s_df is not None:
-            s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume'])
-            s_df = s_df.sort_index()
-            #print(s_df.head())
-            if len(s_df)==0:
-                print('Skip {}'.format(symbol))
-                continue
-            s_df.reset_index(inplace = True)
-            s_df = s_df.drop(columns='datetime')
-            #s_df.rename(columns={'close': 'change', 'datetime':'date'},
-            s_df.rename(columns={'close': 'change'},
-                       inplace = True)
-            #s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y').dt.date
-            #s_df.set_index('date', inplace = True)
-            s_df = s_df.reindex(columns = ['change'])
-            s_df = s_df[~s_df.index.duplicated(keep='first')]
-            #s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
-            #s_df = s_df.iloc[-len(r_df)-2:-1]
-            #s_df = s_df.pct_change(1)
+        for stock in b_indices:
+            symbol = stock.strip().replace('&', '_')
+            symbol = symbol.replace('-', '_')
+            symbol = symbol.replace('*', '')
             
-            if len(s_df)<len(r_df)+1:
-                #print('Skip')
-                #bse_correlations.append(0)
+            s_df = cached(symbol)
+            if s_df is not None:
+                #print('Found in Cache')
                 pass
             else:
-                #s_df.drop(s_df.iloc[0].name, inplace=True) #First entry is going to be NaN
-                c = 0
-                for ii in range(0, len(s_df) - len(r_df)):
-                    #print(-(len(r_df)-ii)-1, -ii)
-                    if ii==0:
-                        temp_df = s_df.iloc[-(len(r_df)+ii)-1:].copy(deep=True)
-                    else:
-                        temp_df = s_df.iloc[-(len(r_df)+ii)-1:-ii].copy(deep=True)
-                    temp_df['change'] = temp_df['change']/(max(temp_df['change'] - min(temp_df['change'])))
-                    if delta:
-                        temp_df = temp_df.pct_change(1)
-                        temp_df.drop(temp_df.iloc[0].name, inplace=True) #First entry is going to be NaN
-                    #c = max(r_df.iloc[:,0].corr(temp_df.iloc[:,0]), c)
-                    cval = calc_correlation(r_df.iloc[:,0], temp_df.iloc[:,0])
-                    #print(f'Correlation: {c}')
-                    #correlations.append(c)
-                if c > c_thresh:
+                s_df = tv.get_hist(
+                            symbol,
+                            'BSE',
+                            interval=timeframe,
+                            n_bars=n_bars,
+                            extended_session=False,
+                        )
+                if s_df is not None:
+                    cached(symbol, s_df)
+            if s_df is not None and len(s_df)>0:
+                c = compare_stock_info(r_df, s_df, delta, logscale=logscale)
+                if c >= c_thresh:
                     shortlist[symbol] = c
                 if c>max_corr:
                     max_corr=c
                     max_corr_idx = [symbol]
                 elif c>0 and c==max_corr:
                     max_corr_idx.append(symbol)
-    #val = max(correlations)
-    #max_idx = [index for index, item in enumerate(correlations) if item == max(correlations)]
-    #names = [indices[idx] for idx in max_idx]
-    #print(f'Maximum correlation (NSE):{val}: {names}')
-    
-    #val = max(bse_correlations)
-    #max_idx = [index for index, item in enumerate(bse_correlations) if item == max(bse_correlations)]
-    #names = [b_indices[idx] for idx in max_idx]
-    #print(f'Maximum correlation (BSE):{val}: {names}')
-    print(f'Maximum correlation:{max_corr}: {max_corr_idx}')
-    print(f'NSE: {len(indices)}. BSE: {len(b_indices)}')
+            print(f'{stock}[{c}] Max: {max_corr_idx}({max_corr})')
+        #val = max(correlations)
+        #max_idx = [index for index, item in enumerate(correlations) if item == max(correlations)]
+        #names = [indices[idx] for idx in max_idx]
+        #print(f'Maximum correlation (NSE):{val}: {names}')
+        
+        #val = max(bse_correlations)
+        #max_idx = [index for index, item in enumerate(bse_correlations) if item == max(bse_correlations)]
+        #names = [b_indices[idx] for idx in max_idx]
+        #print(f'Maximum correlation (BSE):{val}: {names}')
+        print(f'Maximum correlation:{max_corr}: {max_corr_idx}')
+        print(f'NSE: {len(indices)}. BSE: {len(b_indices)}')
 
-    print(f'Shortlist: {json.dumps(shortlist, indent=2)}')
+        print(f'Shortlist: {json.dumps(shortlist, indent=2)}')
 if __name__ == "__main__":
     day = datetime.date.today()
     import argparse
@@ -333,9 +359,12 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--timeframe', help="Timeframe")
     parser.add_argument('-f', '--file', help="CSV file of the candlesticks to search for")
     parser.add_argument('-d', '--delta', action="store_true", default=False, help="Use delta between points to calculate similarity")
+    parser.add_argument('-s', '--stock', help="Specify stock to compare with")
+    parser.add_argument('-l', '--log', action="store_true", default=False, help="Use log scaling for price values ")
     
     timeframe = '1M'
     reference = None
+    stock = None
     #Can add options for weekly sampling and monthly sampling later
     args = parser.parse_args()
     if args.file is not None and len(args.file)>0:
@@ -343,5 +372,7 @@ if __name__ == "__main__":
         reference = args.file
     if args.timeframe is not None and len(args.timeframe)>0:
         timeframe=args.timeframe
+    if args.stock is not None and len(args.stock)>0:
+        stock = args.stock
 
-    main(reference, timeframe=convert_timeframe_to_quant(timeframe), delta=args.delta)
+    main(reference, timeframe=convert_timeframe_to_quant(timeframe), delta=args.delta, stock=stock, logscale=args.log)

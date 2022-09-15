@@ -27,6 +27,14 @@ def get_tvfeed_instance(username, password):
         tvfeed_instance = TvDatafeed(username, password)
     return tvfeed_instance
 
+import numpy as np
+
+def calc_correlation(actual, predic):
+    a_diff = actual - np.mean(actual)
+    p_diff = predic - np.mean(predic)
+    numerator = np.sum(a_diff * p_diff)
+    denominator = np.sqrt(np.sum(a_diff ** 2)) * np.sqrt(np.sum(p_diff ** 2))
+    return numerator / denominator
 
 def cached(name, df=None):
     import json
@@ -70,7 +78,9 @@ def cached(name, df=None):
         df.to_csv(f)
         return None
 
-def main(reference, timeframe):
+def main(reference, timeframe, delta):
+    if delta:
+        print('Use delta')
     try:
         os.mkdir(cache_dir)
     except FileExistsError:
@@ -93,22 +103,30 @@ def main(reference, timeframe):
     
     # Load the reference candlestick chart
     r_df = pd.read_csv(reference)
-    r_df = r_df.drop(columns = ['Candle Color','Candle Length','open','close'])
+    if delta:
+        r_df = r_df.drop(columns = ['Candle Color','Candle Length','open','close'])
+    else:
+        r_df = r_df.drop(columns = ['Candle Color','Candle Length','open','change'])
     #print(s_df.head())
     r_df.reset_index(inplace = True)
     #r_df['date'] = pd.to_datetime(r_df['date'], format='%d/%m/%Y').dt.date
     r_df.set_index('index', inplace = True)
     r_df = r_df.sort_index()
-    r_df = r_df.reindex(columns = ['change'])
-    
-    print(len(r_df))
-    #r_df.drop(r_df.iloc[len(r_df)-1].name, inplace=True) #Last entry is the month which may still be running
+    if delta:
+        r_df = r_df.reindex(columns = ['change'])
+    else:
+        r_df = r_df.reindex(columns = ['close'])
+        r_df.rename(columns={'close': 'change'},
+                           inplace = True)
+    r_df.drop(r_df.iloc[len(r_df)-1].name, inplace=True) #Last entry is the month which may still be running
     
     #start_date = r_df.index.values[0]
     #end_date = r_df.index.values[-1]
     
     r_df.drop(r_df.iloc[0].name, inplace=True) #First entry is not the change, just the baseline
     
+    #print(r_df.tail(10))
+    print(len(r_df))
     username = 'AnshulBot'
     password = '@nshulthakur123'
     tv = get_tvfeed_instance(username, password)
@@ -131,7 +149,7 @@ def main(reference, timeframe):
     bse_correlations = []
 
     shortlist = {}
-    c_thresh = 0.85
+    c_thresh = 0.75
     max_corr = 0
     max_corr_idx = None
     for stock in indices:
@@ -160,43 +178,71 @@ def main(reference, timeframe):
                 cached(symbol, s_df)
         if s_df is not None:
             s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume'])
+            s_df = s_df.sort_index()
             #print(s_df.head())
             if len(s_df)==0:
                 print('Skip {}'.format(symbol))
                 continue
             s_df.reset_index(inplace = True)
+            #print(s_df.head(10))
             s_df = s_df.drop(columns='datetime')
             #s_df.rename(columns={'close': 'change', 'datetime':'date'},
             s_df.rename(columns={'close': 'change'},
                        inplace = True)
             #s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y').dt.date
             #s_df.set_index('date', inplace = True)
-            s_df = s_df.sort_index()
+            #s_df = s_df.sort_index()
             s_df = s_df.reindex(columns = ['change'])
             s_df = s_df[~s_df.index.duplicated(keep='first')]
             #s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
             #s_df = s_df.iloc[-len(r_df)-2:-1]
-
+            #print(s_df.head(10))
             #print(s_df.tail(10))
-            s_df = s_df.pct_change(1)
             
             if len(s_df)<len(r_df)+1:
                 print(f'{len(s_df)},{len(r_df)}Skip')
                 #correlations.append(0)
                 pass
             else:
-                s_df.drop(s_df.iloc[0].name, inplace=True) #First entry is going to be NaN
+                #s_df.drop(s_df.iloc[0].name, inplace=True) #First entry is going to be NaN
                 c = 0
+                #print('Window slide length {}'.format(len(s_df) - len(r_df)))
                 for ii in range(0, len(s_df) - len(r_df)):
-                    c = max(r_df.iloc[:,0].corr(s_df.iloc[-(len(r_df)-ii):-1,0]), c)
-                    #print(f'Correlation: {c}')
+                    #print(-(len(r_df)-ii)-1, -ii)
+                    if ii==0:
+                        temp_df = s_df.iloc[-(len(r_df)+ii)-1:].copy(deep=True)
+                    else:
+                        temp_df = s_df.iloc[-(len(r_df)+ii)-1:-ii].copy(deep=True)
+                    
+                    # if symbol=='ADANIPOWER' and ii==0:
+                    #     print(temp_df.tail(10))
+                    #     print(max(temp_df['change']))
+                    #     print(min(temp_df['change']))
+                    temp_df['change'] = temp_df['change']/(max(temp_df['change'] - min(temp_df['change'])))
+                    # if symbol=='ADANIPOWER' and ii==0:
+                    #     print(temp_df.tail(10))
+                    if delta:
+                        temp_df = temp_df.pct_change(1)
+                        temp_df.drop(temp_df.iloc[0].name, inplace=True) #First entry is going to be NaN
+                    # if symbol=='ADANIPOWER' and ii==0:
+                    #     print(temp_df.head(10))
+                    #     print(temp_df.tail(10))
+                    #     print(len(r_df), len(temp_df))
+                    #cval = r_df.iloc[:,0].corr(temp_df.iloc[:,0])
+                    cval = calc_correlation(r_df.iloc[:,0], temp_df.iloc[:,0])
+                    c = max(cval, c)
+                    
+                    # if symbol=='ADANIPOWER' :
+                    #     print(f'{ii} Correlation: {cval}, {type(cval)}')
                     #correlations.append(c)
+                # if symbol=='ADANIPOWER' :
+                #     print('Correlation:{}'.format(c))
                 if c >= c_thresh:
                     shortlist[symbol] = c
                 if c>max_corr:
                     max_corr=c
                     max_corr_idx = [symbol]
-                elif c==max_corr:
+                elif c>0 and c==max_corr:
                     max_corr_idx.append(symbol)
     
     for stock in b_indices:
@@ -221,6 +267,7 @@ def main(reference, timeframe):
                 cached(symbol, s_df)
         if s_df is not None:
             s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume'])
+            s_df = s_df.sort_index()
             #print(s_df.head())
             if len(s_df)==0:
                 print('Skip {}'.format(symbol))
@@ -232,22 +279,31 @@ def main(reference, timeframe):
                        inplace = True)
             #s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y').dt.date
             #s_df.set_index('date', inplace = True)
-            s_df = s_df.sort_index()
             s_df = s_df.reindex(columns = ['change'])
             s_df = s_df[~s_df.index.duplicated(keep='first')]
             #s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
             #s_df = s_df.iloc[-len(r_df)-2:-1]
-            s_df = s_df.pct_change(1)
+            #s_df = s_df.pct_change(1)
             
             if len(s_df)<len(r_df)+1:
                 #print('Skip')
                 #bse_correlations.append(0)
                 pass
             else:
-                s_df.drop(s_df.iloc[0].name, inplace=True) #First entry is going to be NaN
+                #s_df.drop(s_df.iloc[0].name, inplace=True) #First entry is going to be NaN
                 c = 0
                 for ii in range(0, len(s_df) - len(r_df)):
-                    c = max(r_df.iloc[:,0].corr(s_df.iloc[-(len(r_df)-ii):-1,0]), c)
+                    #print(-(len(r_df)-ii)-1, -ii)
+                    if ii==0:
+                        temp_df = s_df.iloc[-(len(r_df)+ii)-1:].copy(deep=True)
+                    else:
+                        temp_df = s_df.iloc[-(len(r_df)+ii)-1:-ii].copy(deep=True)
+                    temp_df['change'] = temp_df['change']/(max(temp_df['change'] - min(temp_df['change'])))
+                    if delta:
+                        temp_df = temp_df.pct_change(1)
+                        temp_df.drop(temp_df.iloc[0].name, inplace=True) #First entry is going to be NaN
+                    #c = max(r_df.iloc[:,0].corr(temp_df.iloc[:,0]), c)
+                    cval = calc_correlation(r_df.iloc[:,0], temp_df.iloc[:,0])
                     #print(f'Correlation: {c}')
                     #correlations.append(c)
                 if c > c_thresh:
@@ -255,7 +311,7 @@ def main(reference, timeframe):
                 if c>max_corr:
                     max_corr=c
                     max_corr_idx = [symbol]
-                elif c==max_corr:
+                elif c>0 and c==max_corr:
                     max_corr_idx.append(symbol)
     #val = max(correlations)
     #max_idx = [index for index, item in enumerate(correlations) if item == max(correlations)]
@@ -276,6 +332,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Perform reverse search for indices')
     parser.add_argument('-t', '--timeframe', help="Timeframe")
     parser.add_argument('-f', '--file', help="CSV file of the candlesticks to search for")
+    parser.add_argument('-d', '--delta', action="store_true", default=False, help="Use delta between points to calculate similarity")
     
     timeframe = '1M'
     reference = None
@@ -287,4 +344,4 @@ if __name__ == "__main__":
     if args.timeframe is not None and len(args.timeframe)>0:
         timeframe=args.timeframe
 
-    main(reference, timeframe=convert_timeframe_to_quant(timeframe))
+    main(reference, timeframe=convert_timeframe_to_quant(timeframe), delta=args.delta)

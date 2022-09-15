@@ -9,11 +9,22 @@ import os
 from selenium import webdriver
 import csv
 import time
-from selenium.webdriver.chrome.options import Options
+
+from selenium import webdriver
 from selenium.webdriver.common.by import By
 
-from selenium.webdriver.chrome.service import Service as ChromeService
-from webdriver_manager.chrome import ChromeDriverManager
+use_chrome = True
+if use_chrome:
+    from selenium.webdriver.chrome.options import Options
+    
+    from selenium.webdriver.chrome.service import Service
+    from webdriver_manager.chrome import ChromeDriverManager as DriverManager
+    from selenium.webdriver import Chrome as Browser
+else:
+    from selenium.webdriver.edge.service import Service
+    from webdriver_manager.microsoft import EdgeChromiumDriverManager  as DriverManager
+    from selenium.webdriver import Edge as Browser
+
 
 import threading
 import multiprocessing
@@ -132,20 +143,17 @@ def download_data(driver, url):
         else:
             return False
     except Exception as e:
-    	print(e)
-    	print('Exception Geting URL')
-    	return True
+        print(e)
+        print('Exception Geting URL')
+        return True
 
 def work_loop(thread_name, tid):
     global thread_busy
     global stock_codes
 
     print(('{t} Started'.format(t=thread_name)))
-    options = webdriver.ChromeOptions() 
-    
-    from selenium.webdriver.chrome.options import Options
-
     options = Options()
+    
     #opt.add_experimental_option("prefs", {
     #  "download.default_directory": r"C:/Users/Future/Desktop",
     #  "download.prompt_for_download": False,

@@ -1,6 +1,5 @@
 from stocks.models import Stock,Market
 from django.db import models
-from datetime import datetime
 
 
 class Listing(models.Model):

@@ -2,16 +2,11 @@
 import os
 import sys
 import settings
-import matplotlib
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
 
 from django_pandas.io import read_frame
-from mplfinance.original_flavor import candlestick_ohlc
-import matplotlib.dates as mpl_dates
 
-from matplotlib.dates import date2num
 from pandas.tseries.frequencies import to_offset
 
 

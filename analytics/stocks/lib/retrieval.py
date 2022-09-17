@@ -125,12 +125,12 @@ def get_stock_listing(stock, duration=None, last_date = datetime.date.today(), s
             df['ema20'] = talib.EMA(df['close'], 20)
         if 'ema10' in studies.get('daily'):
             df['ema10'] = talib.EMA(df['close'], 10)
-    
-            
-
-    #print(df.tail())
-    #Optionally, filter out by date range
-    #start_date = '2020-01-01'
-    #end_date = '2021-12-31'
-    #df = df.loc[start_date:end_date]
     return df
+
+
+def download_bhav_copy(exchange='nse', day=None):
+    pass
+
+def download_stock_data(symbol=None, exchange='nse', day=None):
+    pass
+

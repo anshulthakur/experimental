@@ -6,10 +6,6 @@ from datetime import datetime, timedelta
 
 from stocks.models import Listing, Industry, Stock
 
-from bs4 import BeautifulSoup
-
-import threading
-import multiprocessing
 import requests
 
 import time
@@ -18,7 +14,6 @@ import gzip
 from io import BytesIO
 from zipfile import ZipFile
 
-import traceback
 
 #from selenium import webdriver
 #from selenium.webdriver.common.by import By

@@ -14,6 +14,7 @@ import datetime
 from dateutil.relativedelta import relativedelta
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.metrics import mean_squared_error
  
 nse_list = 'NSE_list.csv'
 bse_list = 'BSE_list.csv'
@@ -41,6 +42,13 @@ def calc_correlation(actual, predic):
 
 def calc_mape(actual, predic):
     return np.mean(np.abs((actual - predic) / actual))
+
+def calc_rmse(actual, predic):
+    #print(actual)
+    #print(predic)
+    #print(actual.mean())
+    #print(predic.mean())
+    return mean_squared_error(actual - actual.mean(), predic - predic.mean())
 
 def cached(name, df=None):
     import json
@@ -86,10 +94,10 @@ def cached(name, df=None):
 
 def emit_plot(a,b):
     plt.figure(figsize=(16, 8), dpi=150)
-    print(len(a[0]), len(b[0]))
-    a[0].reset_index()
-    ax = (a[0]-a[0].mean()).plot(y=a[1], label='a', color='orange')
-    (b[0]-b[0].mean()).plot(ax=ax, y=b[1], label='b', color='blue')
+    #print(len(a[0]), len(b[0]))
+    #a[0].reset_index()
+    ax = (a[0]).plot(y=a[1], label='a', color='orange')
+    (b[0]).plot(ax=ax, y=b[1], label='b', color='blue')
     plt.savefig('./images/compare_lines.png')
 
 def compare_stock_info(r_df, s_df, delta, emit=False, logscale=False):
@@ -112,8 +120,8 @@ def compare_stock_info(r_df, s_df, delta, emit=False, logscale=False):
     #print(s_df.head(10))
     #print(s_df.tail(10))
     
-    #r_df = r_df - r_df.mean()
-    r_df = r_df.reset_index()
+    r_df = r_df - r_df.mean()
+    #r_df = r_df.reset_index()
     if len(s_df)<len(r_df)+1:
         print(f'{len(s_df)},{len(r_df)}Skip')
         #correlations.append(0)
@@ -126,15 +134,15 @@ def compare_stock_info(r_df, s_df, delta, emit=False, logscale=False):
         for ii in range(0, max(len(s_df) - len(r_df), max_depth)):
             #print(-(len(r_df)-ii)-1, -ii)
             if ii==0:
-                temp_df = s_df.iloc[-(len(r_df)+ii):].copy(deep=True).reset_index()
+                temp_df = s_df.iloc[-(len(r_df)+ii):].copy(deep=True).reset_index().drop(columns = 'index')
                 if logscale:
                     temp_df = np.log10(temp_df)
-                    #temp_df = temp_df - temp_df.mean()
+                temp_df = temp_df - temp_df.mean()
             else:
-                temp_df = s_df.iloc[-(len(r_df)+ii):-ii].copy(deep=True).reset_index()
+                temp_df = s_df.iloc[-(len(r_df)+ii):-ii].copy(deep=True).reset_index().drop(columns = 'index')
                 if logscale:
                     temp_df = np.log10(temp_df)
-                    #temp_df = temp_df - temp_df.mean()
+                temp_df = temp_df - temp_df.mean()
             
             #print(temp_df.tail(10))
             #print(max(temp_df['change']))
@@ -149,19 +157,26 @@ def compare_stock_info(r_df, s_df, delta, emit=False, logscale=False):
             
             if ii==0:
                 #print(temp_df.head(10))
+                #print(r_df.head(10))
                 #print(r_df.iloc[:,0])
                 #print(temp_df.iloc[:,0])
-                #print(r_df.head(10))
+                
                 if emit:
                     emit_plot([r_df, 'change'], [temp_df, 'change'])
+                #plt.figure(figsize=(16, 8), dpi=150)
+                #plt.plot(list(range(0, len(r_df.iloc[:,0]))), r_df.iloc[:,0] - np.mean(r_df.iloc[:,0]), label='a', color='orange')
+                #plt.plot(list(range(0, len(temp_df.iloc[:,0]))), temp_df.iloc[:,0] -  np.mean(temp_df.iloc[:,0]), label='b', color='green')
+                #plt.savefig('./images/compare_lines_1.png')
                 pass
             #print(len(r_df), len(temp_df))
-            #cval = r_df.iloc[:,0].corr(temp_df.iloc[:,0])
-            cval = calc_correlation(r_df.iloc[:,0], temp_df.iloc[:,0])
-            mcval = calc_mape(r_df.iloc[:,0], temp_df.iloc[:,0])
+            cval = r_df.iloc[:,0].corr(temp_df.iloc[:,0])
+            
+            #cval = calc_correlation(r_df.iloc[:,0], temp_df.iloc[:,0])
+            #mcval = calc_mape(r_df.iloc[:,0], temp_df.iloc[:,0])
+            #rmse = calc_rmse(r_df.iloc[:,0], temp_df.iloc[:,0])
             c = max(cval, c)
             
-            print(f'{ii} Correlation: {cval},{mcval}')
+            #print(f'{ii} Correlation: {cval}, {mcval}, {rmse}')
     return c
 
 def main(reference, timeframe, delta, stock=None, logscale=False):
@@ -190,11 +205,11 @@ def main(reference, timeframe, delta, stock=None, logscale=False):
     # Load the reference candlestick chart
     r_df = pd.read_csv(reference)
     if delta:
-        r_df = r_df.drop(columns = ['Candle Color','Candle Length','open','close'])
+        r_df = r_df.drop(columns = ['Candle Color','Candle Length','open','close', 'date'])
     else:
-        r_df = r_df.drop(columns = ['Candle Color','Candle Length','open','change'])
-    #print(s_df.head())
-    r_df.reset_index(inplace = True)
+        r_df = r_df.drop(columns = ['Candle Color','Candle Length','open','change', 'date'])
+    #print(r_df.head())
+    #r_df.reset_index(inplace = True)
     #r_df['date'] = pd.to_datetime(r_df['date'], format='%d/%m/%Y').dt.date
     r_df.set_index('index', inplace = True)
     r_df = r_df.sort_index()
@@ -210,7 +225,8 @@ def main(reference, timeframe, delta, stock=None, logscale=False):
     #end_date = r_df.index.values[-1]
     
     r_df.drop(r_df.iloc[0].name, inplace=True) #First entry is not the change, just the baseline
-    
+    r_df.reset_index(inplace = True)
+    r_df = r_df.drop(columns=['index'])
     #print(r_df.tail(10))
     print(len(r_df))
     username = 'AnshulBot'
@@ -235,7 +251,7 @@ def main(reference, timeframe, delta, stock=None, logscale=False):
     bse_correlations = []
 
     shortlist = {}
-    c_thresh = 0.99
+    c_thresh = 0.95
     max_corr = 0
     max_corr_idx = None
     if stock is not None:
@@ -252,25 +268,28 @@ def main(reference, timeframe, delta, stock=None, logscale=False):
             #print('Found in Cache')
             pass
         else:
-            s_df = tv.get_hist(
-                        symbol,
-                        'NSE',
-                        interval=timeframe,
-                        n_bars=n_bars,
-                        extended_session=False,
-                    )
-            if s_df is not None:
-                cached(symbol, s_df)
-            else:
+            try:
                 s_df = tv.get_hist(
-                        symbol,
-                        'BSE',
-                        interval=timeframe,
-                        n_bars=n_bars,
-                        extended_session=False,
+                            symbol,
+                            'NSE',
+                            interval=timeframe,
+                            n_bars=n_bars,
+                            extended_session=False,
                         )
                 if s_df is not None:
                     cached(symbol, s_df)
+                else:
+                    s_df = tv.get_hist(
+                            symbol,
+                            'BSE',
+                            interval=timeframe,
+                            n_bars=n_bars,
+                            extended_session=False,
+                            )
+                    if s_df is not None:
+                        cached(symbol, s_df)
+            except:
+                s_df = None
         if s_df is not None and len(s_df)>0:
             c = compare_stock_info(r_df, s_df, delta, emit=True, logscale=logscale)
             print(f'{stock} Max: {max_corr_idx}({max_corr})')
@@ -290,15 +309,18 @@ def main(reference, timeframe, delta, stock=None, logscale=False):
                 #print('Found in Cache')
                 pass
             else:
-                s_df = tv.get_hist(
-                            symbol,
-                            'NSE',
-                            interval=timeframe,
-                            n_bars=n_bars,
-                            extended_session=False,
-                        )
-                if s_df is not None:
-                    cached(symbol, s_df)
+                try:
+                    s_df = tv.get_hist(
+                                symbol,
+                                'NSE',
+                                interval=timeframe,
+                                n_bars=n_bars,
+                                extended_session=False,
+                            )
+                    if s_df is not None:
+                        cached(symbol, s_df)
+                except:
+                    s_df = None
             if s_df is not None and len(s_df)>0:
                 c = compare_stock_info(r_df, s_df, delta, logscale=logscale)
                 if c >= c_thresh:
@@ -320,15 +342,18 @@ def main(reference, timeframe, delta, stock=None, logscale=False):
                 #print('Found in Cache')
                 pass
             else:
-                s_df = tv.get_hist(
-                            symbol,
-                            'BSE',
-                            interval=timeframe,
-                            n_bars=n_bars,
-                            extended_session=False,
-                        )
-                if s_df is not None:
-                    cached(symbol, s_df)
+                try:
+                    s_df = tv.get_hist(
+                                symbol,
+                                'BSE',
+                                interval=timeframe,
+                                n_bars=n_bars,
+                                extended_session=False,
+                            )
+                    if s_df is not None:
+                        cached(symbol, s_df)
+                except:
+                    s_df = None
             if s_df is not None and len(s_df)>0:
                 c = compare_stock_info(r_df, s_df, delta, logscale=logscale)
                 if c >= c_thresh:

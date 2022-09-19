@@ -161,6 +161,8 @@ def populate_scrips():
                                   market = market)
                     stock.save()
                     print('Created {}'.format(stock.sid))
+            except:
+                pass
                     
 def add_data_to_db(date = datetime.strptime('01-01-2005', "%d-%m-%Y").date()):
     base_bhav_file = 'cm{day:02}{month}{year:04}bhav.csv'
@@ -213,7 +215,7 @@ if __name__ == "__main__":
     try:
         os.mkdir(raw_data_dir)
         os.mkdir(delivery_data_dir)
-    except FileExistError:
+    except FileExistsError:
         pass
     except:
         print('Error creating raw data folder')

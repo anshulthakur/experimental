@@ -700,6 +700,13 @@ def save_scatter_plots(JDK_RS_ratio, JDK_RS_momentum, sector='unnamed'):
     
 
 def main(date=datetime.date.today(), sampling = 'w', online=True):
+    try:
+        os.mkdir(cache_dir)
+    except FileExistsError:
+        pass
+    except:
+        print('Error creating folder')
+        
     processed = load_progress()
     #print(processed)
     df = load_sectoral_indices(date, sampling, entries=33)

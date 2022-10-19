@@ -100,15 +100,17 @@ def emit_plot(a,b):
     (b[0]).plot(ax=ax, y=b[1], label='b', color='blue')
     plt.savefig('./images/compare_lines.png')
 
-def compare_stock_info(r_df, s_df, delta, emit=False, logscale=False):
-    s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume'])
+def compare_stock_info(r_df, s_df, delta, emit=False, logscale=False, match='close'):
+    ref_columns = ['open', 'high', 'low', 'close', 'volume'] 
+    ref_columns.remove(match)
+    s_df = s_df.drop(columns = ref_columns)
     s_df = s_df.sort_index()
        
     s_df.reset_index(inplace = True)
     #print(s_df.head(10))
     s_df = s_df.drop(columns='datetime')
     #s_df.rename(columns={'close': 'change', 'datetime':'date'},
-    s_df.rename(columns={'close': 'change'},
+    s_df.rename(columns={match: 'change'},
                 inplace = True)
     #s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y').dt.date
     #s_df.set_index('date', inplace = True)
@@ -179,7 +181,8 @@ def compare_stock_info(r_df, s_df, delta, emit=False, logscale=False):
             #print(f'{ii} Correlation: {cval}, {mcval}, {rmse}')
     return c
 
-def main(reference, timeframe, delta, stock=None, logscale=False):
+def main(reference, timeframe, delta, stock=None, logscale=False, 
+         cutoff_date = datetime.datetime.strptime('01-Aug-2018', "%d-%b-%Y"), match = 'close'):
     if delta:
         print('Use delta')
     try:
@@ -233,7 +236,6 @@ def main(reference, timeframe, delta, stock=None, logscale=False):
     password = '@nshulthakur123'
     tv = get_tvfeed_instance(username, password)
     
-    cutoff_date = datetime.datetime.strptime('01-Aug-2018', "%d-%b-%Y")
     #cutoff_date = r_df.index.values[0]
     d = relativedelta(datetime.datetime.today(), cutoff_date)
     if timeframe == Interval.in_monthly:
@@ -241,6 +243,9 @@ def main(reference, timeframe, delta, stock=None, logscale=False):
         n_bars = max((d.years*12) + d.months+1, len(r_df))+10
     elif timeframe == Interval.in_weekly:
         print('Weekly')
+        n_bars = max((d.years*52) + (d.months*5) + d.weeks+1, len(r_df))+10
+    elif timeframe == Interval.in_4_hour:
+        print('4 Hourly')
         n_bars = max((d.years*52) + (d.months*5) + d.weeks+1, len(r_df))+10
     else:
         print('Daily')
@@ -291,7 +296,7 @@ def main(reference, timeframe, delta, stock=None, logscale=False):
             except:
                 s_df = None
         if s_df is not None and len(s_df)>0:
-            c = compare_stock_info(r_df, s_df, delta, emit=True, logscale=logscale)
+            c = compare_stock_info(r_df, s_df, delta, emit=True, logscale=logscale, match=match)
             print(f'{stock} Max: {max_corr_idx}({max_corr})')
             print(f'Correlation: {c}')
     else:
@@ -322,7 +327,7 @@ def main(reference, timeframe, delta, stock=None, logscale=False):
                 except:
                     s_df = None
             if s_df is not None and len(s_df)>0:
-                c = compare_stock_info(r_df, s_df, delta, logscale=logscale)
+                c = compare_stock_info(r_df, s_df, delta, logscale=logscale, match=match)
                 if c >= c_thresh:
                     shortlist[symbol] = c
                 if c>max_corr:
@@ -330,7 +335,7 @@ def main(reference, timeframe, delta, stock=None, logscale=False):
                     max_corr_idx = [symbol]
                 elif c>0 and c==max_corr:
                     max_corr_idx.append(symbol)
-            print(f'{stock}[{c}] Max: {max_corr_idx}({max_corr})')
+                print(f'{stock}[{c}] Max: {max_corr_idx}({max_corr})')
         
         for stock in b_indices:
             symbol = stock.strip().replace('&', '_')
@@ -355,7 +360,7 @@ def main(reference, timeframe, delta, stock=None, logscale=False):
                 except:
                     s_df = None
             if s_df is not None and len(s_df)>0:
-                c = compare_stock_info(r_df, s_df, delta, logscale=logscale)
+                c = compare_stock_info(r_df, s_df, delta, logscale=logscale, match=match)
                 if c >= c_thresh:
                     shortlist[symbol] = c
                 if c>max_corr:
@@ -363,7 +368,7 @@ def main(reference, timeframe, delta, stock=None, logscale=False):
                     max_corr_idx = [symbol]
                 elif c>0 and c==max_corr:
                     max_corr_idx.append(symbol)
-            print(f'{stock}[{c}] Max: {max_corr_idx}({max_corr})')
+                print(f'{stock}[{c}] Max: {max_corr_idx}({max_corr})')
         #val = max(correlations)
         #max_idx = [index for index, item in enumerate(correlations) if item == max(correlations)]
         #names = [indices[idx] for idx in max_idx]
@@ -386,7 +391,8 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--delta', action="store_true", default=False, help="Use delta between points to calculate similarity")
     parser.add_argument('-s', '--stock', help="Specify stock to compare with")
     parser.add_argument('-l', '--log', action="store_true", default=False, help="Use log scaling for price values ")
-    
+    parser.add_argument('-c', '--cutoff', help="Cutoff date")
+    parser.add_argument('-m', '--match', help="Match OHLC (open/high/low/close)", default='close')
     timeframe = '1M'
     reference = None
     stock = None
@@ -399,5 +405,13 @@ if __name__ == "__main__":
         timeframe=args.timeframe
     if args.stock is not None and len(args.stock)>0:
         stock = args.stock
-
-    main(reference, timeframe=convert_timeframe_to_quant(timeframe), delta=args.delta, stock=stock, logscale=args.log)
+    if args.cutoff is not None and len(args.cutoff)>0:
+        cutoff_date = datetime.datetime.strptime(args.cutoff, "%d-%b-%Y")
+    else:
+        cutoff_date = datetime.datetime.strptime('01-Aug-2018', "%d-%b-%Y")
+    main(reference, 
+         timeframe=convert_timeframe_to_quant(timeframe), 
+         delta=args.delta, stock=stock, 
+         logscale=args.log, 
+         cutoff_date=cutoff_date,
+         match = args.match)

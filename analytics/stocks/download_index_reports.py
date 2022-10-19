@@ -39,7 +39,7 @@ def download_daily_data(day, silent=False):
         response.raise_for_status()
         open(filepath, 'wb').write(response.content)
     except Exception as e:
-        print (f'ERR:: Exception occurred while fetching data foor day: {day}')
+        print (f'ERR:: Exception occurred while fetching data for day: {day}')
         if not silent:
             print(e)
         return False

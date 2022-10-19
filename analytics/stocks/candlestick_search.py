@@ -13,7 +13,8 @@ import matplotlib.pyplot as plt
 RED=0
 GREEN=1
 BLUE=2
- 
+
+global debug 
 debug = False
 def print_debug(*args):
     if debug:
@@ -40,7 +41,7 @@ def classify(rgb_tuple):
     #    print_debug(color, rgb_tuple)
     return color
 
-def main(filename):
+def main(filename, ohlc_type='candlestick'):
     # load the image and convert into 
     # numpy array
     img_name = filename
@@ -59,7 +60,7 @@ def main(filename):
         #print_debug(f'Column:{col}')
         for row in range(0, rows):
             #print_debug(f'Column:{col} Row:{row}')
-            if classify(numpydata[row][col])=='black': #Black
+            if ohlc_type=='candlestick' and classify(numpydata[row][col])=='black': #Black
                 #Candle is starting here, now greedily scan for the entire body of the candle
                 candle = {'body_start_left': [row, col]}
                 print_debug(f'Body start left: {candle}')
@@ -130,6 +131,107 @@ def main(filename):
                     print_debug('Skip')
                 col = c
                 break
+            elif ohlc_type=='bars' and classify(numpydata[row][col]) in ['green', 'red', 'black']:
+                #Candle is starting here, now greedily scan for the entire body of the candle
+                if classify(numpydata[row][col])=='green':
+                    #Scan upwards
+                    candle = {'body_end_left': [row+2, col]}
+                    candle['color'] = 'green'
+                    print_debug(f'Body end left: {candle}')
+                    for c in range(col, cols):
+                        #print_debug(c)
+                        colorval = classify(numpydata[row][c])
+                        if  colorval != 'green' and c<=cols: #Could be reaching the end of bar width (edge case of doji)
+                            #Try to find green in rows above
+                            #print_debug("Find green top after col {}".format(c))
+                            for r in range(row, 0, -1):
+                                colorval = classify(numpydata[r][c])
+                                if  colorval == 'green':
+                                    candle['body_start_left']= [r-2, col]
+                                    candle['body_end_right'] = [row+2, c-1]
+                                    candle['body_start_right'] = [r-2, c-1]
+                                    print_debug(f'Body end right: {candle}')
+                                    break
+                            if 'body_start_right' not in candle:
+                                #Doji case
+                                candle['body_start_left']= [row-2, col]
+                                candle['body_end_right'] = [row+2, c-1]
+                                candle['body_start_right'] = [row-2, c-1]
+                                print_debug(f'Doji: Body end right: {candle}')
+                                col = c
+                            else: #Reach end of green top bar
+                                col = c
+                                for c in range(col, cols):
+                                    colorval = classify(numpydata[r][c])
+                                    if  colorval != 'green' and c<=cols:
+                                        col = c
+                                        break
+                            break
+                elif classify(numpydata[row][col])=='red':
+                    #Scan downwards
+                    candle = {'body_start_left': [row, col]}
+                    candle['color'] = 'red'
+                    print_debug(f'Body start left: {candle}')
+                    for c in range(col, cols):
+                        #print_debug(c)
+                        colorval = classify(numpydata[row][c])
+                        if  colorval != 'red' and c<=cols: #Could be reaching the end of bar width (edge case of doji)
+                            #Try to find red in rows below
+                            #print_debug("Find red bottom after col {}".format(c))
+                            for r in range(row, rows):
+                                colorval = classify(numpydata[r][c])
+                                if  colorval == 'red':
+                                    candle['body_end_left']= [r+2, col]
+                                    candle['body_start_right'] = [row, c-1]
+                                    candle['body_end_right'] = [r+2, c-1]
+                                    print_debug(f'Body end right: {candle}')
+                                    break
+                            if 'body_start_right' not in candle:
+                                #Doji case
+                                candle['body_end_left']= [row+2, col]
+                                candle['body_end_right'] = [row+2, c-1]
+                                candle['body_start_right'] = [row, c-1]
+                                print_debug(f'Doji: Body end right: {candle}')
+                                col = c
+                            else: #Reach end of red top bar
+                                col = c
+                                for c in range(col, cols):
+                                    colorval = classify(numpydata[r][c])
+                                    if  colorval != 'red' and c<=cols:
+                                        col = c
+                                        break
+                            break
+                elif classify(numpydata[row][col])=='black':
+                    #doji
+                    candle = {'body_start_left': [row, col]}
+                    candle['color'] = 'black'
+                    print_debug(f'Body start left: {candle}')
+                    for c in range(col, cols):
+                        #print_debug(c)
+                        colorval = classify(numpydata[row][c])
+                        if  colorval != 'black' and c<=cols: #Could be reaching the end of bar width (edge case of doji)
+                            candle['body_end_left']= [row+2, col]
+                            candle['body_end_right'] = [row+2, c-1]
+                            candle['body_start_right'] = [row, c-1]
+                            col = c
+                            
+                            break
+                candle_width = candle['body_start_right'][1] - candle['body_start_left'][1]
+                if candle_width>=2:
+                    if candle['color'] in ['green', 'black']:
+                        candle['close'] = rows - candle['body_start_left'][0]
+                        candle['open'] = rows - candle['body_end_left'][0]
+                    elif candle['color'] == 'red':
+                        candle['close'] = rows - candle['body_end_left'][0]
+                        candle['open'] = rows - candle['body_start_left'][0]
+                    print_debug(candle)
+                    min_close = min(min_close, candle['close'])
+                    max_close = max(max_close, candle['close'])
+                    candles.append(candle)
+                else:
+                    print_debug('Skip')
+                col = c
+                break
         col +=1
     
     #Normalize to range value
@@ -170,6 +272,8 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Perform reverse search for indices')
     parser.add_argument('-f', '--file', help="Image file of the candlesticks to parse for")
+    parser.add_argument('-t', '--type', default='candlestick', help="Type of OHLC plot (candlestick/bars)")
+    parser.add_argument('-d', '--debug', default=False, action="store_true", help="Debug traces")
     
     #Can add options for weekly sampling and monthly sampling later
     args = parser.parse_args()
@@ -178,4 +282,6 @@ if __name__ == "__main__":
     else:
         print('Speficy file name.')
         exit(0)
-    main(filename=args.file)
+    if args.debug:
+        debug=True
+    main(filename=args.file, ohlc_type=args.type)

@@ -1,1 +1,0 @@
-for x in `ls -1a new`; do python reverse_row_order.py $x; done

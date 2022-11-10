@@ -10,21 +10,26 @@ from selenium import webdriver
 import csv
 import time
 from datetime import datetime, timedelta
+import requests 
+import brotli
+import gzip
+from io import BytesIO
+from zipfile import ZipFile
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 
-use_chrome = True
-if use_chrome:
-    from selenium.webdriver.chrome.options import Options
+# use_chrome = False
+# if use_chrome:
+#     from selenium.webdriver.chrome.options import Options
     
-    from selenium.webdriver.chrome.service import Service
-    from webdriver_manager.chrome import ChromeDriverManager as DriverManager
-    from selenium.webdriver import Chrome as Browser
-else:
-    from selenium.webdriver.edge.service import Service
-    from webdriver_manager.microsoft import EdgeChromiumDriverManager  as DriverManager
-    from selenium.webdriver import Edge as Browser
+#     from selenium.webdriver.chrome.service import Service
+#     from webdriver_manager.chrome import ChromeDriverManager as DriverManager
+#     from selenium.webdriver import Chrome as Browser
+# else:
+#     from selenium.webdriver.edge.service import Service
+#     from webdriver_manager.microsoft import EdgeChromiumDriverManager  as DriverManager
+#     from selenium.webdriver import Edge as Browser
 
 
 import threading
@@ -191,7 +196,7 @@ def work_loop(thread_name, tid):
     driver.quit()
 
 
-def download_archive(filename=None, day=None):
+def download_archive_selenium(filename=None, day=None):
     global stock_codes
     try:
         fd = open(filename, 'r')
@@ -216,6 +221,141 @@ def download_archive(filename=None, day=None):
     except:
         print('Error')
 
+raw_data_dir = './bseData/'
+delivery_data_dir = raw_data_dir+'delivery/'
+
+archive_url = 'https://www.bseindia.com/markets/marketinfo/BhavCopy.aspx'
+
+def handle_download(session, url, filename, path=raw_data_dir):
+    print(url)
+    if os.path.isfile(path+filename):
+        #Skip file download
+        return
+    response = session.get(url)
+    #print(response.headers)
+    text = False
+    if response.status_code==200:
+        coder = response.encoding
+        try:
+            #if coder=='br':
+            result = brotli.decompress(response.content).decode('utf-8')
+        except:
+            #elif coder=='gzip':
+            try:
+                buf = BytesIO(response.content)
+                result = gzip.GzipFile(fileobj=buf).read().decode('utf-8')
+            except:
+                #else:
+                try:
+                    result = response.content.decode('utf-8')
+                    text=True
+                except:
+                    result = response.content
+        if text:
+            with open(path+filename, 'w') as fd:
+                fd.write(result)
+        else:
+            with open(path+filename, 'wb') as fd:
+                fd.write(result)
+            
+    else:
+        #print(response.content.decode('utf-8'))
+        pass
+
+
+def clean_delivery_data(filename):
+    newfile = filename.replace('txt', 'csv').replace('TXT', 'csv')
+    with open(newfile, 'w') as d_fd:
+        with open(filename, 'r') as fd:
+            for row in fd:
+                d_fd.write(row.replace('|', ','))
+    os.remove(filename)
+
+
+def download_archive(date = datetime.strptime('01-01-2010', "%d-%m-%Y").date()):
+    #driver.get(archive_url)
+
+    session = requests.Session()
+    # Set correct user agent
+    selenium_user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.35'
+    #print(selenium_user_agent)
+    session.headers.update({"user-agent": selenium_user_agent})
+    session.headers.update({"accept-encoding": "gzip, deflate, br",
+            "accept":
+    """text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9""",
+            "accept-language": "en-US,en;q=0.9",
+            "authority": "www.bseindia.com"})
+
+    time.sleep(2)
+    session.get(archive_url)
+    base_bhav_file_csv = 'EQ{day:02}{month:02}{year}.csv'
+    base_bhav_file = 'EQ{day:02}{month:02}{year}_CSV.zip'
+    base_url_bhav = 'https://www.bseindia.com/download/BhavCopy/Equity/'+base_bhav_file
+
+    base_delivery_file = 'SCBSEALL{day:02}{month:02}.zip'
+    base_delivery_url = 'https://www.bseindia.com/BSEDATA/gross/{year}/'+base_delivery_file
+
+    while date <= datetime.today().date():
+        if date.weekday()<=4:
+            print(f'Downloading for {date}')
+            #Download bhavcopy
+            if os.path.exists(raw_data_dir+base_bhav_file_csv.format(day=date.day, month=date.month, year=str(date.year)[-2:])):
+                print('Skip bhav')
+                pass
+            else:
+                handle_download(session, url = base_url_bhav.format(day=date.day, month=date.month, year=str(date.year)[-2:]), 
+                                    filename = base_bhav_file.format(day=date.day, month=date.month, year=str(date.year)[-2:]))
+                #Bhavcopy is zip file, so handle that
+                if os.path.isfile(raw_data_dir+base_bhav_file.format(day=date.day, month=date.month, year=str(date.year)[-2:])):
+                    with ZipFile(raw_data_dir+base_bhav_file.format(day=date.day, month=date.month, year=str(date.year)[-2:]), 'r') as zipf:
+                        # printing all the contents of the zip file
+                        #zipf.printdir()
+                        # extracting all the files
+                        #print('Extracting all the files now...')
+                        zipf.extractall(raw_data_dir)
+                        #print('Done!')
+                    os.remove(raw_data_dir+base_bhav_file.format(day=date.day, month=date.month, year=str(date.year)[-2:]))
+            #Download delivery data
+            #print(delivery_data_dir+str(date.year)+'/'+base_delivery_file.replace('zip', 'csv').format(day=date.day, month=date.month, year=date.year))
+            if os.path.exists(delivery_data_dir+str(date.year)+'/'+base_delivery_file.replace('zip', 'csv').format(day=date.day, month=date.month, year=date.year)):
+                print('Skip delivery data')
+                pass
+            else:
+                handle_download(session, url = base_delivery_url.format(day=date.day, month=date.month, year=date.year), 
+                                    filename = base_delivery_file.format(day=date.day, month=date.month, year=date.year),
+                                    path=delivery_data_dir+str(date.year)+'/')
+                #Delivery file is zip file, so handle that
+                if os.path.isfile(delivery_data_dir+str(date.year)+'/'+base_delivery_file.format(day=date.day, month=date.month, year=date.year)):
+                    with ZipFile(delivery_data_dir+str(date.year)+'/'+base_delivery_file.format(day=date.day, month=date.month, year=date.year), 'r') as zipf:
+                        # printing all the contents of the zip file
+                        #zipf.printdir()
+                        # extracting all the files
+                        #print('Extracting all the files now...')
+                        zipf.extractall(delivery_data_dir+str(date.year))
+                        #print('Done!')
+                    os.remove(delivery_data_dir+str(date.year)+'/'+base_delivery_file.format(day=date.day, month=date.month, year=date.year))
+                    clean_delivery_data(delivery_data_dir+str(date.year)+'/'+base_delivery_file.replace('zip','txt').format(day=date.day, month=date.month, year=date.year))
+        date = date + timedelta(days=1)
+
+def get_scrip_list(offline=False):
+    url = 'https://www.bseindia.com/corporates/List_Scrips.html'
+    filename = 'BSE_list.csv'
+    if os.path.exists('./'+filename):
+        print(f'File may be outdated. Download latest copy from: {url}')
+        members = []
+        with open(filename,'r') as fd:
+            reader = csv.DictReader(fd)
+            for row in reader:
+                members.append({'symbol': row['Security Id'].upper().strip(),
+                                'name':row['Issuer Name'].upper().strip(),
+                                'isin': row['ISIN No'].upper().strip(),
+                                'facevalue': row['Face Value'].upper().strip(),
+                                'security': row['Security Code'].upper().strip()
+                                })
+    else:
+        print(f'BSE list of scrips does not exist in location. Download from: {url}')
+    return members
+
 if __name__ == "__main__":
     day = datetime.today()
     wait_period = 5
@@ -233,28 +373,33 @@ if __name__ == "__main__":
     if args.bulk:
         bulk = True
 
-    if args.file is None or len(args.file)==0:
-        print("Provide a scrip file name")
-        exit()
-    elif os.path.isfile(args.file) is False:
-        #Skip file download
-        print(f"File {args.file} does not exist")
-        exit()
+    # if args.file is None or len(args.file)==0:
+    #     print("Provide a scrip file name")
+    #     exit()
+    # elif os.path.isfile(args.file) is False:
+    #     #Skip file download
+    #     print(f"File {args.file} does not exist")
+    #     exit()
 
     try:
         os.mkdir(raw_data_dir)
+        os.mkdir(delivery_data_dir)
     except FileExistsError:
         pass
     except:
         print('Error creating raw data folder')
         exit(0)
 
-    if len(sys.argv) < 2:
-        print ("Insufficient Parameters")
-        print(("Usage: %s <csv file of equity list>" %sys.argv[0]))
-        exit()
+    # if len(sys.argv) < 2:
+    #     print ("Insufficient Parameters")
+    #     print(("Usage: %s <csv file of equity list>" %sys.argv[0]))
+    #     exit()
 
     if args.bulk:    
-        download_archive(filename=args.file)
+        download_archive()
     else:
-        download_archive(filename=args.file, date=day.date())
+        download_archive(date=day.date())
+    #if args.bulk:
+    #    download_archive_selenium(filename=args.file)
+    #else:
+    #    download_archive_selenium(filename=args.file, date=day.date())

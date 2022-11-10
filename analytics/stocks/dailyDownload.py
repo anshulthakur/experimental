@@ -33,8 +33,6 @@ def get_data_for_today(obj):
     return get_data_for_date(obj, datetime.today().date())
 
 def get_data_for_date(stock, dateObj):
-
-    
     time.sleep(0.5)
     try:
         listing = Listing.objects.filter(date__contains = dateObj.date(), stock=stock)
@@ -139,6 +137,7 @@ def get_bulk(stock):
                     'referer': stock.get_quote_url(),
                     'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.135 Safari/537.36',
                     }
+        print(stock.get_quote_url())
         req = urllib.request.Request(stock.get_quote_url(), headers=header)
         response = urllib.request.urlopen(req)
         coder = response.headers.get('Content-Encoding', 'utf-8')
@@ -194,7 +193,7 @@ def get_bulk(stock):
                     print(("{code} No data available for the days".format(code=stock.security)))
                     return True
     except Exception as e:
-        print(("{code} Failed".format(code=stock.security)))
+        print(("{code} Failed".format(code=stock.sid)))
         print(e)
         le = len(sys.exc_info())
         #print(le)
@@ -223,7 +222,7 @@ def get_next_stock(override=False):
     If file does not exist, then parse entire DB list
     """
     try:
-        if not override:
+        if override is False:
             with open(ERR_FILE, 'r') as fd:
                 first = True
                 ids = []
@@ -247,7 +246,7 @@ def get_next_stock(override=False):
         for stock in stocks:
             yield stock
     except ReferenceError:
-        print('Old file')
+        print('Get all')
         stocks = Stock.objects.all()
         for stock in stocks:
             yield stock
@@ -459,10 +458,11 @@ if __name__ == "__main__":
         bulk = True
         
     if stock_code is None:
-        stock_iter = LockedIterator(get_next_stock(args.bulk))
+        stock_iter = LockedIterator(get_next_stock(bulk))
     
         threads = []
         num_threads = multiprocessing.cpu_count() * 2
+        num_threads = 1
         try:
             for thread_id in range(num_threads):
                 t = threading.Thread(target=work_loop, args=("Thread ID {id}".format(id=thread_id), thread_id))

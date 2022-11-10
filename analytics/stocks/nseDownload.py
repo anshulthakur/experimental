@@ -34,7 +34,7 @@ from zipfile import ZipFile
 raw_data_dir = './nseData/'
 delivery_data_dir = raw_data_dir+'delivery/'
 
-archive_url = 'https://www1.nseindia.com/products/content/equities/equities/archieve_eq.htm'
+archive_url = 'https://www.nseindia.com/all-reports'
 
 months = ['', 'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
 def handle_download(session, url, filename, path=raw_data_dir):
@@ -42,7 +42,12 @@ def handle_download(session, url, filename, path=raw_data_dir):
     if os.path.isfile(path+filename):
         #Skip file download
         return
-    response = session.get(url)
+    time.sleep(1)
+    try:
+        response = session.get(url)
+    except requests.exceptions.TooManyRedirects:
+        print('Data may not be available')
+        return
     #print(response.headers)
     text = False
     if response.status_code==200:
@@ -70,76 +75,133 @@ def handle_download(session, url, filename, path=raw_data_dir):
                 fd.write(result)
             
     else:
-        print(response.content.decode('utf-8'))
+        #print(response.content.decode('utf-8'))
+        print('Received textual data')
+        pass
+        
 
-def download_archive(date = datetime.strptime('01-01-2005', "%d-%m-%Y").date()):
+def clean_delivery_data(filename):
+    skip = 4
+    newfile = filename.replace('DAT', 'csv')
+    with open(newfile, 'w') as d_fd:
+        d_fd.write("Record Type,Sr No,Name of Security,Type,Quantity Traded,Deliverable Quantity,Percentage\n")
+        with open(filename, 'r') as fd:
+            for row in fd:
+                if skip >0:
+                    skip -= 1
+                    continue
+                d_fd.write(row)
+    os.remove(filename)
+
+def download_archive(date = datetime.strptime('20-04-2012', "%d-%m-%Y").date()):
     #driver.get(archive_url)
 
     session = requests.Session()
     # Set correct user agent
     #selenium_user_agent = driver.execute_script("return navigator.userAgent;")
-    selenium_user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36'
+    selenium_user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.35'
     #print(selenium_user_agent)
     session.headers.update({"user-agent": selenium_user_agent})
     session.headers.update({"accept-encoding": "gzip, deflate, br",
             "accept":
     """text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9""",
-            "accept-language": "en-GB,en;q=0.9,en-US;q=0.8",
-            "host": "www1.nseindia.com",
-            "referer": "https://www1.nseindia.com/products/content/equities/equities/archieve_eq.htm"})
+            "accept-language": "en-US,en;q=0.9",
+            "host": "www.nseindia.com",
+            "referer": "https://www.nseindia.com"})
 
-    #for cookie in driver.get_cookies():
-    #    #print(cookie)
-    #    session.cookies.set(cookie['name'], cookie['value'], domain=cookie['domain'])
-    
-    #time.sleep(2)
-    #search = driver.find_element(by=By.CLASS_NAME, value='archive_search')
-    #Set date
-    #time.sleep(1)
-    #search.find_element(by =By.ID, value="date").send_keys('04-01-2022')
-    #time.sleep(1)
-    #Select bhavcopy
-    #search.find_element(by=By.ID, value="h_filetype").click()
-    #time.sleep(1)
-    #search.find_element(by=By.CSS_SELECTOR, value='option[value="eqbhav"]').click()
-    #time.sleep(1)
-    #click 
-    #print(search.find_element(by=By.CLASS_NAME, value="getdata-button"))
-    #search.find_element(by=By.CLASS_NAME, value="getdata-button").click()
-    time.sleep(2)
-    session.get(archive_url)
-    base_bhav_file = 'cm{day:02}{month}{year:04}bhav.csv.zip'
-    base_url_bhav = 'https://www1.nseindia.com/content/historical/EQUITIES/{year:04}/{month}/'+base_bhav_file
+    base_bhav_file_csv = 'cm{day:02}{month}{year:04}bhav.csv'
+    base_bhav_file = base_bhav_file_csv+'.zip'
+    #base_url_bhav = 'https://www1.nseindia.com/content/historical/EQUITIES/{year:04}/{month}/'+base_bhav_file
+    base_url_bhav = 'https://archives.nseindia.com/content/historical/EQUITIES/{year:04}/{month}/'+base_bhav_file
 
     base_delivery_file = 'MTO_{day:02}{month:02}{year:04}.DAT'
-    base_delivery_url = 'https://www1.nseindia.com/archives/equities/mto/'+base_delivery_file
+    #base_delivery_url = 'https://www1.nseindia.com/archives/equities/mto/'+base_delivery_file
+    base_delivery_url = 'https://archives.nseindia.com/archives/equities/mto/'+base_delivery_file
     
 
     #el = driver.find_element(by = By.XPATH, value='//*[@id="spanDisplayBox"]/table/tbody/tr/td/a')
     #if el is not None:
     #   url = el.get_attribute('href')
     while date <= datetime.today().date():
-
         if date.weekday()<=4:
             print(f'Downloading for {date}')
             #Download bhavcopy
-            handle_download(session, url = base_url_bhav.format(day=date.day, month=months[date.month], year=date.year), 
+            if os.path.exists(raw_data_dir+base_bhav_file_csv.format(day=date.day, month=months[date.month], year=date.year)) and \
+                os.path.exists(delivery_data_dir+base_delivery_file.replace('DAT', 'csv').format(day=date.day, month=date.month, year=date.year)):
+                pass
+            else:
+                session.headers.update({"host": "www.nseindia.com"})
+                session.get(archive_url)
+                session.headers.update({"host": "archives.nseindia.com"})
+            if os.path.exists(raw_data_dir+base_bhav_file_csv.format(day=date.day, month=months[date.month], year=date.year)):
+                pass
+            else:
+                handle_download(session, url = base_url_bhav.format(day=date.day, month=months[date.month], year=date.year), 
                                     filename = base_bhav_file.format(day=date.day, month=months[date.month], year=date.year))
+                #Bhavcopy is zip file, so handle that
+                if os.path.isfile(raw_data_dir+base_bhav_file.format(day=date.day, month=months[date.month], year=date.year)):
+                    with ZipFile(raw_data_dir+base_bhav_file.format(day=date.day, month=months[date.month], year=date.year), 'r') as zipf:
+                        # printing all the contents of the zip file
+                        #zipf.printdir()
+                        # extracting all the files
+                        #print('Extracting all the files now...')
+                        zipf.extractall(raw_data_dir)
+                        #print('Done!')
+                    os.remove(raw_data_dir+base_bhav_file.format(day=date.day, month=months[date.month], year=date.year))
+                    
             #Download delivery data
-            handle_download(session, url = base_delivery_url.format(day=date.day, month=date.month, year=date.year), 
+            if os.path.exists(delivery_data_dir+base_delivery_file.format(day=date.day, month=date.month, year=date.year)):
+                clean_delivery_data(delivery_data_dir+base_delivery_file.format(day=date.day, month=date.month, year=date.year))
+            elif os.path.exists(delivery_data_dir+base_delivery_file.replace('DAT', 'csv').format(day=date.day, month=date.month, year=date.year)):
+                pass
+            else:
+                handle_download(session, url = base_delivery_url.format(day=date.day, month=date.month, year=date.year), 
                                     filename = base_delivery_file.format(day=date.day, month=date.month, year=date.year),
                                     path=delivery_data_dir)
-            #Bhavcopy is zip file, so handle that
-            if os.path.isfile(raw_data_dir+base_bhav_file.format(day=date.day, month=months[date.month], year=date.year)):
-                with ZipFile(raw_data_dir+base_bhav_file.format(day=date.day, month=months[date.month], year=date.year), 'r') as zipf:
-                    # printing all the contents of the zip file
-                    #zipf.printdir()
-                    # extracting all the files
-                    #print('Extracting all the files now...')
-                    zipf.extractall(raw_data_dir)
-                    #print('Done!')
-                os.remove(raw_data_dir+base_bhav_file.format(day=date.day, month=months[date.month], year=date.year))
+                if os.path.exists(delivery_data_dir+base_delivery_file.format(day=date.day, month=date.month, year=date.year)):
+                    clean_delivery_data(delivery_data_dir+base_delivery_file.format(day=date.day, month=date.month, year=date.year))
+
         date = date + timedelta(days=1)
+
+def get_scrip_list(offline=False):
+    url = 'https://archives.nseindia.com/content/equities/EQUITY_L.csv'
+    filename = 'NSE_list.csv'
+    session = requests.Session()
+    user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36'
+    session.headers.update({"user-agent": user_agent})
+    session.headers.update({"accept-encoding": "gzip, deflate, br",
+            "accept":
+    """text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9""",
+            "accept-language": "en-GB,en;q=0.9,en-US;q=0.8",
+            "authority": "www.nseindia.com",
+            "referrer": "www.nseindia.com"})
+    if not offline:
+        try:
+            session.get('https://www.nseindia.com/market-data/securities-available-for-trading')
+            handle_download(session, 
+                            url = url, 
+                            filename = filename,
+                            path='./')
+        except:
+            print("Could not download latest ")
+            pass
+    
+    if os.path.exists('./'+filename):
+        print(f'File may be outdated. Download latest copy from: {url}')
+    else:
+        print(f'NSE list of scrips does not exist in location. Download from: {url}')
+
+    members = []
+    if os.path.exists('./'+filename):
+        with open(filename,'r') as fd:
+            reader = csv.DictReader(fd)
+            for row in reader:
+                members.append({'symbol': row['SYMBOL'].upper().strip(),
+                                'name':row['NAME OF COMPANY'].upper().strip(),
+                                'isin': row[' ISIN NUMBER'].upper().strip(),
+                                'facevalue': row[' FACE VALUE'].upper().strip()
+                                })
+    return members
 
 def populate_scrips():
     scrip_list = 'NSE_list.csv'

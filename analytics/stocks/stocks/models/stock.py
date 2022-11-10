@@ -1,5 +1,7 @@
-from stocks.models import Industry
+from stocks.models import Market
 from django.db import models
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 
 from random import randint
 
@@ -10,32 +12,30 @@ class StockManager(models.Manager):
         return self.all()[random_index]
 
 class Stock(models.Model):
-    sid = models.CharField(blank=False,
+    symbol = models.CharField(blank=False,
                             null=False,
                             max_length=15)
-    name = models.CharField(blank=False,
-                            null=False,
-                            max_length=255)
     group = models.CharField(blank=True,
                              default='',
                              max_length=5)
     face_value = models.DecimalField(max_digits=10, decimal_places = 4)
-    isin = models.CharField(blank=False,
-                            null=False,
-                            max_length=15)
-    industry = models.ForeignKey(Industry,
-                                 null=True,
-                                 default=None,
-                                 on_delete = models.SET_NULL)
+    sid = models.BigIntegerField(default=None, 
+                                 null=True)
+    market = models.ForeignKey(Market,
+                             null=True,
+                             to_field='name',
+                             on_delete = models.CASCADE)
+    content_type = models.ForeignKey(ContentType, null=True, on_delete=models.SET_NULL)
+    object_id = models.PositiveIntegerField(default=None, null=True)
+    content_object = GenericForeignKey('content_type', 'object_id')
+
     objects = StockManager()
     def __str__(self):
-        return (self.name)
+        return (self.symbol)
 
-    def get_quote_url(self):
-        return ("https://www.bseindia.com/markets/equity/EQReports/StockPrcHistori.aspx?expandable=7&scripcode=" + str(self.security) + "&flag=sp&Submit=G")
-        
     class Meta:
         indexes = [
-            models.Index(fields=['isin'], name='isin_idx'),
+            models.Index(fields=['symbol'], name='security_idx'),
             models.Index(fields=['sid'], name='sid_idx'),
+            models.Index(fields=["content_type", "object_id"]),
         ]

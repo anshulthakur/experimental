@@ -8,9 +8,16 @@ from numpy import asarray
 
 transform_rule = {'blue': 'white',
                   'white': 'white',
-                  'black': 'black',
+                  'black': 'white',
                   'red': 'red',
                   'green': 'green'}
+
+# transform_rule = {'blue': 'white',
+#                   'white': 'white',
+#                   'black': 'red',
+#                   'red': 'green',
+#                   'green': 'white'}
+
 colors = {"red": (255, 0, 0),
           "green" : (0,255,0),
           "black" : (0, 0, 0),

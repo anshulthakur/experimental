@@ -4,7 +4,8 @@ from django.apps import apps
 
 conf = {
         'INSTALLED_APPS': [
-            'stocks'
+            'stocks',
+            'django.contrib.contenttypes',
         ],
         'DATABASES': {
             'default': {
@@ -13,6 +14,7 @@ conf = {
             },
         }
     }
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 settings.configure(**conf)
 apps.populate(settings.INSTALLED_APPS)

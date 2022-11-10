@@ -3,6 +3,7 @@ import sys
 import settings
 import csv
 from datetime import datetime
+import dateparser
 
 scrip_list = 'scrip_list.csv'
 from stocks.models import Listing, Industry, Stock, Market, Company
@@ -141,7 +142,7 @@ MARKET_DATA = {
 
 def get_filelist(folder):
     files = os.listdir(folder)
-    files = [f for f in files if os.path.isfile(folder+'/'+f)] #Filtering only the files.
+    files = [f for f in files if os.path.isfile(folder+'/'+f) and f[-3:]=='csv'] #Filtering only the files.
     return files
 
 def parse_bse_delivery(dateval):
@@ -205,8 +206,8 @@ def parse_nse_bhav(reader, symbols, fname):
                 #print(f"{row.get('SYMBOL')} has not been added to DB yet. Skip.")
                 continue
             if deliveries is None:
-                deliveries = parse_nse_delivery(datetime.strptime(row.get('TIMESTAMP').strip(), '%d-%b-%Y'))
-            listing = Listing(date=datetime.strptime(row.get('TIMESTAMP').strip(), '%d-%b-%Y'),
+                deliveries = parse_nse_delivery(dateparser.parse(row.get('TIMESTAMP').strip()))
+            listing = Listing(date=dateparser.parse(row.get('TIMESTAMP').strip()),
                               open=row.get('OPEN'),
                               high=row.get('HIGH'),
                               low=row.get('LOW'),

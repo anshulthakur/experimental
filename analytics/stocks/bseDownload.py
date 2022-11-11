@@ -231,7 +231,15 @@ def handle_download(session, url, filename, path=raw_data_dir):
     if os.path.isfile(path+filename):
         #Skip file download
         return
-    response = session.get(url)
+    try:
+        response = session.get(url, timeout=10)
+    except requests.exceptions.TooManyRedirects:
+        print('Data may not be available')
+        return
+    except requests.exceptions.Timeout:
+        #Skip file download
+        print('Timeout')
+        return
     #print(response.headers)
     text = False
     if response.status_code==200:
@@ -265,10 +273,16 @@ def handle_download(session, url, filename, path=raw_data_dir):
 
 def clean_delivery_data(filename):
     newfile = filename.replace('txt', 'csv').replace('TXT', 'csv')
-    with open(newfile, 'w') as d_fd:
-        with open(filename, 'r') as fd:
-            for row in fd:
-                d_fd.write(row.replace('|', ','))
+    try:
+        with open(newfile, 'w') as d_fd:
+            with open(filename, 'r') as fd:
+                for row in fd:
+                    d_fd.write(row.replace('|', ','))
+    except FileNotFoundError:
+        with open(newfile, 'w') as d_fd:
+            with open(filename.replace('txt', 'TXT'), 'r') as fd:
+                for row in fd:
+                    d_fd.write(row.replace('|', ','))
     os.remove(filename)
 
 
@@ -302,6 +316,9 @@ def download_archive(date = datetime.strptime('01-01-2010', "%d-%m-%Y").date()):
             if os.path.exists(raw_data_dir+base_bhav_file_csv.format(day=date.day, month=date.month, year=str(date.year)[-2:])):
                 print('Skip bhav')
                 pass
+            elif os.path.exists(raw_data_dir+base_bhav_file_csv.replace('csv', 'CSV').format(day=date.day, month=date.month, year=str(date.year)[-2:])):
+                print('Skip bhav')
+                pass
             else:
                 handle_download(session, url = base_url_bhav.format(day=date.day, month=date.month, year=str(date.year)[-2:]), 
                                     filename = base_bhav_file.format(day=date.day, month=date.month, year=str(date.year)[-2:]))
@@ -318,6 +335,9 @@ def download_archive(date = datetime.strptime('01-01-2010', "%d-%m-%Y").date()):
             #Download delivery data
             #print(delivery_data_dir+str(date.year)+'/'+base_delivery_file.replace('zip', 'csv').format(day=date.day, month=date.month, year=date.year))
             if os.path.exists(delivery_data_dir+str(date.year)+'/'+base_delivery_file.replace('zip', 'csv').format(day=date.day, month=date.month, year=date.year)):
+                print('Skip delivery data')
+                pass
+            elif os.path.exists(delivery_data_dir+str(date.year)+'/'+base_delivery_file.replace('zip', 'CSV').format(day=date.day, month=date.month, year=date.year)):
                 print('Skip delivery data')
                 pass
             else:

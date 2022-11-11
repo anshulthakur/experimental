@@ -142,39 +142,49 @@ MARKET_DATA = {
 
 def get_filelist(folder):
     files = os.listdir(folder)
-    files = [f for f in files if os.path.isfile(folder+'/'+f) and f[-3:]=='csv'] #Filtering only the files.
+    files = [f for f in files if os.path.isfile(folder+'/'+f) and f[-3:].strip().lower()=='csv'] #Filtering only the files.
     return files
 
 def parse_bse_delivery(dateval):
     data = {}
     filename = 'SCBSEALL{}.csv'.format(dateval.strftime('%d%m'))
     path = MARKET_DATA['BSE']['delivery']+'{year}/'.format(year=dateval.date().year)+filename
-    with open(path,'r') as fd:
-        reader = csv.DictReader(fd)
-        for row in reader:
-            data[row['SCRIP CODE']]= row['DELIVERY QTY']
+    print('Parsing '+path)
+    try:
+        with open(path,'r') as fd:
+            reader = csv.DictReader(fd)
+            for row in reader:
+                data[row['SCRIP CODE'].strip()]= row['DELIVERY QTY']
+    except FileNotFoundError:
+        filename = 'scbseall{}.csv'.format(dateval.strftime('%d%m'))
+        path = MARKET_DATA['BSE']['delivery']+'{year}/'.format(year=dateval.date().year)+filename
+        with open(path,'r') as fd:
+            reader = csv.DictReader(fd)
+            for row in reader:
+                data[row['SCRIP CODE'].strip()]= row['DELIVERY QTY']
     return data
 
 def parse_bse_bhav(reader, symbols, fname):
     listings = []
     deliveries = None
+    dateval = datetime.strptime(fname.upper().replace('EQ','').replace('.CSV',''), '%d%m%y')
+    #print(symbols)
     for row in reader:
         if row.get('SC_CODE', None) is not None:
-            if row.get('SC_CODE') not in symbols:
-                print(f"{row.get('SC_CODE')}({row.get('SC_NAME')}) has not been added to DB yet. Skip.")
+            if row.get('SC_CODE').strip() not in symbols:
+                #print(f"{row.get('SC_CODE')}({row.get('SC_NAME')}) has not been added to DB yet. Skip.")
                 continue
             if deliveries is None:
-                n = fname.replace('EQ','').replace('.csv','')
-                deliveries = parse_bse_delivery(datetime.strptime(n, '%d%m%y'))
-            listing = Listing(date=datetime.strptime(row.get('TIMESTAMP').strip(), '%d-%b-%y'),
+                deliveries = parse_bse_delivery(dateval)
+            listing = Listing(date=dateval,
                               open=row.get('OPEN'),
                               high=row.get('HIGH'),
                               low=row.get('LOW'),
                               close=row.get('CLOSE'),
                               traded=row.get('NO_OF_SHRS'),
                               trades=row.get('NO_TRADES'),
-                              stock = symbols[row.get('SC_CODE')])
-            if row.get('SC_CODE') in deliveries:
+                              stock = symbols[row.get('SC_CODE').strip()])
+            if row.get('SC_CODE').strip() in deliveries:
                 listing.deliverable = deliveries.get(row.get('SC_CODE'))
             listings.append(listing)
     try:
@@ -242,7 +252,7 @@ def get_active_scrips(market):
         try:
             stock = Stock.objects.get(symbol=member.get('symbol'), market=market)
         except Stock.DoesNotExist:
-            stock = Stock(face_value=int(member.get('facevalue')),
+            stock = Stock(face_value=int(float(member.get('facevalue'))),
                           market = market,
                           symbol=member.get('symbol'),
                           content_object=company

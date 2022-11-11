@@ -44,9 +44,13 @@ def handle_download(session, url, filename, path=raw_data_dir):
         return
     time.sleep(1)
     try:
-        response = session.get(url)
+        response = session.get(url, timeout=10)
     except requests.exceptions.TooManyRedirects:
         print('Data may not be available')
+        return
+    except requests.exceptions.Timeout:
+        #Skip file download
+        print('Timeout')
         return
     #print(response.headers)
     text = False

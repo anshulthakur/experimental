@@ -284,9 +284,8 @@ def clean_delivery_data(filename):
             with open(filename.replace('txt', 'TXT'), 'r') as fd:
                 for row in fd:
                     d_fd.write(row.replace('|', ','))
-        os.remove(filename).replace('txt', 'TXT')
+        os.remove(filename.replace('txt', 'TXT'))
     
-
 
 def download_archive(date = datetime.strptime('01-01-2010', "%d-%m-%Y").date()):
     #driver.get(archive_url)

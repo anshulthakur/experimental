@@ -301,11 +301,15 @@ if __name__ == "__main__":
     parser.add_argument('-m', '--market', help="Market (NSE/BSE/MCX/...)")
     args = parser.parse_args()
     stock_code = None
-    market = 'NSE'
+    market = None
 
     if args.market is not None and len(args.market)>0:
         market = args.market
 
-    if market not in ['BSE', 'NSE']:
+    if market is not None and market not in ['BSE', 'NSE']:
         print(f'{market} not supported currently')
-    populate_db(market)
+    elif market is not None:
+        populate_db(market)
+    else:
+        populate_db(market='NSE')
+        populate_db(market='BSE')

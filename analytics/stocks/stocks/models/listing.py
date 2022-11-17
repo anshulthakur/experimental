@@ -16,7 +16,15 @@ class Listing(models.Model):
                               on_delete = models.CASCADE)
 
     def __str__(self):
-        return (self.stock.name+' '+ self.date.strftime("%d-%m-%Y"))
+        strval = "{date} {symbol} O:{open} H:{high} L:{low} C:{close} Del:{deli}".format(date=self.date.strftime("%d-%m-%Y"),
+                                                                             symbol=self.stock.symbol,
+                                                                             open=self.open,
+                                                                             close=self.close,
+                                                                             high=self.high,
+                                                                             low=self.low,
+                                                                             deli=self.deliverable)
+                                                                             
+        return (strval)
     
     class Meta:
         indexes = [

@@ -82,7 +82,7 @@ def parse_bse_bhav(reader, symbols, fname):
                     print('Update delivery data')
                     listing.save()
             except Listing.DoesNotExist:
-                print('Create entry')
+                print('Create entry for {}'.format(stock.symbol))
                 listing = Listing(date=dateval,
                                   open=row.get('OPEN'),
                                   high=row.get('HIGH'),
@@ -93,7 +93,7 @@ def parse_bse_bhav(reader, symbols, fname):
                                   stock = stock)
                 if row.get('SC_CODE') in deliveries:
                     listing.deliverable = deliveries.get(row.get('SC_CODE'))
-                    listing.save()
+                listing.save()
             except Exception as e:
                 print(e)
                 print(("Unexpected error:", sys.exc_info()[0]))
@@ -143,7 +143,7 @@ def parse_nse_bhav(reader, symbols, fname):
                     print('Update delivery data')
                     listing.save()
             except Listing.DoesNotExist:
-                print('Create entry')
+                print('Create entry for {}'.format(stock.symbol))
                 listing = Listing(date=dateval,
                                 open=row.get('OPEN'),
                                 high=row.get('HIGH'),
@@ -153,7 +153,7 @@ def parse_nse_bhav(reader, symbols, fname):
                                 stock = stock)
                 if row.get('SYMBOL') in deliveries:
                     listing.deliverable = deliveries.get(row.get('SYMBOL'))
-                    listing.save()
+                listing.save()
             except Exception as e:
                 print(e)
                 print(("Unexpected error:", sys.exc_info()[0]))

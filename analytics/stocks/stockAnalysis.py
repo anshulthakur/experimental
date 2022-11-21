@@ -24,10 +24,10 @@ from matplotlib import pyplot
 
 #Method 2
 #Somehow, can't use a.group in a single query. Some problem occurs
-#stocks = pd.read_sql_query("SELECT a.security, a.sid, a.name, a.face_value, a.isin, b.name FROM stocks_stock AS a INNER JOIN stocks_industry AS b ON a.industry_id=b.id;", conn)
+#stocks = pd.read_sql_query("SELECT a.symbol, a.sid, a.name, a.face_value, a.isin, b.name FROM stocks_stock AS a INNER JOIN stocks_industry AS b ON a.industry_id=b.id;", conn)
 #print(stocks)
 
-#listings = pd.read_sql_query("SELECT a.date, a.opening, a.high, a.low, a.closing, a.wap, a.traded, a.trades, a.turnover, a.deliverable, a.ratio, a.spread_high_low, a.spread_close_open, b.name FROM stocks_listing AS a INNER JOIN stocks_stock AS b ON a.stock_id=b.id;", conn)
+#listings = pd.read_sql_query("SELECT a.date, a.open, a.high, a.low, a.close, a.wap, a.traded, a.trades, a.turnover, a.deliverable, a.ratio, a.spread_high_low, a.spread_close_open, b.name FROM stocks_listing AS a INNER JOIN stocks_stock AS b ON a.stock_id=b.id;", conn)
 #print(listings)
 
 #Method 3
@@ -36,7 +36,7 @@ stock = Stock.objects.get(sid='ASIANPAINT')
 listings = Listing.objects.filter(stock=stock).order_by('date')
 
 #df = read_frame(listings) #cf https://stackoverflow.com/questions/22898824/filtering-pandas-dataframes-on-dates
-df = read_frame(listings, index_col='date', coerce_float=True, fieldnames=['date', 'opening', 'closing', 'high', 'low', 'wap', 'traded', 'trades', 'turnover', 'deliverable', 'ratio', 'spread_high_low', 'spread_close_open'])
+df = read_frame(listings, index_col='date', coerce_float=True, fieldnames=['date', 'open', 'close', 'high', 'low', 'wap', 'traded', 'trades', 'turnover', 'deliverable', 'ratio', 'spread_high_low', 'spread_close_open'])
 #print(df)
 
 
@@ -47,8 +47,8 @@ def plot_prices(df, from_date=None, to_date=None):
     to_date = df.index[-1]
 
   filtered_vals = df.loc[from_date:to_date] #With date as index, we access it with .loc attribute
-  filtered_vals.closing.plot()
-  filtered_vals.opening.plot()
+  filtered_vals.close.plot()
+  filtered_vals.open.plot()
 
 pyplot.figure()
 #plot_prices(df, from_date='2018-12-01', to_date='2018-12-31')
@@ -61,11 +61,11 @@ pyplot.show()
 #Take two stocks and find the covariance of the two over a period
 stock = Stock.objects.get(sid='ASIANPAINT')
 listings = Listing.objects.filter(stock=stock).order_by('date')
-stock_1 = read_frame(listings, index_col='date', coerce_float=True, fieldnames=['date', 'opening', 'closing', 'high', 'low', 'wap', 'traded', 'trades', 'turnover', 'deliverable', 'ratio', 'spread_high_low', 'spread_close_open'])
+stock_1 = read_frame(listings, index_col='date', coerce_float=True, fieldnames=['date', 'open', 'close', 'high', 'low', 'wap', 'traded', 'trades', 'turnover', 'deliverable', 'ratio', 'spread_high_low', 'spread_close_open'])
 
 stock = Stock.objects.get(sid='BAJAJELEC')
 listings = Listing.objects.filter(stock=stock).order_by('date')
-stock_2 = read_frame(listings, index_col='date', coerce_float=True, fieldnames=['date', 'opening', 'closing', 'high', 'low', 'wap', 'traded', 'trades', 'turnover', 'deliverable', 'ratio', 'spread_high_low', 'spread_close_open'])
+stock_2 = read_frame(listings, index_col='date', coerce_float=True, fieldnames=['date', 'open', 'close', 'high', 'low', 'wap', 'traded', 'trades', 'turnover', 'deliverable', 'ratio', 'spread_high_low', 'spread_close_open'])
 
 def fixup_series(stock_1, stock_2):
   """
@@ -76,8 +76,8 @@ def fixup_series(stock_1, stock_2):
   indices_2 = set(stock_2.index.tolist())
 
   dummy_entry = { 'date': None,
-                  'opening': 0,
-                  'closing' : 0,
+                  'open': 0,
+                  'close' : 0,
                   'high':0,
                   'low':0,
                   'wap':0,
@@ -92,10 +92,10 @@ def fixup_series(stock_1, stock_2):
   diff = indices_1.difference(indices_2)
   for index in diff:
     #dummy_entry['date'] = stock_1.index[stock_1.index.get_loc(index)-1]
-    dummy_entry['opening'] = stock_2.loc[stock_1.index[stock_1.index.get_loc(index)-1]]['closing']
-    dummy_entry['closing'] = stock_2.loc[stock_1.index[stock_1.index.get_loc(index)-1]]['closing']
-    dummy_entry['high'] = stock_2.loc[stock_1.index[stock_1.index.get_loc(index)-1]]['closing']
-    dummy_entry['low'] = stock_2.loc[stock_1.index[stock_1.index.get_loc(index)-1]]['closing']
+    dummy_entry['open'] = stock_2.loc[stock_1.index[stock_1.index.get_loc(index)-1]]['close']
+    dummy_entry['close'] = stock_2.loc[stock_1.index[stock_1.index.get_loc(index)-1]]['close']
+    dummy_entry['high'] = stock_2.loc[stock_1.index[stock_1.index.get_loc(index)-1]]['close']
+    dummy_entry['low'] = stock_2.loc[stock_1.index[stock_1.index.get_loc(index)-1]]['close']
     #stock_2.loc[index] = dummy_entry
     for key in dummy_entry:
       stock_2.loc[index, key] = dummy_entry[key]
@@ -104,10 +104,10 @@ def fixup_series(stock_1, stock_2):
   diff = indices_2.difference(indices_1)
   for index in diff:
     #dummy_entry['date'] = stock_2.index[stock_2.index.get_loc(index)-1]
-    dummy_entry['opening'] = stock_1.loc[stock_2.index[stock_2.index.get_loc(index)-1]]['closing']
-    dummy_entry['closing'] = stock_1.loc[stock_2.index[stock_2.index.get_loc(index)-1]]['closing']
-    dummy_entry['high'] = stock_1.loc[stock_2.index[stock_2.index.get_loc(index)-1]]['closing']
-    dummy_entry['low'] = stock_1.loc[stock_2.index[stock_2.index.get_loc(index)-1]]['closing']
+    dummy_entry['open'] = stock_1.loc[stock_2.index[stock_2.index.get_loc(index)-1]]['close']
+    dummy_entry['close'] = stock_1.loc[stock_2.index[stock_2.index.get_loc(index)-1]]['close']
+    dummy_entry['high'] = stock_1.loc[stock_2.index[stock_2.index.get_loc(index)-1]]['close']
+    dummy_entry['low'] = stock_1.loc[stock_2.index[stock_2.index.get_loc(index)-1]]['close']
     #stock_1.loc[index] = dummy_entry
     for key in dummy_entry:
       stock_1.loc[index, key] = dummy_entry[key]
@@ -129,10 +129,10 @@ def compute_covariance(stock_1, stock_2, from_date=None, to_date=None):
 (stock_1, stock_2) = fixup_series(stock_1, stock_2)
 
 #Compute ROI for each day
-stock_1['roi'] = stock_1['closing'] - stock_1['closing'].shift(1)
-stock_1.loc[stock_1.index[0]]['roi'] = stock_1.loc[stock_1.index[0]]['closing'] - stock_1.loc[stock_1.index[0]]['opening']
-stock_2['roi'] = stock_2['closing'] - stock_2['closing'].shift(1)
-stock_2.loc[stock_2.index[0]]['roi'] = stock_2.loc[stock_2.index[0]]['closing'] - stock_2.loc[stock_2.index[0]]['opening']
+stock_1['roi'] = stock_1['close'] - stock_1['close'].shift(1)
+stock_1.loc[stock_1.index[0]]['roi'] = stock_1.loc[stock_1.index[0]]['close'] - stock_1.loc[stock_1.index[0]]['open']
+stock_2['roi'] = stock_2['close'] - stock_2['close'].shift(1)
+stock_2.loc[stock_2.index[0]]['roi'] = stock_2.loc[stock_2.index[0]]['close'] - stock_2.loc[stock_2.index[0]]['open']
 #print(stock_1.loc[stock_1.index[0]])
 #print(stock_1.loc[stock_1.index[1]])
 
@@ -154,8 +154,8 @@ def fixup_series_all(series):
       indices_2 = set(stock_2.index.tolist())
 
       dummy_entry = { #'date': None,
-                      'opening': 0,
-                      'closing' : 0,
+                      'open': 0,
+                      'close' : 0,
                       'high':0,
                       'low':0,
                       'wap':0,
@@ -174,8 +174,8 @@ def fixup_series_all(series):
         if stock_1.index.get_loc(index)==0:
           #First date does not exist, use all zeros (not listed/not traded on day 1 or required interval)
           dummy_entry = { #'date': None,
-                      'opening': 0,
-                      'closing' : 0,
+                      'open': 0,
+                      'close' : 0,
                       'high':0,
                       'low':0,
                       'wap':0,
@@ -193,10 +193,10 @@ def fixup_series_all(series):
           #print(stock_1.index[stock_1.index.get_loc(index)])
           #print(stock_1.index[stock_1.index.get_loc(index)-1])
           #dummy_entry['date'] = stock_1.index[stock_1.index.get_loc(index)-1]
-          dummy_entry['opening'] = stock_2.loc[stock_1.index[stock_1.index.get_loc(index)-1]]['closing']
-          dummy_entry['closing'] = stock_2.loc[stock_1.index[stock_1.index.get_loc(index)-1]]['closing']
-          dummy_entry['high'] = stock_2.loc[stock_1.index[stock_1.index.get_loc(index)-1]]['closing']
-          dummy_entry['low'] = stock_2.loc[stock_1.index[stock_1.index.get_loc(index)-1]]['closing']
+          dummy_entry['open'] = stock_2.loc[stock_1.index[stock_1.index.get_loc(index)-1]]['close']
+          dummy_entry['close'] = stock_2.loc[stock_1.index[stock_1.index.get_loc(index)-1]]['close']
+          dummy_entry['high'] = stock_2.loc[stock_1.index[stock_1.index.get_loc(index)-1]]['close']
+          dummy_entry['low'] = stock_2.loc[stock_1.index[stock_1.index.get_loc(index)-1]]['close']
         #stock_2.loc[index] = dummy_entry
         for key in dummy_entry:
           stock_2.loc[index, key] = dummy_entry[key]
@@ -206,8 +206,8 @@ def fixup_series_all(series):
       for index in diff:
         if stock_2.index.get_loc(index)==0:
           dummy_entry = { #'date': None,
-                      'opening': 0,
-                      'closing' : 0,
+                      'open': 0,
+                      'close' : 0,
                       'high':0,
                       'low':0,
                       'wap':0,
@@ -221,10 +221,10 @@ def fixup_series_all(series):
                     }
         else:
           #dummy_entry['date'] = stock_2.index[stock_2.index.get_loc(index)-1]
-          dummy_entry['opening'] = stock_1.loc[stock_2.index[stock_2.index.get_loc(index)-1]]['closing']
-          dummy_entry['closing'] = stock_1.loc[stock_2.index[stock_2.index.get_loc(index)-1]]['closing']
-          dummy_entry['high'] = stock_1.loc[stock_2.index[stock_2.index.get_loc(index)-1]]['closing']
-          dummy_entry['low'] = stock_1.loc[stock_2.index[stock_2.index.get_loc(index)-1]]['closing']
+          dummy_entry['open'] = stock_1.loc[stock_2.index[stock_2.index.get_loc(index)-1]]['close']
+          dummy_entry['close'] = stock_1.loc[stock_2.index[stock_2.index.get_loc(index)-1]]['close']
+          dummy_entry['high'] = stock_1.loc[stock_2.index[stock_2.index.get_loc(index)-1]]['close']
+          dummy_entry['low'] = stock_1.loc[stock_2.index[stock_2.index.get_loc(index)-1]]['close']
           #stock_1.loc[index] = dummy_entry
         for key in dummy_entry:
           stock_1.loc[index, key] = dummy_entry[key]
@@ -246,15 +246,15 @@ end_date = '2018-11-30'
 for stock in stock_qs:
   names.append(stock.sid)
   listings = Listing.objects.filter(stock=stock).order_by('date')
-  df = read_frame(listings, index_col='date', coerce_float=True, fieldnames=['date', 'opening', 'closing', 'high', 'low', 'wap', 'traded', 'trades', 'turnover', 'deliverable', 'ratio', 'spread_high_low', 'spread_close_open'])[start_date:end_date]
+  df = read_frame(listings, index_col='date', coerce_float=True, fieldnames=['date', 'open', 'close', 'high', 'low', 'wap', 'traded', 'trades', 'turnover', 'deliverable', 'ratio', 'spread_high_low', 'spread_close_open'])[start_date:end_date]
   series.append(df.sort_index())
 
 series = fixup_series_all(series)
 for index in range(0, len(names)):
   try:
     stock = series[index]
-    stock['roi'] = stock['closing'] - stock['closing'].shift(1)
-    stock.loc[stock.index[0]]['roi'] = stock.loc[stock.index[0]]['closing'] - stock.loc[stock.index[0]]['opening']
+    stock['roi'] = stock['close'] - stock['close'].shift(1)
+    stock.loc[stock.index[0]]['roi'] = stock.loc[stock.index[0]]['close'] - stock.loc[stock.index[0]]['open']
   except:
     print('Error in {} Index {}'.format(names[index], index))
 

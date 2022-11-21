@@ -25,13 +25,13 @@ from stocks.models import Listing, Stock
 def get_stock_listing(stock):
     print(stock.sid)
     listing = Listing.objects.filter(stock=stock)
-    df = read_frame(listing, fieldnames=['closing', 'date'], index_col='date')
+    df = read_frame(listing, fieldnames=['close', 'date'], index_col='date')
     for column in df.columns:
         if column != 'stock':
            df[column] = pd.to_numeric(df[column])
     df = df.sort_index()
-    df = df.reindex(columns = ['closing'])
-    df.rename(columns={"closing":stock.sid.replace(' ', '_')}, inplace=True)
+    df = df.reindex(columns = ['close'])
+    df.rename(columns={"close":stock.sid.replace(' ', '_')}, inplace=True)
     #Optionally, filter out by date range
     start_date = '2020-01-01'
     end_date = '2020-12-31'
@@ -44,12 +44,12 @@ def get_stock_listing(stock):
     first_date = datetime.date(2020, 1, 1)
     last_date = datetime.date(2022, 6, 15)
     listing = Listing.objects.filter(stock=stock, date__range=(first_date, last_date))
-    df = read_frame(listing, fieldnames=['closing', 'date'], index_col='date')
+    df = read_frame(listing, fieldnames=['close', 'date'], index_col='date')
     for column in df.columns:
         if column != 'stock':
            df[column] = pd.to_numeric(df[column])
     df = df.sort_index()
-    df = df.reindex(columns = ['closing'])
+    df = df.reindex(columns = ['close'])
     df.index = pd.to_datetime(df.index)
 
     #Delete duplicate columns
@@ -58,17 +58,17 @@ def get_stock_listing(stock):
     resample = False
     if resample:
         #Resample weekly
-        logic = {'closing' : 'last',
+        logic = {'close' : 'last',
                  }
         #Resample on weekly levels
         df_weekly = df.resample('W').apply(logic)
         df_weekly.index -= to_offset("6D")
 
-        #df_weekly.rename(columns={"closing":stock.sid.replace(' ', '_')}, inplace=True)
-        df_weekly.rename(columns={"closing":stock.security}, inplace=True)
+        #df_weekly.rename(columns={"close":stock.sid.replace(' ', '_')}, inplace=True)
+        df_weekly.rename(columns={"close":stock.symbol}, inplace=True)
         df = df_weekly
     else:
-        df.rename(columns={"closing":stock.sid}, inplace=True)
+        df.rename(columns={"close":stock.sid}, inplace=True)
 
     #Optionally, filter out by date range
     #start_date = '2020-01-01'

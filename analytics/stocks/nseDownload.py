@@ -249,10 +249,10 @@ def add_data_to_db(date = datetime.strptime('01-01-2005', "%d-%m-%Y").date()):
                                       sid = row.get('SYMBOL'))
                     listing = Listing(stock=stock,
                                           date=datetime.strptime(row.get('Date').strip(), '%d-%B-%Y'),
-                                          opening=float(row.get('Open Price').strip()),
+                                          open=float(row.get('Open Price').strip()),
                                           high = float(row.get('High Price').strip()),
                                           low = float(row.get('Low Price').strip()),
-                                          closing = float(row.get('Close Price').strip()),
+                                          close = float(row.get('Close Price').strip()),
                                           wap = float(row.get('WAP').strip()),
                                           traded = int(row.get('No.of Shares').strip()),
                                           trades = int(row.get('No. of Trades').strip()),

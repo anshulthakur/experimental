@@ -11,18 +11,18 @@ from stocks.models import Listing, Industry, Stock, Market, Company
 def legacy():
     def populate_trades(stock):
         try:
-            #print(stock.security)
-            fd = open('bsedata/{name}.csv'.format(name=stock.security), 'r')
+            #print(stock.symbol)
+            fd = open('bsedata/{name}.csv'.format(name=stock.symbol), 'r')
             reader = csv.DictReader(fd,delimiter=",", quotechar="'")
             #print(stock)
             listings = []
             for row in reader:
                 listing = Listing(stock=stock,
                                     date=datetime.strptime(row.get('Date').strip(), '%d-%B-%Y'),
-                                    opening=float(row.get('Open Price').strip()),
+                                    open=float(row.get('Open Price').strip()),
                                     high = float(row.get('High Price').strip()),
                                     low = float(row.get('Low Price').strip()),
-                                    closing = float(row.get('Close Price').strip()),
+                                    close = float(row.get('Close Price').strip()),
                                     wap = float(row.get('WAP').strip()),
                                     traded = int(row.get('No.of Shares').strip()),
                                     trades = int(row.get('No. of Trades').strip()),
@@ -87,7 +87,7 @@ def legacy():
                 industry = Industry.objects.get(name=industry)
             else:
                 industry = None
-            stock = Stock(security=int(row.get('Security Code')),
+            stock = Stock(symbol=int(row.get('Security Code')),
                 sid = row.get('Security Id'),
                 name = row.get('Security Name').strip(),
                 group = row.get('Group').strip(),
@@ -125,7 +125,7 @@ def legacy():
     for sid in sids:
         #print(row)
         try:
-            stock = Stock.objects.get(security=int(sid))
+            stock = Stock.objects.get(symbol=int(sid))
             populate_trades(stock)
         except:
             print(stock)

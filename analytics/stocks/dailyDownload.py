@@ -481,7 +481,7 @@ if __name__ == "__main__":
                 fd.write('\n{}'.format(stock.id))
     else:
         try:
-            stock = Stock.objects.get(security=stock_code)
+            stock = Stock.objects.get(sid=stock_code, market='BSE')
             if args.bulk:
                 get_bulk(stock)
             else:

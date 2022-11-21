@@ -2,122 +2,13 @@ import os
 import sys
 import settings
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta
 import dateparser
+import signal
 
 from stocks.models import Listing, Industry, Stock, Market, Company
 
-def legacy():
-    def populate_trades(stock):
-        try:
-            #print(stock.security)
-            fd = open('bsedata/{name}.csv'.format(name=stock.security), 'r')
-            reader = csv.DictReader(fd,delimiter=",", quotechar="'")
-            #print(stock)
-            listings = []
-            for row in reader:
-                #print(stock)
-                #print(row)
-                try:
-                    listing = Listing.objects.get(stock=stock, date=datetime.strptime(row.get('Date'), '%d-%B-%Y'))
-                except Listing.DoesNotExist:
-                    listing = Listing(stock=stock,
-                                    date=datetime.strptime(row.get('Date').strip(), '%d-%B-%Y'),
-                                    opening=float(row.get('Open Price').strip()),
-                                    high = float(row.get('High Price').strip()),
-                                    low = float(row.get('Low Price').strip()),
-                                    closing = float(row.get('Close Price').strip()),
-                                    wap = float(row.get('WAP').strip()),
-                                    traded = int(row.get('No.of Shares').strip()),
-                                    trades = int(row.get('No. of Trades').strip()),
-                                    turnover = float(row.get('Total Turnover (Rs.)').strip()),
-                                    deliverable = float(row.get('Deliverable Quantity').strip()) if len(row.get('Deliverable Quantity').strip()) > 0 else 0,
-                                    ratio = float(row.get('% Deli. Qty to Traded Qty').strip()) if len(row.get('% Deli. Qty to Traded Qty').strip()) > 0 else 0,
-                                    spread_high_low = float(row.get('Spread High-Low').strip()),
-                                    spread_close_open = float(row.get('Spread Close-Open').strip()))
-                    try:
-                        #listing.save()
-                        #print('Adding to list')
-                        listings.append(listing)
-                    except:
-                        print(stock)
-                        print(row)
-                        print(listing)
-                        for e in sys.exc_info():
-                            print(("Unexpected error:", e))
-                except:
-                    print('Something went wrong')
-                    print(stock)
-                    print(row)
-                    print(("Unexpected error:", sys.exc_info()[0]))
-            try:
-                Listing.objects.bulk_create(listings)
-            except:
-                print(("Unexpected error:", sys.exc_info()[0]))
-        except IOError:
-            pass
-
-    #Industries
-    #fd = open('industries.txt', 'r')
-    fd = open('ListOfScrips_equity.csv', 'r')
-    reader = csv.DictReader(fd)
-    for row in reader:
-        industry = row.get('Industry', '').strip()
-        if industry is not None and len(industry) > 0:
-            try:
-                Industry.objects.get(name=industry)
-            except Industry.DoesNotExist:
-                Industry(name=industry).save()
-            except Exception as e:
-                print(e)
-                print(("Unexpected error:", sys.exc_info()[0]))
-
-    Industry.objects.bulk_create(stocks)
-    fd.close()
-
-    print((len(Industry.objects.all())))
-
-    #List of Equity
-
-
-    #fd = open('ListOfScrips.csv', 'r')
-    fd = open('ListOfScrips_equity.csv', 'r')
-    reader = csv.DictReader(fd)
-
-
-    for row in reader:
-        #print(row)
-        try:
-            stock = Stock.objects.get(security=int(row.get('Security Code')))
-            #print(stock)
-            populate_trades(stock)
-        except Stock.DoesNotExist:
-            industry = row.get('Industry', '').strip()
-            try:
-                if industry is not None and len(industry) > 0:
-                    industry = Industry.objects.get(name=industry)
-                else:
-                    industry = None
-            except Industry.DoesNotExist:
-                print('Industry: {} does not exist'.format(row.get('Industry', '').strip()))
-                exit()
-            stock = Stock(security=int(row.get('Security Code')),
-                sid = row.get('Security Id'),
-                name = row.get('Security Name').strip(),
-                group = row.get('Group').strip(),
-                face_value = row.get('Face Value').strip(),
-                isin = row.get('ISIN No').strip(),
-                industry = industry)
-            stock.save()
-            print(stock)
-            populate_trades(stock)
-        except:
-                print(("Unexpected error:", sys.exc_info()[0]))
-
-    fd.close()
-
-    print((len(Stock.objects.all())))
-
+error_dates = []
 MARKET_DATA = {
                 'NSE': {'bhav': './nseData/',
                        'delivery': './nseData/delivery/',
@@ -127,12 +18,24 @@ MARKET_DATA = {
                         }
                }
 
+def write_error_file():
+    global error_dates
+    with open("error_dates.txt", 'a') as fd:
+        for e in error_dates:
+            fd.write(e+'\n')
+
+def handler(signum, frame):
+    write_error_file()
+    print('Error dates appended to error_dates.txt')
+    exit(0)
+
 def get_filelist(folder):
     files = os.listdir(folder)
     files = [f for f in files if os.path.isfile(folder+'/'+f) and f[-3:].strip().lower()=='csv'] #Filtering only the files.
     return files
 
 def parse_bse_delivery(dateval):
+    global error_dates
     data = {}
     filename = 'SCBSEALL{}.csv'.format(dateval.strftime('%d%m'))
     path = MARKET_DATA['BSE']['delivery']+'{year}/'.format(year=dateval.date().year)+filename
@@ -156,6 +59,7 @@ def parse_bse_delivery(dateval):
     return data
 
 def parse_bse_bhav(reader, symbols, fname):
+    global error_dates
     deliveries = None
     dateval = datetime.strptime(fname.upper().replace('EQ','').replace('.CSV',''), '%d%m%y')
     market = Market.objects.get(name='BSE')
@@ -178,7 +82,7 @@ def parse_bse_bhav(reader, symbols, fname):
                     print('Update delivery data')
                     listing.save()
             except Listing.DoesNotExist:
-                #print('Create entry')
+                print('Create entry')
                 listing = Listing(date=dateval,
                                   open=row.get('OPEN'),
                                   high=row.get('HIGH'),
@@ -239,7 +143,7 @@ def parse_nse_bhav(reader, symbols, fname):
                     print('Update delivery data')
                     listing.save()
             except Listing.DoesNotExist:
-                #print('Create entry')
+                print('Create entry')
                 listing = Listing(date=dateval,
                                 open=row.get('OPEN'),
                                 high=row.get('HIGH'),
@@ -296,42 +200,40 @@ def get_bhav_filename(day, market):
                   'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
     fname = None
     if market=='BSE':
-        fname= 'EQ{day:02}{month:02}{year}.csv'.format(day = day.day, 
+        fname= 'EQ{day:02}{month:02}{year}.CSV'.format(day = day.day, 
                                                         month = day.month, 
-                                                        year = day.year)
+                                                        year = str(day.year)[-2:])
     elif market=='NSE':
         fname='cm{day:02}{month}{year:04}bhav.csv'.format(day = day.day, 
                                                         month = months[day.month], 
                                                         year = day.year)
     return fname
 
-def populate_db_1(market, day=datetime.today(), bulk=False):
-    #Create Market object
-    market_obj = None
+
+def populate_for_date(market, symbols, date=datetime.today()):
+    global error_dates
+    f = get_bhav_filename(day=date, market = market.name)
+    print('Parsing '+MARKET_DATA[market.name]['bhav']+f)
     try:
-        market_obj = Market.objects.get(name=market)
-    except Market.DoesNotExist:
-        print(f'Create for {market}')
-        market_obj = Market(name=market)
-        market_obj.save()
-    except Exception as e:
-        print(e)
-        print(("Unexpected error:", sys.exc_info()[0]))
-        return
-    #Create scrip members (and Company if applicable)
-    symbols = get_active_scrips(market_obj)
+        with open(MARKET_DATA[market.name]['bhav']+f,'r') as fd:
+            reader = csv.DictReader(fd)
+            if market.name=='NSE':
+                parse_nse_bhav(reader, symbols, f)
+            elif market.name=='BSE':
+                parse_bse_bhav(reader, symbols, f)
+    except FileNotFoundError:
+        if date.weekday()<=4: #Weekends won't have a file
+            error_dates.append(date.strftime('%d-%m-%y'))
+            print('Error')
+        pass
 
-    #Handle bhav data
-    print('Parsing '+MARKET_DATA[market]['bhav']+get_bhav_filename(day=day, market=market))    
-    with open(MARKET_DATA[market]['bhav']+get_bhav_filename(day=day, market=market),'r') as fd:
-        reader = csv.DictReader(fd)
-        if market=='NSE':
-            parse_nse_bhav(reader, symbols, f)
-        elif market=='BSE':
-            parse_bse_bhav(reader, symbols, f)
-
-def populate_db(market):
+def populate_db(market, date = None, bulk=False):
     #Create Market object
+    if date is None and bulk is False:
+        date = datetime.today()
+    elif date is None and bulk is True:
+        date = datetime.strptime('01-01-2010', "%d-%m-%Y").date()
+    
     market_obj = None
     try:
         market_obj = Market.objects.get(name=market)
@@ -348,20 +250,15 @@ def populate_db(market):
     symbols = get_active_scrips(market_obj)
 
     #Handle bhav data
-    files = get_filelist(MARKET_DATA[market]['bhav'])
-    for f in files:
-        print('Parsing '+MARKET_DATA[market]['bhav']+f)
-        with open(MARKET_DATA[market]['bhav']+f,'r') as fd:
-            reader = csv.DictReader(fd)
-            if market=='NSE':
-                parse_nse_bhav(reader, symbols, f)
-            elif market=='BSE':
-                parse_bse_bhav(reader, symbols, f)
-
+    if bulk:
+        while date <= datetime.today().date():
+            populate_for_date(market = market_obj, symbols=symbols, date=date)
+            date = date + timedelta(days=1)
+    else:
+        populate_for_date(market = market_obj, symbols=symbols, date=date)
 
 if __name__ == "__main__":
-    day = datetime.today()
-    bulk = False
+    signal.signal(signal.SIGINT, handler)
     import argparse
     parser = argparse.ArgumentParser(description='Download stock data for stock/date')
     parser.add_argument('-m', '--market', help="Market (NSE/BSE/MCX/...)")
@@ -369,23 +266,22 @@ if __name__ == "__main__":
     parser.add_argument('-b', '--bulk', help="Get bulk data for stock(s)", action="store_true", default=False)
 
     args = parser.parse_args()
-    stock_code = None
     market = None
+    day = None
 
     if args.date is not None and len(args.date)>0:
         print('Get data for date: {}'.format(args.date))
-        day = datetime.strptime(args.date, "%d/%m/%y")
+        day = datetime.strptime(args.date, "%d/%m/%y").date()
 
     if args.market is not None and len(args.market)>0:
         market = args.market
 
-    if args.bulk:
-        bulk = True
-
     if market is not None and market not in ['BSE', 'NSE']:
         print(f'{market} not supported currently')
+        exit(0)
     elif market is not None:
-        populate_db(market)
+        populate_db(market, date=day, bulk=args.bulk)
     else:
-        populate_db(market='NSE')
-        populate_db(market='BSE')
+        populate_db(market='NSE', date=day, bulk=args.bulk)
+        populate_db(market='BSE', date=day, bulk=args.bulk)
+    write_error_file()

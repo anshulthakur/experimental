@@ -21,6 +21,16 @@ def print_debug(*args):
         print(args)
     return
 
+color_scheme = {'candlesticks': {
+                                'body': ['green', 'red'],
+                                'border': ['green', 'red'],
+                                #'border': ['black']
+                                },
+                'bars': {
+                    'body': ['green', 'red']
+                }
+                }
+
 def classify(rgb_tuple):
     #https://stackoverflow.com/questions/36439384/classifying-rgb-values-in-python
     # eg. rgb_tuple = (2,44,300)
@@ -60,7 +70,7 @@ def main(filename, ohlc_type='candlestick', find_tops=False):
         #print_debug(f'Column:{col}')
         for row in range(0, rows):
             #print_debug(f'Column:{col} Row:{row}')
-            if ohlc_type=='candlestick' and classify(numpydata[row][col])=='black': #Black
+            if ohlc_type=='candlestick' and classify(numpydata[row][col]) in color_scheme['candlesticks']['border']:
                 #Candle is starting here, now greedily scan for the entire body of the candle
                 candle = {'body_start_left': [row, col]}
                 print_debug(f'Body start left: {candle}')
@@ -69,20 +79,15 @@ def main(filename, ohlc_type='candlestick', find_tops=False):
                 for r in range(row, rows):
                     #print_debug(r)
                     colorval = classify(numpydata[r][col])
-                    if colorval != 'black': #Not Black
-                        #Handle partial candle
-                        if colorval in ['green', 'red']:
-                            #print_debug('Partial candle')
-                            pass
-                        else:
-                            candle['body_end_left'] =  [r, col]
-                            print_debug(f'Body end left: {candle}')
-                            break
+                    if colorval not in color_scheme['candlesticks']['border']: #Not Black
+                        candle['body_end_left'] =  [r, col]
+                        print_debug(f'Body end left: {candle}')
+                        break
                 print_debug('Find right ends')
                 for c in range(col, cols):
                     #print_debug(c)
                     colorval = classify(numpydata[row][c])
-                    if  colorval != 'black' or c==cols: #Not Black
+                    if  colorval not in color_scheme['candlesticks']['border'] or c==cols: #Not Black
                         candle['body_start_right']= [row, c-1]
                         candle['body_end_right'] = [r, c-1]
                         print_debug(f'Body end right: {candle}')

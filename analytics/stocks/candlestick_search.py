@@ -14,9 +14,9 @@ RED=0
 GREEN=1
 BLUE=2
 
-global debug 
 debug = False
 def print_debug(*args):
+    global debug
     if debug:
         print(args)
     return
@@ -387,5 +387,6 @@ if __name__ == "__main__":
         print('Speficy file name.')
         exit(0)
     if args.debug:
+        print('Debug is ON')
         debug=True
     main(filename=args.file, ohlc_type=args.type, find_tops=args.peak)

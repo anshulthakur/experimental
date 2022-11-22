@@ -4,14 +4,15 @@ Created on 17-Oct-2022
 @author: Anshul
 '''
 from PIL import Image
-from numpy import asarray
+from numpy import asarray, array
 
 transform_rule = {'blue': 'white',
                   'white': 'white',
                   'black': 'white',
                   'red': 'red',
                   'green': 'green'}
-
+red_candle = ['red']
+green_candle = ['green']
 # transform_rule = {'blue': 'white',
 #                   'white': 'white',
 #                   'black': 'red',
@@ -41,15 +42,22 @@ def classify(rgb_tuple):
 
 def main(img_name):
     print('Preprocessing: images/{}.png'.format(args.file))
-    img = Image.open('images/'+img_name+'.png').convert('RGB')
-    numpydata = asarray(img)
+    #img = Image.open('images/'+img_name+'.png').convert('RGB')
+    numpydata = array( Image.open('images/'+img_name+'.png').convert('RGB'))
+    #numpydata = asarray(img)
     
     [rows, cols, _colors]= numpydata.shape
     for row in range(0, rows):
         for col in range(0, cols):
             color = classify(numpydata[row][col])
             if color in transform_rule:
-                numpydata[row][col] = colors[transform_rule[color]]
+                if (classify(numpydata[row][col]) in red_candle and classify(numpydata[row][col-1]) in green_candle)\
+                    or (classify(numpydata[row][col]) in green_candle and classify(numpydata[row][col-1]) in red_candle):#Handle partitioning when boundaries touch
+                    for r in range(0, rows):
+                        numpydata[r][col] = colors['white']
+                    continue
+                else:
+                    numpydata[row][col] = colors[transform_rule[color]]
     im = Image.fromarray(numpydata)
     im.save('images/'+img_name+'_crop.png')
 

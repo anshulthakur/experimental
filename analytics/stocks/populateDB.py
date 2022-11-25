@@ -8,6 +8,8 @@ import signal
 
 from stocks.models import Listing, Industry, Stock, Market, Company
 
+from nseDownload import download_archive as download_nse_data
+from bseDownload import download_archive as download_bse_data
 error_dates = []
 MARKET_DATA = {
                 'NSE': {'bhav': './nseData/',
@@ -276,12 +278,18 @@ if __name__ == "__main__":
     if args.market is not None and len(args.market)>0:
         market = args.market
 
-    if market is not None and market not in ['BSE', 'NSE']:
-        print(f'{market} not supported currently')
-        exit(0)
-    elif market is not None:
+    if market is not None:
+        if market not in ['BSE', 'NSE']:
+            print(f'{market} not supported currently')
+            exit(0)
+        elif market=='NSE':
+            download_nse_data(day, args.bulk)
+        elif market=='BSE':
+            download_bse_data(day, args.bulk)
         populate_db(market, date=day, bulk=args.bulk)
     else:
+        download_nse_data(day, args.bulk)
+        download_bse_data(day, args.bulk)
         populate_db(market='NSE', date=day, bulk=args.bulk)
         populate_db(market='BSE', date=day, bulk=args.bulk)
     write_error_file()

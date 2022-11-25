@@ -14,23 +14,6 @@ import gzip
 from io import BytesIO
 from zipfile import ZipFile
 
-
-#from selenium import webdriver
-#from selenium.webdriver.common.by import By
-
-#use_chrome = True
-#if use_chrome:
-#    from selenium.webdriver.chrome.options import Options
-#    
-#    from selenium.webdriver.chrome.service import Service
-#    from webdriver_manager.chrome import ChromeDriverManager as DriverManager
-#    from selenium.webdriver import Chrome as Browser
-#else:
-#    from selenium.webdriver.edge.service import Service
-#    from webdriver_manager.microsoft import EdgeChromiumDriverManager  as DriverManager
-#    from selenium.webdriver import Edge as Browser
-
-
 raw_data_dir = './nseData/'
 delivery_data_dir = raw_data_dir+'delivery/'
 
@@ -97,8 +80,53 @@ def clean_delivery_data(filename):
                 d_fd.write(row)
     os.remove(filename)
 
-def download_archive(date = datetime.strptime('20-04-2012', "%d-%m-%Y").date()):
-    #driver.get(archive_url)
+def download_for_day(session, date):
+    base_bhav_file_csv = 'cm{day:02}{month}{year:04}bhav.csv'
+    base_bhav_file = base_bhav_file_csv+'.zip'
+    #base_url_bhav = 'https://www1.nseindia.com/content/historical/EQUITIES/{year:04}/{month}/'+base_bhav_file
+    base_url_bhav = 'https://archives.nseindia.com/content/historical/EQUITIES/{year:04}/{month}/'+base_bhav_file
+
+    base_delivery_file = 'MTO_{day:02}{month:02}{year:04}.DAT'
+    #base_delivery_url = 'https://www1.nseindia.com/archives/equities/mto/'+base_delivery_file
+    base_delivery_url = 'https://archives.nseindia.com/archives/equities/mto/'+base_delivery_file
+    #Download bhavcopy
+    if os.path.exists(raw_data_dir+base_bhav_file_csv.format(day=date.day, month=months[date.month], year=date.year)) and \
+        os.path.exists(delivery_data_dir+base_delivery_file.replace('DAT', 'csv').format(day=date.day, month=date.month, year=date.year)):
+        pass
+    else:
+        session.headers.update({"host": "www.nseindia.com"})
+        session.get(archive_url)
+        session.headers.update({"host": "archives.nseindia.com"})
+    if os.path.exists(raw_data_dir+base_bhav_file_csv.format(day=date.day, month=months[date.month], year=date.year)):
+        pass
+    else:
+        handle_download(session, url = base_url_bhav.format(day=date.day, month=months[date.month], year=date.year), 
+                            filename = base_bhav_file.format(day=date.day, month=months[date.month], year=date.year))
+        #Bhavcopy is zip file, so handle that
+        if os.path.isfile(raw_data_dir+base_bhav_file.format(day=date.day, month=months[date.month], year=date.year)):
+            with ZipFile(raw_data_dir+base_bhav_file.format(day=date.day, month=months[date.month], year=date.year), 'r') as zipf:
+                # printing all the contents of the zip file
+                #zipf.printdir()
+                # extracting all the files
+                #print('Extracting all the files now...')
+                zipf.extractall(raw_data_dir)
+                #print('Done!')
+            os.remove(raw_data_dir+base_bhav_file.format(day=date.day, month=months[date.month], year=date.year))
+            
+    #Download delivery data
+    if os.path.exists(delivery_data_dir+base_delivery_file.format(day=date.day, month=date.month, year=date.year)):
+        clean_delivery_data(delivery_data_dir+base_delivery_file.format(day=date.day, month=date.month, year=date.year))
+    elif os.path.exists(delivery_data_dir+base_delivery_file.replace('DAT', 'csv').format(day=date.day, month=date.month, year=date.year)):
+        pass
+    else:
+        handle_download(session, url = base_delivery_url.format(day=date.day, month=date.month, year=date.year), 
+                            filename = base_delivery_file.format(day=date.day, month=date.month, year=date.year),
+                            path=delivery_data_dir)
+        if os.path.exists(delivery_data_dir+base_delivery_file.format(day=date.day, month=date.month, year=date.year)):
+            clean_delivery_data(delivery_data_dir+base_delivery_file.format(day=date.day, month=date.month, year=date.year))
+
+
+def download_archive(date = datetime.strptime('20-04-2012', "%d-%m-%Y").date(), bulk=False):
 
     session = requests.Session()
     # Set correct user agent
@@ -112,60 +140,15 @@ def download_archive(date = datetime.strptime('20-04-2012', "%d-%m-%Y").date()):
             "accept-language": "en-US,en;q=0.9",
             "host": "www.nseindia.com",
             "referer": "https://www.nseindia.com"})
-
-    base_bhav_file_csv = 'cm{day:02}{month}{year:04}bhav.csv'
-    base_bhav_file = base_bhav_file_csv+'.zip'
-    #base_url_bhav = 'https://www1.nseindia.com/content/historical/EQUITIES/{year:04}/{month}/'+base_bhav_file
-    base_url_bhav = 'https://archives.nseindia.com/content/historical/EQUITIES/{year:04}/{month}/'+base_bhav_file
-
-    base_delivery_file = 'MTO_{day:02}{month:02}{year:04}.DAT'
-    #base_delivery_url = 'https://www1.nseindia.com/archives/equities/mto/'+base_delivery_file
-    base_delivery_url = 'https://archives.nseindia.com/archives/equities/mto/'+base_delivery_file
-    
-
-    #el = driver.find_element(by = By.XPATH, value='//*[@id="spanDisplayBox"]/table/tbody/tr/td/a')
-    #if el is not None:
-    #   url = el.get_attribute('href')
-    while date <= datetime.today().date():
-        if date.weekday()<=4:
-            print(f'Downloading for {date}')
-            #Download bhavcopy
-            if os.path.exists(raw_data_dir+base_bhav_file_csv.format(day=date.day, month=months[date.month], year=date.year)) and \
-                os.path.exists(delivery_data_dir+base_delivery_file.replace('DAT', 'csv').format(day=date.day, month=date.month, year=date.year)):
-                pass
-            else:
-                session.headers.update({"host": "www.nseindia.com"})
-                session.get(archive_url)
-                session.headers.update({"host": "archives.nseindia.com"})
-            if os.path.exists(raw_data_dir+base_bhav_file_csv.format(day=date.day, month=months[date.month], year=date.year)):
-                pass
-            else:
-                handle_download(session, url = base_url_bhav.format(day=date.day, month=months[date.month], year=date.year), 
-                                    filename = base_bhav_file.format(day=date.day, month=months[date.month], year=date.year))
-                #Bhavcopy is zip file, so handle that
-                if os.path.isfile(raw_data_dir+base_bhav_file.format(day=date.day, month=months[date.month], year=date.year)):
-                    with ZipFile(raw_data_dir+base_bhav_file.format(day=date.day, month=months[date.month], year=date.year), 'r') as zipf:
-                        # printing all the contents of the zip file
-                        #zipf.printdir()
-                        # extracting all the files
-                        #print('Extracting all the files now...')
-                        zipf.extractall(raw_data_dir)
-                        #print('Done!')
-                    os.remove(raw_data_dir+base_bhav_file.format(day=date.day, month=months[date.month], year=date.year))
-                    
-            #Download delivery data
-            if os.path.exists(delivery_data_dir+base_delivery_file.format(day=date.day, month=date.month, year=date.year)):
-                clean_delivery_data(delivery_data_dir+base_delivery_file.format(day=date.day, month=date.month, year=date.year))
-            elif os.path.exists(delivery_data_dir+base_delivery_file.replace('DAT', 'csv').format(day=date.day, month=date.month, year=date.year)):
-                pass
-            else:
-                handle_download(session, url = base_delivery_url.format(day=date.day, month=date.month, year=date.year), 
-                                    filename = base_delivery_file.format(day=date.day, month=date.month, year=date.year),
-                                    path=delivery_data_dir)
-                if os.path.exists(delivery_data_dir+base_delivery_file.format(day=date.day, month=date.month, year=date.year)):
-                    clean_delivery_data(delivery_data_dir+base_delivery_file.format(day=date.day, month=date.month, year=date.year))
-
-        date = date + timedelta(days=1)
+    if bulk:
+        while date <= datetime.today().date():
+            if date.weekday()<=4:
+                print(f'Downloading for {date}')
+                download_for_day(session, date)
+            date = date + timedelta(days=1)
+    else:
+        print(f'Downloading for {date}')
+        download_for_day(session, date)
 
 def get_scrip_list(offline=False):
     url = 'https://archives.nseindia.com/content/equities/EQUITY_L.csv'
@@ -207,61 +190,6 @@ def get_scrip_list(offline=False):
                                 })
     return members
 
-def populate_scrips():
-    scrip_list = 'NSE_list.csv'
-    with open(scrip_list, 'r') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            try:
-                market = Market.objects.get(name = 'NSE')
-                industry = None
-                try:
-                    stock = Stock.objects.get(isin=row.get('ISIN NUMBER'))
-                except Stock.DoesNotExist:
-                    stock = Stock(sid = row.get('SYMBOL'),
-                                  name = row.get('NAME OF COMPANY').strip(),
-                                  group = row.get('SERIES').strip(),
-                                  face_value = row.get('FACE VALUE').strip(),
-                                  isin = row.get('ISIN NUMBER').strip(),
-                                  industry = industry,
-                                  market = market)
-                    stock.save()
-                    print('Created {}'.format(stock.sid))
-            except:
-                pass
-                    
-def add_data_to_db(date = datetime.strptime('01-01-2005', "%d-%m-%Y").date()):
-    base_bhav_file = 'cm{day:02}{month}{year:04}bhav.csv'
-    base_delivery_file = 'MTO_{day:02}{month:02}{year:04}.DAT'
-
-    while date <= datetime.today().date():
-        stocks = []
-        listings = []
-        bhav_name = raw_data_dir+base_bhav_file.format(day=date.day, month=months[date.month], year=date.year)
-        if os.path.isfile(bhav_name):
-            with open(bhav_name, 'r') as bhavfile:
-                reader = csv.DictReader(bhavfile)
-                for row in reader:
-                    try:
-                        stock = Stock.objects.get(isin=row.get('ISIN'))
-                    except Stock.DoesNotExist:
-                        stock = Stock(isin = row.get('ISIN'),
-                                      sid = row.get('SYMBOL'))
-                    listing = Listing(stock=stock,
-                                          date=datetime.strptime(row.get('Date').strip(), '%d-%B-%Y'),
-                                          open=float(row.get('Open Price').strip()),
-                                          high = float(row.get('High Price').strip()),
-                                          low = float(row.get('Low Price').strip()),
-                                          close = float(row.get('Close Price').strip()),
-                                          wap = float(row.get('WAP').strip()),
-                                          traded = int(row.get('No.of Shares').strip()),
-                                          trades = int(row.get('No. of Trades').strip()),
-                                          turnover = float(row.get('Total Turnover (Rs.)').strip()),
-                                          deliverable = float(row.get('Deliverable Quantity').strip()) if len(row.get('Deliverable Quantity').strip()) > 0 else 0,
-                                          )
-                    listings += [listing]
-    pass
-
 if __name__ == "__main__":
     day = datetime.today()
     wait_period = 5
@@ -275,8 +203,6 @@ if __name__ == "__main__":
     if args.date is not None and len(args.date)>0:
         print('Get data for date: {}'.format(args.date))
         day = datetime.strptime(args.date, "%d/%m/%y")
-    if args.bulk:
-        bulk = True
 
     try:
         os.mkdir(raw_data_dir)
@@ -286,16 +212,5 @@ if __name__ == "__main__":
     except:
         print('Error creating raw data folder')
         exit(0)
-    #options = Options()
-    #preferences = {"download.default_directory" : raw_data_dir}
-    #options.add_experimental_option("prefs", preferences)
-    #options.add_argument("--headless")
-
-    #service = Service(executable_path=DriverManager().install())
-    #driver = Browser(service=service, options=options)
-    #driver.implicitly_wait(wait_period)
-    #driver = None
-    if args.bulk:    
-        download_archive()
-    else:
-        download_archive(date=day.date())
+    
+    download_archive(date=day.date(), bulk=args.bulk)

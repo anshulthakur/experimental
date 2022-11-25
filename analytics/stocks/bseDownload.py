@@ -287,7 +287,7 @@ def clean_delivery_data(filename):
         os.remove(filename.replace('txt', 'TXT'))
     
 
-def download_archive(date = datetime.strptime('01-01-2010', "%d-%m-%Y").date()):
+def download_archive(date = datetime.strptime('01-01-2010', "%d-%m-%Y").date(), bulk=False):
     #driver.get(archive_url)
 
     session = requests.Session()

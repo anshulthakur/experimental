@@ -767,7 +767,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Compute RRG data for indices')
     parser.add_argument('-d', '--daily', action='store_true', default = False, help="Compute RRG on daily TF")
     parser.add_argument('-w', '--weekly', action='store_true', default = True, help="Compute RRG on weekly TF")
-    parser.add_argument('-o', '--online', action='store_false', default = True, help="Compute RRG on weekly TF")
+    parser.add_argument('-o', '--online', action='store_true', default = False, help="Fetch data from TradingView (Online)")
     parser.add_argument('-f', '--for', dest='date', help="Compute RRG for date")
     #Can add options for weekly sampling and monthly sampling later
     args = parser.parse_args()

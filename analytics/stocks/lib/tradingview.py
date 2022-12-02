@@ -16,6 +16,7 @@ import sys
 
 logger = logging.getLogger(__name__)
 
+tvfeed_instance = None
 
 class Interval(enum.Enum):
     in_1_minute = "1"
@@ -315,6 +316,11 @@ class TvDatafeed:
 
         return self.__create_df(raw_data, symbol)
 
+def get_tvfeed_instance(username, password):
+    global tvfeed_instance
+    if tvfeed_instance is None:
+        tvfeed_instance = TvDatafeed(username, password)
+    return tvfeed_instance
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)

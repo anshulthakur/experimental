@@ -78,20 +78,15 @@ def get_stock_listing(stock, duration=None, last_date = datetime.date.today(), s
         if column != 'stock':
            df[column] = pd.to_numeric(df[column])
     df = df.sort_index()
-    df = df.reindex(columns = ['opening', 'high', 'low', 'closing', 'traded', 'deliverable', 'trades'])
-    df.rename(columns={"opening": "open", 
-                       "high": "high", 
-                       "low": "low", 
-                       "closing":"close", 
-                       "traded":"volume", 
-                       'deliverable':'delivery',
-                       'trades':'trades'}, inplace=True)
+    df = df.reindex(columns = ['open', 'high', 'low', 'close', 'traded', 'deliverable', 'trades'])
+    df.rename(columns={"traded":"volume", 
+                       'deliverable':'delivery'}, inplace=True)
     df.index = pd.to_datetime(df.index)
 
     #Delete duplicate columns
     #df = df.loc[:,~df.columns.duplicated()]
     df.drop_duplicates(inplace = True)
-    df.dropna(inplace=True)
+    #df.dropna(inplace=True)
     if resample:
         #Resample weekly
         logic = {'open'  : 'first',

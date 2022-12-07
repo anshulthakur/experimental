@@ -151,3 +151,4 @@ widgetsnbextension
 wsproto
 zipp
 zope.interface
+reportlab

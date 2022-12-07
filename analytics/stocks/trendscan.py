@@ -19,14 +19,65 @@ import json
 #Plotting
 from matplotlib.lines import Line2D # For legend
 import matplotlib.pyplot as plt
+import mplfinance as mpf
 #from mplfinance.original_flavor import candlestick_ohlc
 #import matplotlib.dates as mpl_dates
 
 #from matplotlib.dates import date2num
 
+# Import the ReportLab library
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
+from reportlab.lib.units import inch
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_JUSTIFY
 
 report_dir = './reports/scanners/'
 report = {}
+
+def create_report():
+    report = get_report_handle()
+    log(json.dumps(report, indent=2, sort_keys=True), logtype='info')
+    for stock in report:
+        # # Create a new PDF document with A4 size
+        # pdf = canvas.Canvas(f"{report_dir}{stock}.pdf", pagesize=A4)
+        # width, height = A4
+        # print(width, height)
+        # # Add some text to the PDF
+        # pdf.drawString(100, 750, f"Stock: {stock}")
+
+        # # Add an image to the PDF
+        # pdf.drawImage(f"{report_dir}{stock}.png", 100, 100)
+
+        # # Save the PDF
+        # pdf.save()
+
+        doc = SimpleDocTemplate(f"{report_dir}{stock}.pdf",pagesize=A4,
+                        rightMargin=72,leftMargin=72,
+                        topMargin=72,bottomMargin=18)
+        Story=[]
+        styles=getSampleStyleSheet()
+        styles.add(ParagraphStyle(name='Justify', alignment=TA_JUSTIFY))
+        ptext = '%s' % datetime.datetime.today().strftime("%d/%m/%Y")
+        Story.append(Paragraph(ptext, styles["Normal"]))
+        Story.append(Spacer(1, 12))
+
+        im = Image(f"{report_dir}{stock}_ohlc.png", 4*inch, 3*inch)
+        Story.append(im)
+        Story.append(Spacer(1, 12))
+
+        im = Image(f"{report_dir}{stock}.png", 4*inch, 3*inch)
+        Story.append(im)
+
+        Story.append(Spacer(1, 12))
+        Story.append(Paragraph(f"Trend: {report[stock]}", styles["Normal"]))
+        Story.append(Spacer(1, 12))
+        doc.build(Story)
+
+        #Remove the images
+        os.remove(f"{report_dir}{stock}_ohlc.png")
+        os.remove(f"{report_dir}{stock}.png")
 
 def save_plot(stock, df, hh, hl, lh, ll, order=1):
     log('Saving plot', logtype='debug')
@@ -82,9 +133,25 @@ def save_plot(stock, df, hh, hl, lh, ll, order=1):
     plt.title(f'Potential Divergence Points for  Closing Price')
     plt.legend(handles=legend_elements, bbox_to_anchor=(1, 0.65))
     #plt.show()
-    plt.savefig(f"{report_dir}{stock}.jpg", bbox_inches="tight",
+    plt.savefig(f"{report_dir}{stock}.png", bbox_inches="tight",
             pad_inches=0.3, transparent=False)
     plt.close()
+
+    # s = mpf.make_mpf_style(base_mpf_style='yahoo', rc={'font.size': 6})
+    # fig = mpf.figure(figsize=(30, 17), style=s)
+    # mpf.plot(df_2,type='candle', volume=True)
+
+    # Plot candlestick.
+    # Add volume.
+    # Add moving averages: 3,6,9.
+    # Save graph to *.png.
+    mpf.plot(df, type='candle', style='charles',
+            title='',
+            ylabel='',
+            ylabel_lower='',
+            volume=True, 
+            mav=(20), 
+            savefig=f"{report_dir}{stock}_ohlc.png")
 
 def get_report_handle():
     global report
@@ -125,7 +192,7 @@ def get_dataframe(stock, market, timeframe, date, online=False):
         s_df = get_stock_listing(stock, duration=duration, last_date = date, 
                                     resample=True if 'w' in timeframe.lower() else False, 
                                     monthly=True if 'm' in timeframe.lower() else False)
-        s_df = s_df.drop(columns = ['volume', 'delivery', 'trades'])
+        s_df = s_df.drop(columns = ['delivery', 'trades'])
         if len(s_df)==0:
             log('Skip {}'.format(stock.symbol), logtype='warning')
     return s_df
@@ -281,5 +348,4 @@ if __name__ == "__main__":
             m = stock.split(':')[0]
             main(s, m, timeframe = timeframe, date=day, online=args.online)
     
-    report = get_report_handle()
-    log(json.dumps(report, indent=2, sort_keys=True), logtype='info')
+    create_report()

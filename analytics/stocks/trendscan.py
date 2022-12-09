@@ -221,7 +221,7 @@ def get_dataframe(stock, market, timeframe, date, online=False):
             pass
     else:
         s_df = get_stock_listing(stock, duration=duration, last_date = date, 
-                                    resample=True if 'w' in timeframe.lower() else False, 
+                                    resample=True if timeframe[-1].lower() in ['w', 'm'] else False, 
                                     monthly=True if 'm' in timeframe.lower() else False)
         s_df = s_df.drop(columns = ['delivery', 'trades'])
         if len(s_df)==0:

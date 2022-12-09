@@ -19,6 +19,8 @@ from zipfile import ZipFile
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 
+from lib.misc import create_directory
+
 # use_chrome = False
 # if use_chrome:
 #     from selenium.webdriver.chrome.options import Options
@@ -403,10 +405,8 @@ if __name__ == "__main__":
     #     exit()
 
     try:
-        os.mkdir(raw_data_dir)
-        os.mkdir(delivery_data_dir)
-    except FileExistsError:
-        pass
+        create_directory(raw_data_dir)
+        create_directory(delivery_data_dir)
     except:
         print('Error creating raw data folder')
         exit(0)

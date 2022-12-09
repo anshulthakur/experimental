@@ -19,3 +19,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 settings.configure(**conf)
 apps.populate(settings.INSTALLED_APPS)
 
+project_dirs = {
+    'reports': os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reports/'),
+    'cache'  : os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reports/.cache/'),
+}
+

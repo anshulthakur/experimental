@@ -14,6 +14,7 @@ from lib.retrieval import get_stock_listing
 from lib.tradingview import convert_timeframe_to_quant, get_tvfeed_instance
 from lib.pivots import getHigherHighs, getLowerHighs, getLowerLows, getHigherLows
 from lib.logging import set_loglevel, log
+from lib.misc import create_directory
 import json
 
 #Plotting
@@ -32,54 +33,64 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
 from reportlab.lib.units import inch
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_JUSTIFY
+from PyPDF2 import PdfFileReader, PdfFileWriter
 
 report_dir = './reports/scanners/'
 report = {}
 
 def create_report():
+    try:
+        create_directory(report_dir)
+    except:
+        log(f"Error while creating directory at: {report_dir}")
+        return
+    
     report = get_report_handle()
-    log(json.dumps(report, indent=2, sort_keys=True), logtype='info')
-    for stock in report:
-        # # Create a new PDF document with A4 size
-        # pdf = canvas.Canvas(f"{report_dir}{stock}.pdf", pagesize=A4)
-        # width, height = A4
-        # print(width, height)
-        # # Add some text to the PDF
-        # pdf.drawString(100, 750, f"Stock: {stock}")
+    #First, invert the report structure so that parsing on a per stock level is easier:
+    alt_report = {}
+    for timeframe in report:
+        tf_report = report[timeframe]
+        for stock in tf_report:
+            if stock in alt_report:
+                alt_report[stock][timeframe] = tf_report[stock]
+            else:
+                alt_report[stock] = {timeframe: tf_report[stock]}
 
-        # # Add an image to the PDF
-        # pdf.drawImage(f"{report_dir}{stock}.png", 100, 100)
-
-        # # Save the PDF
-        # pdf.save()
-
+    log(json.dumps(alt_report, indent=2, sort_keys=True), logtype='info')
+    for stock in alt_report:
+        stock_report = alt_report[stock]
+        pdf_reader = None
+        pdf_writer = None
         doc = SimpleDocTemplate(f"{report_dir}{stock}.pdf",pagesize=A4,
-                        rightMargin=72,leftMargin=72,
-                        topMargin=72,bottomMargin=18)
+                            rightMargin=72,leftMargin=72,
+                            topMargin=72,bottomMargin=18)
         Story=[]
-        styles=getSampleStyleSheet()
-        styles.add(ParagraphStyle(name='Justify', alignment=TA_JUSTIFY))
-        ptext = '%s' % datetime.datetime.today().strftime("%d/%m/%Y")
-        Story.append(Paragraph(ptext, styles["Normal"]))
-        Story.append(Spacer(1, 12))
+        for timeframe in stock_report:
+            styles=getSampleStyleSheet()
+            styles.add(ParagraphStyle(name='Justify', alignment=TA_JUSTIFY))
+            ptext = '%s' % datetime.datetime.today().strftime("%d/%m/%Y")
+            Story.append(Paragraph(ptext, styles["Normal"]))
+            Story.append(Spacer(1, 12))
 
-        im = Image(f"{report_dir}{stock}_ohlc.png", 4*inch, 3*inch)
-        Story.append(im)
-        Story.append(Spacer(1, 12))
+            im = Image(f"{report_dir}{stock}_ohlc_{timeframe}.png", 4*inch, 3*inch)
+            Story.append(im)
+            Story.append(Spacer(1, 12))
 
-        im = Image(f"{report_dir}{stock}.png", 4*inch, 3*inch)
-        Story.append(im)
+            im = Image(f"{report_dir}{stock}_{timeframe}.png", 4*inch, 3*inch)
+            Story.append(im)
 
-        Story.append(Spacer(1, 12))
-        Story.append(Paragraph(f"Trend: {report[stock]}", styles["Normal"]))
-        Story.append(Spacer(1, 12))
+            Story.append(Spacer(1, 12))
+            Story.append(Paragraph(f"Trend({timeframe}): {stock_report[timeframe]}", styles["Normal"]))
+            Story.append(Spacer(1, 12))
+
         doc.build(Story)
 
-        #Remove the images
-        os.remove(f"{report_dir}{stock}_ohlc.png")
-        os.remove(f"{report_dir}{stock}.png")
-
-def save_plot(stock, df, hh, hl, lh, ll, order=1):
+        for timeframe in stock_report:
+            #Remove the images
+            os.remove(f"{report_dir}{stock}_ohlc_{timeframe}.png")
+            os.remove(f"{report_dir}{stock}_{timeframe}.png")
+        
+def save_plot(stock, df, hh, hl, lh, ll, timeframe, order=1):
     log('Saving plot', logtype='debug')
     dates = df.index
     price = df['close'].values
@@ -133,7 +144,7 @@ def save_plot(stock, df, hh, hl, lh, ll, order=1):
     plt.title(f'Potential Divergence Points for  Closing Price')
     plt.legend(handles=legend_elements, bbox_to_anchor=(1, 0.65))
     #plt.show()
-    plt.savefig(f"{report_dir}{stock}.png", bbox_inches="tight",
+    plt.savefig(f"{report_dir}{stock}_{get_timeframe_keyword(timeframe)}.png", bbox_inches="tight",
             pad_inches=0.3, transparent=False)
     plt.close()
 
@@ -151,11 +162,31 @@ def save_plot(stock, df, hh, hl, lh, ll, order=1):
             ylabel_lower='',
             volume=True, 
             mav=(20), 
-            savefig=f"{report_dir}{stock}_ohlc.png")
+            savefig=f"{report_dir}{stock}_ohlc_{get_timeframe_keyword(timeframe)}.png")
 
-def get_report_handle():
+def get_timeframe_keyword(timeframe):
+    key = 'daily'
+    if timeframe == '1d':
+        key = 'daily'
+    elif timeframe == '1w':
+        key = 'weekly'
+    elif timeframe == '1m':
+        key = 'monthly'
+    elif timeframe == '1h':
+        key = 'hourly'
+    return key
+
+def get_report_handle(timeframe=None):
     global report
-    return report
+    key = 'daily'
+    if timeframe is None:
+        return report
+
+    key = get_timeframe_keyword(timeframe)
+    if key not in report:
+        report[key] = {}
+
+    return report[key]
 
 def get_dataframe(stock, market, timeframe, date, online=False):
     duration = 60
@@ -198,7 +229,7 @@ def get_dataframe(stock, market, timeframe, date, online=False):
     return s_df
 
 def get_trend(stock, market, timeframe, date, saveplot=False, online=False):
-    report = get_report_handle()
+    report = get_report_handle(timeframe)
     df = get_dataframe(stock, market, timeframe, date, online)
 
     hh_val = 0
@@ -266,7 +297,7 @@ def get_trend(stock, market, timeframe, date, saveplot=False, online=False):
 
     if saveplot:
         if stock.symbol in report:
-            save_plot(stock.symbol, df, hh, hl, lh, ll, order)
+            save_plot(stock.symbol, df, hh, hl, lh, ll, order = order, timeframe = timeframe)
 
 def main(stock_name=None, exchange = None, timeframe= '1d', date=None, online=False):
     market = None
@@ -307,7 +338,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Scan stock securities for trend')
     parser.add_argument('-s', '--stock', help="Stock code")
     parser.add_argument('-e', '--exchange', help="Exchange")
-    parser.add_argument('-t', '--timeframe', help="Timeframe")
+    parser.add_argument('-t', '--timeframe', help="Timeframe(s). If specifying more than one, separate using commas")
     parser.add_argument('-d', '--date', help="Date")
     parser.add_argument('-l', '--list', help="List of stocks to scan (MARKET:SYMBOL)")
     parser.add_argument('-o', '--online', action='store_true', default=False, help="Online mode:Fetch from tradingview")
@@ -315,7 +346,7 @@ if __name__ == "__main__":
     stock_code = None
     day =  datetime.datetime.now()
     exchange = 'NSE'
-    timeframe = '1d'
+    timeframes = ['1d']
     category = 'all'
     
     if args.stock is not None and len(args.stock)>0:
@@ -334,10 +365,11 @@ if __name__ == "__main__":
     if args.exchange is not None and len(args.exchange)>0:
         exchange=args.exchange
     if args.timeframe is not None and len(args.timeframe)>0:
-        timeframe=args.timeframe
+        timeframes=args.timeframe.split(',')
     
     if args.list is None:
-        main(stock_code, exchange, timeframe = timeframe, date=day, online=args.online)
+        for timeframe in timeframes:
+            main(stock_code, exchange, timeframe = timeframe, date=day, online=args.online)
     else:
         stock_list = []
         with open(args.list, 'r') as fd:
@@ -346,6 +378,7 @@ if __name__ == "__main__":
         for stock in stock_list:
             s = stock.split(':')[1]
             m = stock.split(':')[0]
-            main(s, m, timeframe = timeframe, date=day, online=args.online)
+            for timeframe in timeframes:
+                main(s, m, timeframe = timeframe, date=day, online=args.online)
     
     create_report()

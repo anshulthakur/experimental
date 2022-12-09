@@ -5,6 +5,8 @@ Created on 30-Jul-2022
 '''
 
 import socket
+import os
+
 REMOTE_SERVER = "one.one.one.one"
 def is_connected(hostname):
     try:
@@ -18,3 +20,9 @@ def is_connected(hostname):
     except Exception:
         pass # we ignore any errors, returning False
     return False
+
+def create_directory(path):
+    try:
+        os.mkdir(path)
+    except FileExistsError:
+        pass

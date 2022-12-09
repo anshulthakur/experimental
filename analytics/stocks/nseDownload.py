@@ -13,6 +13,7 @@ import brotli
 import gzip
 from io import BytesIO
 from zipfile import ZipFile
+from lib.misc import create_directory
 
 raw_data_dir = './nseData/'
 delivery_data_dir = raw_data_dir+'delivery/'
@@ -205,8 +206,8 @@ if __name__ == "__main__":
         day = datetime.strptime(args.date, "%d/%m/%y")
 
     try:
-        os.mkdir(raw_data_dir)
-        os.mkdir(delivery_data_dir)
+        create_directory(raw_data_dir)
+        create_directory(delivery_data_dir)
     except FileExistsError:
         pass
     except:

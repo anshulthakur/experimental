@@ -15,7 +15,11 @@ from dateutil.relativedelta import relativedelta
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
- 
+from lib.misc import create_directory
+from lib.retrieval import get_stock_listing
+from lib.logging import set_loglevel, log
+from stocks.models import Listing, Stock, Market
+
 nse_list = 'NSE_list.csv'
 bse_list = 'BSE_list.csv'
 img_dir = './images/'
@@ -107,8 +111,12 @@ def compare_stock_info(r_df, s_df, delta, emit=False, logscale=False, match='clo
     s_df = s_df.sort_index()
        
     s_df.reset_index(inplace = True)
+
     #print(s_df.head(10))
-    s_df = s_df.drop(columns='datetime')
+    if 'datetime' in s_df.columns:
+        s_df = s_df.drop(columns='datetime')
+    else:
+        s_df = s_df.drop(columns='date')
     #s_df.rename(columns={'close': 'change', 'datetime':'date'},
     s_df.rename(columns={match: 'change'},
                 inplace = True)
@@ -119,8 +127,6 @@ def compare_stock_info(r_df, s_df, delta, emit=False, logscale=False, match='clo
     s_df = s_df[~s_df.index.duplicated(keep='first')]
     #s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
     #s_df = s_df.iloc[-len(r_df)-2:-1]
-    #print(s_df.head(10))
-    #print(s_df.tail(10))
     
     r_df = r_df - r_df.mean()
     #r_df = r_df.reset_index()
@@ -181,14 +187,68 @@ def compare_stock_info(r_df, s_df, delta, emit=False, logscale=False, match='clo
             #print(f'{ii} Correlation: {cval}, {mcval}, {rmse}')
     return c
 
+def get_dataframe(stock, market, timeframe, duration, date=datetime.datetime.now(), offline=False):
+    if timeframe not in [Interval.in_monthly, 
+                         Interval.in_weekly, 
+                         Interval.in_daily]:
+        offline = False
+
+
+    if not offline:
+        username = 'AnshulBot'
+        password = '@nshulthakur123'
+
+        tv = get_tvfeed_instance(username, password)
+        symbol = stock.strip().replace('&', '_')
+        symbol = symbol.replace('-', '_')
+        symbol = symbol.replace('*', '')
+        nse_map = {'UNITDSPR': 'MCDOWELL_N',
+                   'MOTHERSUMI': 'MSUMI'}
+        if symbol in nse_map:
+            symbol = nse_map[symbol]
+        
+        s_df = cached(symbol)
+        if s_df is not None:
+            #print('Found in Cache')
+            pass
+        else:
+            try:
+                s_df = tv.get_hist(
+                            symbol,
+                            market,
+                            interval=timeframe,
+                            n_bars=duration,
+                            extended_session=False,
+                        )
+                if s_df is not None:
+                    cached(symbol, s_df)
+            except:
+                s_df = None
+    else:
+        try:
+            market_obj = Market.objects.get(name=market)
+        except Market.DoesNotExist:
+            log(f"No object exists for {market}", logtype='error')
+            return None
+        try:
+            stock_obj = Stock.objects.get(symbol=stock, market=market_obj)
+        except Stock.DoesNotExist:
+            log(f"Stock with symbol {stock} not found in {market}", logtype='error')
+            return
+        s_df = get_stock_listing(stock_obj, duration=duration, last_date = date, 
+                                 resample=True if timeframe in [Interval.in_monthly, 
+                                                                Interval.in_weekly] else False, 
+                                 monthly=True if timeframe in [Interval.in_monthly] else False)
+        s_df = s_df.drop(columns = ['delivery', 'trades'])
+    return s_df
+
+
 def main(reference, timeframe, delta, stock=None, logscale=False, 
-         cutoff_date = datetime.datetime.strptime('01-Aug-2018', "%d-%b-%Y"), match = 'close'):
+         cutoff_date = datetime.datetime.strptime('01-Aug-2018', "%d-%b-%Y"), match = 'close', offline=False):
     if delta:
         print('Use delta')
     try:
-        os.mkdir(cache_dir)
-    except FileExistsError:
-        pass
+        create_directory(cache_dir)
     except:
         print('Error creating folder')
     
@@ -231,10 +291,7 @@ def main(reference, timeframe, delta, stock=None, logscale=False,
     r_df.reset_index(inplace = True)
     r_df = r_df.drop(columns=['index'])
     #print(r_df.tail(10))
-    print(len(r_df))
-    username = 'AnshulBot'
-    password = '@nshulthakur123'
-    tv = get_tvfeed_instance(username, password)
+    #print(len(r_df))
     
     #cutoff_date = r_df.index.values[0]
     d = relativedelta(datetime.datetime.today(), cutoff_date)
@@ -260,114 +317,48 @@ def main(reference, timeframe, delta, stock=None, logscale=False,
     max_corr = 0
     max_corr_idx = None
     if stock is not None:
-        symbol = stock.strip().replace('&', '_')
-        symbol = symbol.replace('-', '_')
-        symbol = symbol.replace('*', '')
-        nse_map = {'UNITDSPR': 'MCDOWELL_N',
-                'MOTHERSUMI': 'MSUMI'}
-        if symbol in nse_map:
-            symbol = nse_map[symbol]
-        
-        s_df = cached(symbol)
-        if s_df is not None:
-            #print('Found in Cache')
-            pass
-        else:
-            try:
-                s_df = tv.get_hist(
-                            symbol,
-                            'NSE',
-                            interval=timeframe,
-                            n_bars=n_bars,
-                            extended_session=False,
-                        )
-                if s_df is not None:
-                    cached(symbol, s_df)
-                else:
-                    s_df = tv.get_hist(
-                            symbol,
-                            'BSE',
-                            interval=timeframe,
-                            n_bars=n_bars,
-                            extended_session=False,
-                            )
-                    if s_df is not None:
-                        cached(symbol, s_df)
-            except:
-                s_df = None
+        s_df = get_dataframe(stock=stock, 
+                            market='NSE', 
+                            timeframe=timeframe, 
+                            duration=n_bars, 
+                            offline=offline)
         if s_df is not None and len(s_df)>0:
             c = compare_stock_info(r_df, s_df, delta, emit=True, logscale=logscale, match=match)
             print(f'{stock} Max: {max_corr_idx}({max_corr})')
             print(f'Correlation: {c}')
     else:
         for stock in indices:
-            symbol = stock.strip().replace('&', '_')
-            symbol = symbol.replace('-', '_')
-            symbol = symbol.replace('*', '')
-            nse_map = {'UNITDSPR': 'MCDOWELL_N',
-                    'MOTHERSUMI': 'MSUMI'}
-            if symbol in nse_map:
-                symbol = nse_map[symbol]
-            
-            s_df = cached(symbol)
-            if s_df is not None:
-                #print('Found in Cache')
-                pass
-            else:
-                try:
-                    s_df = tv.get_hist(
-                                symbol,
-                                'NSE',
-                                interval=timeframe,
-                                n_bars=n_bars,
-                                extended_session=False,
-                            )
-                    if s_df is not None:
-                        cached(symbol, s_df)
-                except:
-                    s_df = None
+            s_df = get_dataframe(stock=stock, 
+                                 market='NSE', 
+                                 timeframe=timeframe, 
+                                 duration=n_bars, 
+                                 offline=offline)
             if s_df is not None and len(s_df)>0:
                 c = compare_stock_info(r_df, s_df, delta, logscale=logscale, match=match)
                 if c >= c_thresh:
-                    shortlist[symbol] = c
+                    shortlist[stock] = c
                 if c>max_corr:
                     max_corr=c
-                    max_corr_idx = [symbol]
+                    max_corr_idx = [stock]
                 elif c>0 and c==max_corr:
-                    max_corr_idx.append(symbol)
+                    max_corr_idx.append(stock)
                 print(f'{stock}[{c}] Max: {max_corr_idx}({max_corr})')
         
         for stock in b_indices:
-            symbol = stock.strip().replace('&', '_')
-            symbol = symbol.replace('-', '_')
-            symbol = symbol.replace('*', '')
-            
-            s_df = cached(symbol)
-            if s_df is not None:
-                #print('Found in Cache')
-                pass
-            else:
-                try:
-                    s_df = tv.get_hist(
-                                symbol,
-                                'BSE',
-                                interval=timeframe,
-                                n_bars=n_bars,
-                                extended_session=False,
-                            )
-                    if s_df is not None:
-                        cached(symbol, s_df)
-                except:
-                    s_df = None
+            s_df = get_dataframe(stock=stock, 
+                                 market='BSE', 
+                                 timeframe=timeframe, 
+                                 duration=n_bars, 
+                                 offline=offline)
             if s_df is not None and len(s_df)>0:
                 c = compare_stock_info(r_df, s_df, delta, logscale=logscale, match=match)
                 if c >= c_thresh:
-                    shortlist[symbol] = c
+                    shortlist[stock] = c
                 if c>max_corr:
                     max_corr=c
-                    max_corr_idx = [symbol]
+                    max_corr_idx = [stock]
                 elif c>0 and c==max_corr:
-                    max_corr_idx.append(symbol)
+                    max_corr_idx.append(stock)
                 print(f'{stock}[{c}] Max: {max_corr_idx}({max_corr})')
         #val = max(correlations)
         #max_idx = [index for index, item in enumerate(correlations) if item == max(correlations)]
@@ -393,6 +384,7 @@ if __name__ == "__main__":
     parser.add_argument('-l', '--log', action="store_true", default=False, help="Use log scaling for price values ")
     parser.add_argument('-c', '--cutoff', help="Cutoff date")
     parser.add_argument('-m', '--match', help="Match OHLC (open/high/low/close)", default='close')
+    parser.add_argument('-o', '--offline', help="Run the analysis using offline data", action = "store_true", default=False)
     timeframe = '1M'
     reference = None
     stock = None
@@ -414,4 +406,5 @@ if __name__ == "__main__":
          delta=args.delta, stock=stock, 
          logscale=args.log, 
          cutoff_date=cutoff_date,
-         match = args.match)
+         match = args.match,
+         offline = args.offline)

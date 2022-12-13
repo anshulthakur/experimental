@@ -46,6 +46,11 @@ def get_stock_listing(stock, duration=None, last_date = datetime.date.today(), s
         requested_duration = duration
     elif duration == -1:
         duration = 3650
+    elif duration is not None and resample==True:
+        if monthly is False:
+            duration = duration*5
+        else:
+            duration = duration*30
     elif studies is not None:
         #studies={'daily': ['rsi', 'ema20', 'ema10', 'sma200'],
         #                   'weekly':['rsi', 'ema20', 'ema10'],
@@ -72,6 +77,7 @@ def get_stock_listing(stock, duration=None, last_date = datetime.date.today(), s
                 
     #print(duration)
     first_date = last_date - datetime.timedelta(days=duration)
+    #print(first_date)
     listing = Listing.objects.filter(stock=stock, date__range=(first_date, last_date))
     df = read_frame(listing, index_col='date')
     for column in df.columns:

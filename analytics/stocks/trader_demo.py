@@ -15,7 +15,7 @@ import time
 tradebook = None
 
 class Position(object):
-    def __init__(self, buy=None, sell=None):
+    def __init__(self, buy=None, sell=None, quantity=1):
         if buy is not None and sell is not None:
             log(f'Cannot have both buy and sell in a single order', 'error')
             raise Exception('Cannot have both buy and sell in a single order')
@@ -23,20 +23,22 @@ class Position(object):
         self.buy = buy
         self.sell = sell
         self.profit = 0
+        self.quantity = quantity
     
     def is_long(self):
-        return True if (self.buy_price is not None and self.sell_price is None) else False
+        return True if (self.buy is not None and self.sell is None) else False
 
     def close(self, price):
         if self.is_long():
             self.sell = price
         else:
             self.buy = price
-        self.profit = self.buy - self.sell
+        self.profit = (self.sell - self.buy)*self.quantity
         log(f'Closed position. Profit = {self.profit}', 'info')
 
 class Broker(object):
-    def __init__(self) -> None:
+    def __init__(self):
+        super().__init__()
         pass
 
     def get_charges(self, buy=True, price=0, quantity=0, segment='equity'):
@@ -88,9 +90,14 @@ class BaseBot(object):
     orderbook = []
     position = None
     charges = 0
+    initial_cash = 0
+    lot_size = 1
 
-    def __init__(self, cash=0):
+    def __init__(self, cash=0, lot_size=1):
         self.cash = cash
+        self.initial_cash = cash
+        self.lot_size = lot_size
+        super().__init__()
 
     def buy(self, price, date=datetime.datetime.now()):
         if self.position is not None:
@@ -100,23 +107,30 @@ class BaseBot(object):
             else:
                 log(f'Close shorts', 'info')
                 self.position.close(price)
-                self.cash = self.cash + price - self.get_charges(segment='options', quantity=1, buy=price)
-                self.charges += self.get_charges(segment='options', quantity=1, buy=price)
+                charges = self.get_charges(segment='options', quantity=self.lot_size, buy=True, price=price)
+                self.cash = self.cash + (price*self.lot_size) - charges
+                self.charges += charges
                 self.orderbook.append({'timestamp': date, 
                                        'operation': 'buy', 
                                        'price': price, 
-                                       'quantity': 1, 
-                                       'charges': self.get_charges(segment='options', quantity=1, buy=price)})
+                                       'quantity': self.lot_size, 
+                                       'charges': charges})
+                #log(f'{self.orderbook[-1]}', 'info')
+                log(f'Cash: {self.cash} Charges: {self.charges}')
+                self.position = None
         else:
-            if self.cash > (price + self.get_charges(segment='options', quantity=1, buy=price)):
-                self.position = Position(buy=price)
-                self.cash = self.cash - price - self.get_charges(segment='options', quantity=1, buy=price)
-                self.charges += self.get_charges(segment='options', quantity=1, buy=price)
+            charges = self.get_charges(segment='options', quantity=self.lot_size, buy=True, price=price)
+            if self.cash > ((price*self.lot_size) + charges):
+                self.position = Position(buy=price, quantity=self.lot_size)
+                self.cash = self.cash - (price*self.lot_size) - charges
+                self.charges += charges
                 self.orderbook.append({'timestamp': date, 
                                        'operation': 'buy', 
                                        'price': price, 
-                                       'quantity': 1, 
-                                       'charges': self.get_charges(segment='options', quantity=1, buy=price)})
+                                       'quantity': self.lot_size, 
+                                       'charges': charges})
+                #log(f'{self.orderbook[-1]}', 'info')
+                log(f'Cash: {self.cash} Charges: {self.charges}')
             else:
                 log(f'Not enough cash', 'warning')
 
@@ -128,46 +142,62 @@ class BaseBot(object):
             else:
                 log(f'Close longs', 'info')
                 self.position.close(price)
-                self.cash = self.cash + price - self.get_charges(segment='options', quantity=1, sell=price)
-                self.charges += self.get_charges(segment='options', quantity=1, sell=price)
+                charges = self.get_charges(segment='options', quantity=self.lot_size, buy=False, price=price)
+                self.cash = self.cash + (price*self.lot_size) - charges
+                self.charges += charges
                 self.orderbook.append({'timestamp': date, 
                                        'operation': 'sell', 
                                        'price': price, 
-                                       'quantity': 1, 
-                                       'charges': self.get_charges(segment='options', quantity=1, sell=price)})
+                                       'quantity': self.lot_size, 
+                                       'charges': charges})
+                #log(f'{self.orderbook[-1]}', 'info')
+                log(f'Cash: {self.cash} Charges: {self.charges}')
+                self.position = None
         else:
-            if self.cash > (price + self.get_charges(segment='options', quantity=1, sell=price)):
-                self.position = Position(sell=price)
-                self.cash = self.cash - price - self.get_charges(segment='options', quantity=1, sell=price)
-                self.charges += self.get_charges(segment='options', quantity=1, sell=price)
+            charges = self.get_charges(segment='options', quantity=self.lot_size, buy=False, price=price)
+            if self.cash > ((price*self.lot_size) + charges):
+                self.position = Position(sell=price, quantity=self.lot_size)
+                self.cash = self.cash - (price*self.lot_size) - charges
+                self.charges += charges
                 self.orderbook.append({'timestamp': date, 
                                        'operation': 'sell', 
                                        'price': price, 
-                                       'quantity': 1, 
-                                       'charges': self.get_charges(segment='options', quantity=1, sell=price)})
+                                       'quantity': self.lot_size, 
+                                       'charges': charges})
+                #log(f'{self.orderbook[-1]}', 'info')
+                log(f'Cash: {self.cash} Charges: {self.charges}')
             else:
                 log(f'Not enough cash', 'warning')
 
-    def close(self, price, date=datetime.datetime.now()):
+    def close_position(self, price, date=datetime.datetime.now()):
         if self.position is not None:
             if self.position.is_long():
                 self.position.close(price)
-                self.cash = self.cash + price - self.get_charges(segment='options', quantity=1, sell=price)
-                self.charges += self.get_charges(segment='options', quantity=1, sell=price)
+                charges = self.get_charges(segment='options', 
+                                            quantity=self.lot_size, 
+                                            buy=False, price=price)
+                self.cash = self.cash + (price*self.lot_size) - charges
+                self.charges += charges
                 self.orderbook.append({'timestamp': date, 
                                        'operation': 'sell', 
                                        'price': price, 
-                                       'quantity': 1, 
-                                       'charges': self.get_charges(segment='options', quantity=1, sell=price)})
+                                       'quantity': self.lot_size, 
+                                       'charges': charges})
+                #log(f'{self.orderbook[-1]}', 'info')
+                log(f'Cash: {self.cash} Charges: {self.charges}')
             else:
                 self.position.close(price)
-                self.cash = self.cash + price - self.get_charges(segment='options', quantity=1, buy=price)
-                self.charges += self.get_charges(segment='options', quantity=1, buy=price)
+                charges = self.get_charges(segment='options', quantity=self.lot_size, buy=True, price=price)
+                self.cash = self.cash + (price*self.lot_size) - charges
+                self.charges += charges
                 self.orderbook.append({'timestamp': date, 
                                        'operation': 'buy', 
                                        'price': price, 
-                                       'quantity': 1, 
-                                       'charges': self.get_charges(segment='options', quantity=1, buy=price)})
+                                       'quantity': self.lot_size, 
+                                       'charges': charges})
+                #log(f'{self.orderbook[-1]}', 'info')
+                log(f'Cash: {self.cash} Charges: {self.charges}')
+        self.position = None
 
 class LongBot(BaseBot, Broker):
     sl = 0
@@ -189,14 +219,14 @@ class LongBot(BaseBot, Broker):
             d = df.index[-1].to_pydatetime()
             if d.hour==self.end_hr and d.minute==self.end_min:
                 if self.position:
-                    self.position.close(df['Close'][-1], date=df.index[-1].to_pydatetime())
+                    self.close_position(df['Close'][-1], date=df.index[-1].to_pydatetime())
                     log(f'Close position. Total Charges (so far): {self.charges}', 'info')
                     return
         if len(df) <= 1:
             return
         if self.position:
             if self.sl > df['Close'][-1]:
-                self.position.close(df['Close'][-1], date=df.index[-1].to_pydatetime())
+                self.close_position(df['Close'][-1], date=df.index[-1].to_pydatetime())
                 log(f'SL Hit. Total Charges (so far): {self.charges}', 'info')
         if df['Close'][-1] > df['Close'][-2]:
             if len(self.supports)==0:
@@ -217,8 +247,8 @@ class LongBot(BaseBot, Broker):
                     
                 else:
                     #Else, update Stop Loss
-                    log('Update stop loss', 'info')
                     self.sl = self.supports[-2][1]
+                    log(f'Update stop loss: {self.sl}', 'info')
             elif (self.direction == 'DOWN'):
                 #Could be turning around, mark support
                 self.supports.append((df.index[-2], df['Close'][-2]))
@@ -254,6 +284,7 @@ def get_dataframe_yahoo(stock, market, timeframe, date):
     s = yf.Ticker(stock)
     df = s.history(period="1d", interval=timeframe)
 
+    #log(df.head(10), 'info')
     return df
 
 def get_dataframe_lib(stock, market, timeframe, date, online=True):
@@ -303,74 +334,106 @@ def get_dataframe(stock, market, timeframe, date, online=True, use_yahoo=True):
         s_df = get_dataframe_lib(stock, market, timeframe, date, online)
     return s_df
 
-def main():
+def main(backtest=False):
     logic = {'Open'  : 'first',
              'High'  : 'max',
              'Low'   : 'min',
              'Close' : 'last'}
     bots = {'1m': {
-                    'bot': LongBot(cash=100000),
+                    'bot': LongBot(cash=20000000, lot_size=75),
                     'resampler': None,
                     'scheduled': True,
                     'last_run': None
                   },
             '5m': {
-                    'bot': LongBot(cash=100000),
+                    'bot': LongBot(cash=20000000, lot_size=75),
                     'resampler': '5Min',
                     'scheduled': True,
                     'last_run': None
                   },
             '15m': {
-                    'bot': LongBot(cash=100000),
+                    'bot': LongBot(cash=20000000, lot_size=75),
                     'resampler': '15Min',
                     'scheduled': True,
                     'last_run': None
                   },
             '30m': {
-                    'bot': LongBot(cash=100000),
+                    'bot': LongBot(cash=20000000, lot_size=75),
                     'resampler': '30Min',
                     'scheduled': True,
                     'last_run': None
                   },
             '60m': {
-                    'bot': LongBot(cash=100000),
+                    'bot': LongBot(cash=20000000, lot_size=75),
                     'resampler': '60Min',
                     'scheduled': True,
                     'last_run': None
                   },
             }
     
-    # using now() to get current time
-    current_time = datetime.datetime.now()
-    #Sleep to align running to near start of minute
-    time.sleep(60 - current_time.second + 2)
-    last_minute = current_time.minute+1
-
-    while (current_time.hour < 15 and current_time.minute<30):
-        log(f'Run loop once', 'info')
-        #df = get_dataframe(stock='^NSEI', exchange='NSE', timeframe='1m', online=True, use_yahoo=True)
+    if backtest:
+        df_store = {}
         for bot in bots:
-            #Run only if an epoch has elapsed
-            if (int(bot[0:-1])<60 and (current_time.minute-1)%int(bot[0:-1])==0) or \
-                (int(bot[0:-1])==60 and current_time.hour > bots[bot]['last_run'].hour) :
-                log(f'TF {bot} scheduled', 'info')
-                bots[bot]['scheduled'] = True
-
-            if bots[bot]['scheduled']:
-                s_df = get_dataframe(stock='^NSEI', market='NSE', timeframe=bot, online=True, use_yahoo=True, date=None)
-                bots[bot]['scheduled'] = False
-                bots[bot]['last_run'] = current_time
-                # if bots[bot]['resampler'] is not None:
-                #     s_df = df.resample(bots[bot]['resampler']).apply(logic)
-                # else:
-                #     s_df = df
-                log(f'Running', 'info')
+            df_store[bot] = {'df' :get_dataframe(stock='^NSEI', 
+                                                 market='NSE', 
+                                                 timeframe=bot, 
+                                                 online=True, 
+                                                 use_yahoo=True, 
+                                                 date=None),
+                            'index': 1,
+                            }
+        for bot in bots:
+            while df_store[bot]['index']<=len(df_store[bot]['df']):
+                s_df = df_store[bot]['df'].iloc[0:df_store[bot]['index']]
+                #log(s_df, 'info')
                 bots[bot]['bot'].next(s_df)
-        #Done processing, now fetch next candle or wait until next minute
+                df_store[bot]['index'] +=1
+        for bot in bots:
+            profit = ((bots[bot]["bot"].cash - bots[bot]["bot"].initial_cash)/bots[bot]["bot"].initial_cash)*100
+            print(f'TF {bot}:\n\tFinal capital:\t{bots[bot]["bot"].cash}\t({profit}%)\n')
+    else:
+        # using now() to get current time
         current_time = datetime.datetime.now()
-        if current_time.minute > last_minute:
-            time.sleep(60 - current_time.second)
+        #Sleep to align running to near start of minute
+        time.sleep(60 - current_time.second + 2)
+        last_minute = current_time.minute+1
+
+        while (current_time.hour < 15 and current_time.minute<30):
+            log(f'Run loop once', 'info')
+            #df = get_dataframe(stock='^NSEI', exchange='NSE', timeframe='1m', online=True, use_yahoo=True)
+            for bot in bots:
+                #Run only if an epoch has elapsed
+                if (int(bot[0:-1])<60 and (current_time.minute-1)%int(bot[0:-1])==0) or \
+                    (int(bot[0:-1])==60 and current_time.hour > bots[bot]['last_run'].hour) :
+                    log(f'TF {bot} scheduled', 'info')
+                    bots[bot]['scheduled'] = True
+
+                if bots[bot]['scheduled']:
+                    s_df = get_dataframe(stock='^NSEI', market='NSE', timeframe=bot, online=True, use_yahoo=True, date=None)
+                    bots[bot]['scheduled'] = False
+                    bots[bot]['last_run'] = current_time
+                    # if bots[bot]['resampler'] is not None:
+                    #     s_df = df.resample(bots[bot]['resampler']).apply(logic)
+                    # else:
+                    #     s_df = df
+                    log(f'Running', 'info')
+                    bots[bot]['bot'].next(s_df)
+            #Done processing, now fetch next candle or wait until next minute
+            current_time = datetime.datetime.now()
+            if current_time.minute > last_minute:
+                time.sleep(60 - current_time.second)
 
 if __name__ == "__main__":
     set_loglevel('info')
-    main()
+    import argparse
+    parser = argparse.ArgumentParser(description='Scan stock securities for trend')
+    parser.add_argument('-s', '--stock', help="Stock code")
+    parser.add_argument('-e', '--exchange', help="Exchange")
+    parser.add_argument('-t', '--timeframe', help="Timeframe(s). If specifying more than one, separate using commas")
+    parser.add_argument('-d', '--date', help="Date")
+    parser.add_argument('-l', '--list', help="List of stocks to scan (MARKET:SYMBOL)")
+    parser.add_argument('-o', '--online', action='store_true', default=False, help="Online mode:Fetch from tradingview")
+    parser.add_argument('-b', '--backtest', help="Backtest mode", action="store_true", default=False)
+    args = parser.parse_args()
+
+    main(args.backtest)

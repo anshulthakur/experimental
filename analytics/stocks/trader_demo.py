@@ -39,7 +39,6 @@ class Position(object):
 class Broker(object):
     def __init__(self):
         super().__init__()
-        pass
 
     def get_charges(self, buy=True, price=0, quantity=0, segment='equity'):
         if segment=='equity':
@@ -86,14 +85,10 @@ class Broker(object):
         return margin
 
 class BaseBot(object):
-    cash = 0
-    orderbook = []
-    position = None
-    charges = 0
-    initial_cash = 0
-    lot_size = 1
-
     def __init__(self, cash=0, lot_size=1):
+        self.orderbook = []
+        self.position = None
+        self.charges = 0
         self.cash = cash
         self.initial_cash = cash
         self.lot_size = lot_size
@@ -116,7 +111,7 @@ class BaseBot(object):
                                        'quantity': self.lot_size, 
                                        'charges': charges})
                 #log(f'{self.orderbook[-1]}', 'info')
-                log(f'Cash: {self.cash} Charges: {self.charges}')
+                log(f'Cash: {self.cash} Charges: {self.charges}', 'info')
                 self.position = None
         else:
             charges = self.get_charges(segment='options', quantity=self.lot_size, buy=True, price=price)
@@ -200,13 +195,6 @@ class BaseBot(object):
         self.position = None
 
 class LongBot(BaseBot, Broker):
-    sl = 0
-    resistances = []
-    supports = []
-    direction = 'UNKNOWN'
-
-    is_intraday = True
-
     #In case of intraday
     start_hr = 9
     start_min = 0
@@ -214,20 +202,34 @@ class LongBot(BaseBot, Broker):
     end_hr = 15
     end_min = 15
 
+    def __init__(self, cash=0, lot_size=1, timeframe=None):
+        self.timeframe = timeframe
+        self.sl = 0
+        self.resistances = []
+        self.supports = []
+        self.direction = 'UNKNOWN'
+
+        self.is_intraday = True
+        super().__init__(cash, lot_size)
+
     def next(self, df):
         if self.is_intraday:
             d = df.index[-1].to_pydatetime()
-            if d.hour==self.end_hr and d.minute==self.end_min:
+            if d.hour==self.end_hr and d.minute>=self.end_min:
                 if self.position:
+                    log('End of day.', 'info')
                     self.close_position(df['Close'][-1], date=df.index[-1].to_pydatetime())
-                    log(f'Close position. Total Charges (so far): {self.charges}', 'info')
+                    log(f'Close position {df["Close"][-1]}. Total Charges (so far): {self.charges}', 'info')
+                    return
+                else:
                     return
         if len(df) <= 1:
+            #log(f"First candle. Supports: {self.supports}. Resistances: {self.resistances}")
             return
         if self.position:
             if self.sl > df['Close'][-1]:
                 self.close_position(df['Close'][-1], date=df.index[-1].to_pydatetime())
-                log(f'SL Hit. Total Charges (so far): {self.charges}', 'info')
+                log(f'SL Hit {df["Close"][-1]}. Total Charges (so far): {self.charges}', 'info')
         if df['Close'][-1] > df['Close'][-2]:
             if len(self.supports)==0:
                 #Moving up for the first time. Mark support
@@ -241,7 +243,7 @@ class LongBot(BaseBot, Broker):
                 log(f'New resistance turned support: {self.supports[-1]}', 'debug')
                 if not self.position:
                     #If we don't have any position, then go long here
-                    log('Go long', 'info')
+                    log(f"Go long: {df['Close'][-1]}", 'info')
                     self.sl = self.supports[-2][1]
                     self.buy(df['Close'][-1], date=df.index[-1].to_pydatetime())
                     
@@ -302,7 +304,7 @@ def get_dataframe_lib(stock, market, timeframe, date, online=True):
         tv = get_tvfeed_instance(username, password)
         interval=convert_timeframe_to_quant(timeframe)
 
-        symbol = stock.symbol.strip().replace('&', '_')
+        symbol = stock.strip().replace('&', '_')
         symbol = symbol.replace('-', '_')
         nse_map = {'UNITDSPR': 'MCDOWELL_N',
                     'MOTHERSUMI': 'MSUMI'}
@@ -310,7 +312,7 @@ def get_dataframe_lib(stock, market, timeframe, date, online=True):
             symbol = nse_map[symbol]
         s_df = tv.get_hist(
                             symbol,
-                            market.name,
+                            market,
                             interval=interval,
                             n_bars=duration,
                             extended_session=False,
@@ -340,31 +342,31 @@ def main(backtest=False):
              'Low'   : 'min',
              'Close' : 'last'}
     bots = {'1m': {
-                    'bot': LongBot(cash=20000000, lot_size=75),
+                    'bot': LongBot(cash=20000000, lot_size=75, timeframe='1m'),
                     'resampler': None,
                     'scheduled': True,
                     'last_run': None
                   },
             '5m': {
-                    'bot': LongBot(cash=20000000, lot_size=75),
+                    'bot': LongBot(cash=20000000, lot_size=75, timeframe='5m'),
                     'resampler': '5Min',
                     'scheduled': True,
                     'last_run': None
                   },
             '15m': {
-                    'bot': LongBot(cash=20000000, lot_size=75),
+                    'bot': LongBot(cash=20000000, lot_size=75, timeframe='15m'),
                     'resampler': '15Min',
                     'scheduled': True,
                     'last_run': None
                   },
             '30m': {
-                    'bot': LongBot(cash=20000000, lot_size=75),
+                    'bot': LongBot(cash=20000000, lot_size=75, timeframe='30m'),
                     'resampler': '30Min',
                     'scheduled': True,
                     'last_run': None
                   },
             '60m': {
-                    'bot': LongBot(cash=20000000, lot_size=75),
+                    'bot': LongBot(cash=20000000, lot_size=75, timeframe='60m'),
                     'resampler': '60Min',
                     'scheduled': True,
                     'last_run': None
@@ -383,22 +385,26 @@ def main(backtest=False):
                             'index': 1,
                             }
         for bot in bots:
-            while df_store[bot]['index']<=len(df_store[bot]['df']):
+            log(f'Running [{bot}]: Index {df_store[bot]["index"]}', 'info')
+            while df_store[bot]['index']<=len(df_store[bot]['df']) and bots[bot]['scheduled']:
                 s_df = df_store[bot]['df'].iloc[0:df_store[bot]['index']]
-                #log(s_df, 'info')
+                #log(s_df.tail(1), 'info')
                 bots[bot]['bot'].next(s_df)
                 df_store[bot]['index'] +=1
         for bot in bots:
             profit = ((bots[bot]["bot"].cash - bots[bot]["bot"].initial_cash)/bots[bot]["bot"].initial_cash)*100
-            print(f'TF {bot}:\n\tFinal capital:\t{bots[bot]["bot"].cash}\t({profit}%)\n')
+            print(f'TF {bot}:')
+            print(f'\tFinal capital:\t{bots[bot]["bot"].cash}\t({profit}%)')
+            print(f'\tTrades:\t{len(bots[bot]["bot"].orderbook)}')
+            print(f'\tCharges: {bots[bot]["bot"].charges}')
+
     else:
         # using now() to get current time
         current_time = datetime.datetime.now()
         #Sleep to align running to near start of minute
         time.sleep(60 - current_time.second + 2)
         last_minute = current_time.minute+1
-
-        while (current_time.hour < 15 and current_time.minute<30):
+        while (current_time.hour < 15 or (current_time.hour > 15 and current_time.minute<30)):
             log(f'Run loop once', 'info')
             #df = get_dataframe(stock='^NSEI', exchange='NSE', timeframe='1m', online=True, use_yahoo=True)
             for bot in bots:
@@ -409,7 +415,8 @@ def main(backtest=False):
                     bots[bot]['scheduled'] = True
 
                 if bots[bot]['scheduled']:
-                    s_df = get_dataframe(stock='^NSEI', market='NSE', timeframe=bot, online=True, use_yahoo=True, date=None)
+                    #s_df = get_dataframe(stock='^NSEI', market='NSE', timeframe=bot, online=True, use_yahoo=True, date=None)
+                    s_df = get_dataframe(stock='NIFTY50', market='NSE', timeframe=bot, online=True, use_yahoo=False, date=None)
                     bots[bot]['scheduled'] = False
                     bots[bot]['last_run'] = current_time
                     # if bots[bot]['resampler'] is not None:
@@ -424,7 +431,7 @@ def main(backtest=False):
                 time.sleep(60 - current_time.second)
 
 if __name__ == "__main__":
-    set_loglevel('info')
+    set_loglevel('debug')
     import argparse
     parser = argparse.ArgumentParser(description='Scan stock securities for trend')
     parser.add_argument('-s', '--stock', help="Stock code")

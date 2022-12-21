@@ -40,6 +40,8 @@ def convert_timeframe_to_quant(timeframe):
         if tf in [1,3,5,15,30,45]:
             return eval(f'Interval.in_{tf}_minute')
         else:
+            if tf == 60:
+                return Interval.in_1_hour    
             return Interval.in_15_minute
     elif timeframe[-1].lower()=='h':
         tf = int(timeframe[0:-1])

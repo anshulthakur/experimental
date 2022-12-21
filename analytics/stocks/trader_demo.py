@@ -289,8 +289,7 @@ def get_dataframe_yahoo(stock, market, timeframe, date):
     #log(df.head(10), 'info')
     return df
 
-def get_dataframe_lib(stock, market, timeframe, date, online=True):
-    duration = 60
+def get_dataframe_lib(stock, market, timeframe, date, duration=60, online=True):
     if 'w' in timeframe.lower():
         duration = duration * 5 
     if 'M' in timeframe:
@@ -310,6 +309,7 @@ def get_dataframe_lib(stock, market, timeframe, date, online=True):
                     'MOTHERSUMI': 'MSUMI'}
         if symbol in nse_map:
             symbol = nse_map[symbol]
+        log(f'Symbol: {stock}, Exchange: {market}, TF: {interval}, Duration: {duration}', 'info')
         s_df = tv.get_hist(
                             symbol,
                             market,
@@ -317,7 +317,7 @@ def get_dataframe_lib(stock, market, timeframe, date, online=True):
                             n_bars=duration,
                             extended_session=False,
                         )
-        if len(s_df)==0:
+        if (s_df is None) or (s_df is not None and len(s_df)==0):
             log('Skip {}'.format(symbol), logtype='warning')
             pass
     else:
@@ -327,13 +327,22 @@ def get_dataframe_lib(stock, market, timeframe, date, online=True):
         s_df = s_df.drop(columns = ['delivery', 'trades'])
         if len(s_df)==0:
             log('Skip {}'.format(stock.symbol), logtype='warning')
+    s_df.rename(columns={"open": "Open", "high": "High", "low": "Low", "close":"Close", "volume":'Volume'}, inplace=True)
     return s_df
 
-def get_dataframe(stock, market, timeframe, date, online=True, use_yahoo=True):
+def get_dataframe(stock, market, timeframe, date, duration=60, online=True, use_yahoo=True):
     if use_yahoo:
-        s_df = get_dataframe_yahoo(stock, market, timeframe, date)
+        s_df = get_dataframe_yahoo(stock=stock, 
+                                 market=market, 
+                                 timeframe=timeframe, 
+                                 date=date)
     else:
-        s_df = get_dataframe_lib(stock, market, timeframe, date, online)
+        s_df = get_dataframe_lib(stock=stock, 
+                                 market=market, 
+                                 timeframe=timeframe, 
+                                 date=date, 
+                                 online=online, 
+                                 duration=duration)
     return s_df
 
 def main(backtest=False):
@@ -376,27 +385,41 @@ def main(backtest=False):
     if backtest:
         df_store = {}
         for bot in bots:
-            df_store[bot] = {'df' :get_dataframe(stock='^NSEI', 
+            # df_store[bot] = {'df' :get_dataframe(stock='^NSEI', 
+            #                                      market='NSE', 
+            #                                      timeframe=bot, 
+            #                                      online=True, 
+            #                                      use_yahoo=True, 
+            #                                      date=None),
+            #                 'index': 1,
+            #                 }
+            duration = (60*6)+15+1 #Prepare for minutewise scan
+            if bot[-1] is 'm':
+                duration = (duration//int(bot[0:-1])) + 1
+            elif bot[-1] is 'h':
+                duration = (duration//60) + 1
+            log(f'Duration: {duration}', 'info')
+            df_store[bot] = {'df' :get_dataframe(stock='NIFTY', 
                                                  market='NSE', 
                                                  timeframe=bot, 
                                                  online=True, 
-                                                 use_yahoo=True, 
-                                                 date=None),
+                                                 use_yahoo=False, 
+                                                 date=None,
+                                                 duration=duration),
                             'index': 1,
                             }
         for bot in bots:
             log(f'Running [{bot}]: Index {df_store[bot]["index"]}', 'info')
             while df_store[bot]['index']<=len(df_store[bot]['df']) and bots[bot]['scheduled']:
                 s_df = df_store[bot]['df'].iloc[0:df_store[bot]['index']]
-                #log(s_df.tail(1), 'info')
-                bots[bot]['bot'].next(s_df)
+                if len(s_df)>1 and s_df.index[-2].to_pydatetime().day != datetime.datetime.today().day:
+                    log('Skip stale entries', 'info')
+                elif len(s_df)==1 and s_df.index[-1].to_pydatetime().day != datetime.datetime.today().day:
+                    log('Skip stale entries', 'info')
+                elif len(s_df)>0:
+                    #log(s_df.tail(1), 'info')
+                    bots[bot]['bot'].next(s_df)
                 df_store[bot]['index'] +=1
-        for bot in bots:
-            profit = ((bots[bot]["bot"].cash - bots[bot]["bot"].initial_cash)/bots[bot]["bot"].initial_cash)*100
-            print(f'TF {bot}:')
-            print(f'\tFinal capital:\t{bots[bot]["bot"].cash}\t({profit}%)')
-            print(f'\tTrades:\t{len(bots[bot]["bot"].orderbook)}')
-            print(f'\tCharges: {bots[bot]["bot"].charges}')
 
     else:
         # using now() to get current time
@@ -405,30 +428,45 @@ def main(backtest=False):
         time.sleep(60 - current_time.second + 2)
         last_minute = current_time.minute+1
         while (current_time.hour < 15 or (current_time.hour > 15 and current_time.minute<30)):
-            log(f'Run loop once', 'info')
+            log(f'Run loop once: ', 'info')
             #df = get_dataframe(stock='^NSEI', exchange='NSE', timeframe='1m', online=True, use_yahoo=True)
             for bot in bots:
                 #Run only if an epoch has elapsed
                 if (int(bot[0:-1])<60 and (current_time.minute-1)%int(bot[0:-1])==0) or \
-                    (int(bot[0:-1])==60 and current_time.hour > bots[bot]['last_run'].hour) :
+                    ((bots[bot]['last_run'] is not None) and (int(bot[0:-1])==60 and current_time.hour > bots[bot]['last_run'].hour)) :
                     log(f'TF {bot} scheduled', 'info')
                     bots[bot]['scheduled'] = True
 
                 if bots[bot]['scheduled']:
                     #s_df = get_dataframe(stock='^NSEI', market='NSE', timeframe=bot, online=True, use_yahoo=True, date=None)
-                    s_df = get_dataframe(stock='NIFTY50', market='NSE', timeframe=bot, online=True, use_yahoo=False, date=None)
-                    bots[bot]['scheduled'] = False
-                    bots[bot]['last_run'] = current_time
-                    # if bots[bot]['resampler'] is not None:
-                    #     s_df = df.resample(bots[bot]['resampler']).apply(logic)
-                    # else:
-                    #     s_df = df
-                    log(f'Running', 'info')
-                    bots[bot]['bot'].next(s_df)
+                    s_df = get_dataframe(stock='NIFTY', market='NSE', timeframe=bot, online=True, use_yahoo=False, date=None)
+                    if s_df.index[-2].to_pydatetime().day != datetime.datetime.today().day:
+                        log('Skip stale entries', 'info')
+                    else:
+                        bots[bot]['scheduled'] = False
+                        bots[bot]['last_run'] = current_time
+                        # if bots[bot]['resampler'] is not None:
+                        #     s_df = df.resample(bots[bot]['resampler']).apply(logic)
+                        # else:
+                        #     s_df = df
+                        #log(f'Running', 'info')
+                        bots[bot]['bot'].next(s_df)
             #Done processing, now fetch next candle or wait until next minute
+            last_minute = current_time.minute
             current_time = datetime.datetime.now()
             if current_time.minute > last_minute:
                 time.sleep(60 - current_time.second)
+    for bot in bots:
+        profit = ((bots[bot]["bot"].cash - bots[bot]["bot"].initial_cash)/bots[bot]["bot"].initial_cash)*100
+        print(f'TF {bot}:')
+        print(f'\tFinal capital:\t{bots[bot]["bot"].cash}\t({profit}%)')
+        print(f'\tTrades:\t{len(bots[bot]["bot"].orderbook)}')
+        print(f'\tCharges: {bots[bot]["bot"].charges}')
+
+    for bot in bots:
+        print(f'TF {bot}: Orderbook')
+        for order in bots[bot]["bot"].orderbook:
+            print(order)
 
 if __name__ == "__main__":
     set_loglevel('debug')

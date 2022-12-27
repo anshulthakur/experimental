@@ -39,6 +39,7 @@ class Position(object):
 class Broker(object):
     def __init__(self):
         super().__init__()
+        pass
 
     def get_charges(self, buy=True, price=0, quantity=0, segment='equity'):
         if segment=='equity':

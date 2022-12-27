@@ -1,3 +1,5 @@
+from lib.logging import log
+
 class FlowGraphNode:
     def __init__(self):
         self.callbacks = []
@@ -20,10 +22,24 @@ class FlowGraphNode:
 
 
 class FlowGraph:
-    def __init__(self):
+    def __init__(self, frequency=None):
+        self._frequency = frequency
         self.nodes = []
         self.connections = []
     
+    @property
+    def frequency(self):
+        return self._frequency
+    
+    @frequency.setter
+    def set_frequency(self, frequency):
+        if frequency is not None:
+            try:
+                self._frequency = float(frequency)
+            except:
+                log(f"Error setting frequency to {frequency}. Ensure that floats are passed", "error")
+                pass
+
     def add_node(self, node):
         if isinstance(node, FlowGraphNode):
             node.flowgraph = self
@@ -37,6 +53,7 @@ class FlowGraph:
     
     def run(self):
         # code for running the flowgraph goes here
+        # Start from the first node in the flowgraph and run to completion
         pass
     
     def display(self):

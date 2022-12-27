@@ -5,30 +5,45 @@ from lib.logging import log, set_loglevel
 
 import time
 import threading
+from threading import Thread
 
 from base import FlowGraph
 from base.scheduler import AsyncScheduler as Scheduler
-from nodes import IndicatorNode
+from nodes import IndicatorNode, TradingViewSource, FileSink
+
+import signal, os
+
+def signal_handler(signum, frame):
+    signame = signal.Signals(signum).name
+    print(f'Signal handler called with signal {signame} ({signum})')
+    global running
+    running = False
 
 # define an async callback function to be registered with a node
 async def signal_callback(signal_data, emitting_node):
     # do some asynchronous processing here
     await asyncio.sleep(1)
+    # send a request to the new thread
+    queue.put_nowait("some_request")
+    # wait for a response from the new thread
+    response = queue.get()
+    print(response)
     print(f"Received signal {signal_data} from node {emitting_node}")
 
+# The broker is implemented as a separate thread for communicating with the broker endpoint
+class Broker(Thread):
+    def __init__(self, queue):
+        self.queue = queue
+        pass
 
-
-# create a queue for communication between the scheduler and the new thread
-queue = asyncio.Queue()
-# define the function for the new thread
-def thread_function():
-    while True:
-        # wait for a request to be received on the queue
-        request = queue.get()
-        if request == "some_request":
-            # process the request and send a response on the queue
-            response = "some_response"
-            queue.put_nowait(response)
+    def run(self):
+        while True:
+            # wait for a request to be received on the queue
+            request = self.queue.get()
+            if request == "some_request":
+                # process the request and send a response on the queue
+                response = "some_response"
+                queue.put_nowait(response)
 
 # define an async callback function to execute trades
 async def execute_trade(signal_data, emitting_node):
@@ -65,15 +80,28 @@ async def subscribe_to_feed(emitting_node):
             await asyncio.sleep(1)
 
 
-async def test_run():
+# create a queue for communication between the scheduler and the new thread
+queue = asyncio.Queue()
+running = False
+
+async def main():
+    global running
+    set_loglevel('debug')
+    # Set the signal handler and a 5-second alarm
+    signal.signal(signal.SIGINT, signal_handler)
+
     # create and start the new thread
-    thread = threading.Thread(target=thread_function)
+    thread = Broker(queue=queue)
     thread.start()
 
     # Create a flowgraph
     fg = FlowGraph()
 
-    # add some nodes to the flowgraph
+    # Add a dataframe source 
+    source = TradingViewSource(symbol='NIFTY', exchange='NSE', timeframe='1m')
+    fg.add_node(source)
+
+    # Add some indicator nodes to the flowgraph
     node1 = IndicatorNode(indicators=[{'tagname': 'RSI', 'indicator': 'RSI', 'length': 14}])
     node2 = IndicatorNode(indicators=[{'tagname': 'EMA10', 'indicator': 'EMA', 'length': 10},
                                       {'tagname': 'EMA20', 'indicator': 'EMA', 'length': 20}
@@ -81,50 +109,34 @@ async def test_run():
     fg.add_node(node1)
     fg.add_node(node2)
 
-    # connect the nodes
-    fg.connect(node1, node2)
+    # Add some sink nodes 
+    sink1 = FileSink(filename='/tmp/RsiDump.csv')
+    sink2 = FileSink(filename='/tmp/EmaDump.csv')
+    fg.add_node(sink1)
+    fg.add_node(sink2)
 
-    # run the flowgraph
-    fg.run()
+    # connect the nodes together
+    fg.connect(source, node1)
+    fg.connect(source, node2)
+    fg.connect(node1, sink1)
+    fg.connect(node2, sink2)
 
-    # display the flowgraph
-    fg.display()
+    # Create a scheduler
+    scheduler = Scheduler(1) # 1 second scheduler
 
-    async_scheduler = Scheduler(5)
     # register some flowgraphs with the scheduler
-    fg1 = FlowGraph()
-    fg2 = FlowGraph()
-    await async_scheduler.register(fg1)
-    await async_scheduler.register(fg2)
+    scheduler.register(fg)
 
     # start the scheduler
-    while True:
-        # send a request to the new thread
-        queue.put_nowait("some_request")
-        # wait for a response from the new thread
-        response = queue.get()
-        print(response)
-        await async_scheduler.run()
-        await asyncio.sleep(async_scheduler.interval)
+    running = True
+    while running:
+        await scheduler.run()
+        #await asyncio.sleep(scheduler.interval)
 
-class Broker(object):
-    pass
+        
+        
 
-class Bot(object):
-    pass 
-
-class Strategy(object):
-    pass
-
-
-def main():
-    set_loglevel('debug')
-    #Create a scheduler
-    scheduler = Scheduler()
-
-    #Create a separate thread for Broker communication
-    pass
-
+    thread.join()
 
 if __name__ == "__main__":
     main()

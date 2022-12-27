@@ -1,10 +1,11 @@
 
 class AsyncScheduler:
-    def __init__(self, interval):
+    def __init__(self, interval, simulation=False):
+        self.simulation = simulation
         self.interval = interval
         self.flowgraphs = []
     
-    async def register(self, flowgraph):
+    def register(self, flowgraph):
         self.flowgraphs.append(flowgraph)
     
     async def run(self):

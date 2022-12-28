@@ -77,51 +77,53 @@ class HumpbackShorts(Strategy):
                     print('Close position')
                     self.position.close()
                     return
-        hh = getHigherHighs(self.data.High, order=self.order)
+
+        #Get the higher highs
+        hh = getHigherHighs(self.data.Close, order=self.order)
         hh_idx = np.array([min(i[1] , len(self.data)-1) for i in hh])
+
+        #Get the higher lows
+        hl = getHigherLows(self.data.Close, order=self.order)
+        hl_idx = np.array([min(i[1] , len(self.data)-1) for i in hl])
+
+        #Get the lower lows
+        ll = getLowerLows(self.data.Close, order=self.order)
+        ll_idx = np.array([min(i[1] , len(df)-1) for i in ll])
+
+        #Get the lower highs
+        lh = getLowerHighs(self.data.Close, order=self.order)
+        lh_idx = np.array([min(i[1] , len(df)-1) for i in lh])
+
         if hh_idx is not None and len(hh_idx)>1:
             hh_id = hh_idx[-1]-self.order
-            if abs(hh_val - self.data.High[hh_id])>self.tolerance:
+            if self.data.Close[hh_id]> hh_val and abs(hh_val - self.data.Close[hh_id])>self.tolerance:
                 hh_val = self.data.High[hh_id]
-        else:
-            hh_id = -1
-
-        hl = getHigherLows(self.data.Low, order=self.order)
-        hl_idx = np.array([min(i[1] , len(self.data)-1) for i in hl])
+        
         if hl_idx is not None and len(hl_idx)>1:        
-            if self.data.Low[hl_idx[0]] < ll_val:
+            if self.data.Close[hl_idx[0]] < ll_val:
                 #When trend changes, the last low won't be marked 
                 ll_id = hl_idx[0]-self.order
-                ll_val = self.data.Low[ll_id]
-            hl_id = hl_id[-1]
-            if abs(hl_val - self.data.Low[hl_id])>self.tolerance:
-                hl_val = self.data.Low[hl_id]
-        else:
-            hl_id = -1
+                ll_val = self.data.Close[ll_id]
+            hl_id = hl_idx[-1]-self.order
+            if self.data.Close[hl_id] > hl_val and  abs(hl_val - self.data.Close[hl_id])>self.tolerance:
+                hl_val = self.data.Close[hl_id]
         
-        ll = getLowerLows(self.data.Low, order=self.order)
-        ll_idx = np.array([min(i[1] , len(df)-1) for i in ll])
         if ll_idx is not None and len(ll_idx)>1:
             ll_id = ll_idx[-1]-self.order
-            if abs(ll_val - self.data.Low[ll_id])>self.tolerance:
-                ll_val = self.data.Low[ll_id]
-        else:
-            ll_id = -1
+            if self.data.Close[ll_id] < ll_val and abs(ll_val - self.data.Close[ll_id])>self.tolerance:
+                ll_val = self.data.Close[ll_id]
         
-        lh = getLowerHighs(self.data.High, order=self.order)
-        lh_idx = np.array([min(i[1] , len(df)-1) for i in lh])
         if lh_idx is not None and len(lh_idx)>1:
             lh_id = lh_idx[-1]-self.order
             lh_val = df.close[lh_id]
-            if self.data.High[lh_idx[0]] > hh_val:
+            if self.data.Close[lh_idx[0]] > hh_val:
                 hh_id = lh_idx[0]
-                hh_val = self.data.High[hh_id]
+                hh_val = self.data.Close[hh_id]
             lh_id = lh_idx[-1]
-            if abs(lh_val - self.data.High[lh_id])>self.tolerance:
-                lh_val = self.data.High[lh_id]
+            if self.data.Close[lh_id] < lh_val and abs(lh_val - self.data.Close[lh_id])>self.tolerance:
+                lh_val = self.data.Close[lh_id]
         else:
             lh_id = -1
-        
         
         print(f'D: {self.data.df.index[-1]} HH:{hh}({hh_val}) HL:{hl}({hl_val}) LH:{lh}({lh_val}) LL:{ll}({ll_val}) ')
         if hh>ll and hl>ll:

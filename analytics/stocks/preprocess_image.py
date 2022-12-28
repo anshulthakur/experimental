@@ -105,12 +105,13 @@ def variant2(img_name):
     im2.save(base_name+'_crop_2.png')
 
 def main(img_name):
+    print('Preprocessing: images/{}.png'.format(args.file))
     base_name = img_name
     if len(img_name.split('.'))>=2 and img_name.split('.')[-1] in ['jpg', 'jpeg', 'png']:
         base_name = ''.join(img_name.split('.')[0:-1])
     else:
         img_name = img_name+'.png'
-    print('Preprocessing: {}'.format(args.file))
+    print('Preprocessing: {}'.format(img_name))
     #img = Image.open('images/'+img_name+'.png').convert('RGB')
     numpydata = array( Image.open(img_name).convert('RGB'))
     #numpydata = asarray(img)

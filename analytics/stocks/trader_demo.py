@@ -327,7 +327,7 @@ def get_dataframe_yahoo(stock, market, timeframe, date):
     import yfinance as yf
 
     s = yf.Ticker(stock)
-    df = s.history(period="1d", interval=timeframe)
+    df = s.history(period="5d", interval=timeframe)
 
     #log(df.head(10), 'info')
     return df

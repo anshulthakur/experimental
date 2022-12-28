@@ -310,7 +310,7 @@ def main(stock_name=None, exchange = None, timeframe= '1d', date=None, online=Fa
         if stock_name is None:
             for stock in Stock.objects.filter(market=market):
                 try:
-                    get_trend(stock, market, timeframe, date, online)
+                    get_trend(stock, market, timeframe, date, saveplot=True, online=online )
                 except:
                     pass
             pass
@@ -325,7 +325,7 @@ def main(stock_name=None, exchange = None, timeframe= '1d', date=None, online=Fa
         if stock_name is None:
             for stock in Stock.objects.all():
                 try:
-                    get_trend(stock, market, timeframe, date, online)
+                    get_trend(stock, market, timeframe, date, saveplot=True, online=online )
                 except:
                     pass
         else:
@@ -345,7 +345,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     stock_code = None
     day =  datetime.datetime.now()
-    exchange = 'NSE'
     timeframes = ['1d']
     category = 'all'
     
@@ -362,14 +361,12 @@ if __name__ == "__main__":
             except:
                 log('Error parsing date', logtype='error')
                 day = None
-    if args.exchange is not None and len(args.exchange)>0:
-        exchange=args.exchange
     if args.timeframe is not None and len(args.timeframe)>0:
         timeframes=args.timeframe.split(',')
     
     if args.list is None:
         for timeframe in timeframes:
-            main(stock_code, exchange, timeframe = timeframe, date=day, online=args.online)
+            main(stock_code, args.exchange, timeframe = timeframe, date=day, online=args.online)
     else:
         stock_list = []
         with open(args.list, 'r') as fd:

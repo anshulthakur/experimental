@@ -42,8 +42,14 @@ def classify(rgb_tuple):
 
 def main(img_name):
     print('Preprocessing: images/{}.png'.format(args.file))
+    base_name = img_name
+    if len(img_name.split('.'))>=2 and img_name.split('.')[-1] in ['jpg', 'jpeg', 'png']:
+        base_name = ''.join(img_name.split('.')[0:-1])
+    else:
+        img_name = img_name+'.png'
+
     #img = Image.open('images/'+img_name+'.png').convert('RGB')
-    numpydata = array( Image.open('images/'+img_name+'.png').convert('RGB'))
+    numpydata = array( Image.open(img_name).convert('RGB'))
     #numpydata = asarray(img)
     
     [rows, cols, _colors]= numpydata.shape
@@ -59,7 +65,7 @@ def main(img_name):
                 else:
                     numpydata[row][col] = colors[transform_rule[color]]
     im = Image.fromarray(numpydata)
-    im.save('images/'+img_name+'_crop.png')
+    im.save(base_name+'_crop.png')
 
 if __name__ == "__main__":
     import argparse

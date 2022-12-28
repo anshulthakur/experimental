@@ -12,7 +12,14 @@ from lib.retrieval import get_stock_listing
 import datetime
 import time
 
-tradebook = None
+import signal, os
+
+def signal_handler(signum, frame):
+    signame = signal.Signals(signum).name
+    print(f'Signal handler called with signal {signame} ({signum})')
+    dump_botinfo()
+    exit(0)
+
 
 class Position(object):
     def __init__(self, buy=None, sell=None, quantity=1):
@@ -280,6 +287,39 @@ def get_tradebook():
     
     return tradebook
 
+tradebook = None
+bots = {'1m': {
+                    'bot': LongBot(cash=20000000, lot_size=75, timeframe='1m'),
+                    'resampler': None,
+                    'scheduled': True,
+                    'last_run': None
+                  },
+            '5m': {
+                    'bot': LongBot(cash=20000000, lot_size=75, timeframe='5m'),
+                    'resampler': '5Min',
+                    'scheduled': True,
+                    'last_run': None
+                  },
+            '15m': {
+                    'bot': LongBot(cash=20000000, lot_size=75, timeframe='15m'),
+                    'resampler': '15Min',
+                    'scheduled': True,
+                    'last_run': None
+                  },
+            '30m': {
+                    'bot': LongBot(cash=20000000, lot_size=75, timeframe='30m'),
+                    'resampler': '30Min',
+                    'scheduled': True,
+                    'last_run': None
+                  },
+            '60m': {
+                    'bot': LongBot(cash=20000000, lot_size=75, timeframe='60m'),
+                    'resampler': '60Min',
+                    'scheduled': True,
+                    'last_run': None
+                  },
+            }
+            
 
 def get_dataframe_yahoo(stock, market, timeframe, date):
     import yfinance as yf
@@ -346,42 +386,30 @@ def get_dataframe(stock, market, timeframe, date, duration=60, online=True, use_
                                  duration=duration)
     return s_df
 
+def dump_botinfo():
+    global bots
+    for bot in bots:
+        profit = ((bots[bot]["bot"].cash - bots[bot]["bot"].initial_cash)/bots[bot]["bot"].initial_cash)*100
+        print(f'TF {bot}:')
+        print(f'\tFinal capital:\t{bots[bot]["bot"].cash}\t({profit}%)')
+        print(f'\tTrades:\t{len(bots[bot]["bot"].orderbook)}')
+        print(f'\tCharges: {bots[bot]["bot"].charges}')
+
+    for bot in bots:
+        print(f'TF {bot}: Orderbook')
+        for order in bots[bot]["bot"].orderbook:
+            print(order)
+
 def main(backtest=False):
+    global bots
+    # Set the signal handler and a 5-second alarm
+    signal.signal(signal.SIGINT, signal_handler)
+
     logic = {'Open'  : 'first',
              'High'  : 'max',
              'Low'   : 'min',
              'Close' : 'last'}
-    bots = {'1m': {
-                    'bot': LongBot(cash=20000000, lot_size=75, timeframe='1m'),
-                    'resampler': None,
-                    'scheduled': True,
-                    'last_run': None
-                  },
-            '5m': {
-                    'bot': LongBot(cash=20000000, lot_size=75, timeframe='5m'),
-                    'resampler': '5Min',
-                    'scheduled': True,
-                    'last_run': None
-                  },
-            '15m': {
-                    'bot': LongBot(cash=20000000, lot_size=75, timeframe='15m'),
-                    'resampler': '15Min',
-                    'scheduled': True,
-                    'last_run': None
-                  },
-            '30m': {
-                    'bot': LongBot(cash=20000000, lot_size=75, timeframe='30m'),
-                    'resampler': '30Min',
-                    'scheduled': True,
-                    'last_run': None
-                  },
-            '60m': {
-                    'bot': LongBot(cash=20000000, lot_size=75, timeframe='60m'),
-                    'resampler': '60Min',
-                    'scheduled': True,
-                    'last_run': None
-                  },
-            }
+    
     
     if backtest:
         df_store = {}
@@ -423,51 +451,45 @@ def main(backtest=False):
                 df_store[bot]['index'] +=1
 
     else:
-        # using now() to get current time
-        current_time = datetime.datetime.now()
-        #Sleep to align running to near start of minute
-        time.sleep(60 - current_time.second + 2)
-        last_minute = current_time.minute+1
-        while (current_time.hour < 15 or (current_time.hour > 15 and current_time.minute<30)):
-            log(f'\nRun loop once: ', 'info')
-            #df = get_dataframe(stock='^NSEI', exchange='NSE', timeframe='1m', online=True, use_yahoo=True)
-            for bot in bots:
-                #Run only if an epoch has elapsed
-                if (int(bot[0:-1])<60 and (current_time.minute-1)%int(bot[0:-1])==0) or \
-                    ((bots[bot]['last_run'] is not None) and (int(bot[0:-1])==60 and current_time.hour > bots[bot]['last_run'].hour)) :
-                    log(f'TF {bot} scheduled', 'info')
-                    bots[bot]['scheduled'] = True
-
-                if bots[bot]['scheduled']:
-                    #s_df = get_dataframe(stock='^NSEI', market='NSE', timeframe=bot, online=True, use_yahoo=True, date=None)
-                    s_df = get_dataframe(stock='NIFTY', market='NSE', timeframe=bot, online=True, use_yahoo=False, date=None)
-                    if s_df.index[-2].to_pydatetime().day != datetime.datetime.today().day:
-                        log('Skip stale entries', 'info')
-                    else:
-                        bots[bot]['scheduled'] = False
-                        bots[bot]['last_run'] = current_time
-                        # if bots[bot]['resampler'] is not None:
-                        #     s_df = df.resample(bots[bot]['resampler']).apply(logic)
-                        # else:
-                        #     s_df = df
-                        #log(f'Running', 'info')
-                        bots[bot]['bot'].next(s_df)
-            #Done processing, now fetch next candle or wait until next minute
-            last_minute = current_time.minute
+        try:
+            # using now() to get current time
             current_time = datetime.datetime.now()
-            if current_time.minute > last_minute:
-                time.sleep(60 - current_time.second)
-    for bot in bots:
-        profit = ((bots[bot]["bot"].cash - bots[bot]["bot"].initial_cash)/bots[bot]["bot"].initial_cash)*100
-        print(f'TF {bot}:')
-        print(f'\tFinal capital:\t{bots[bot]["bot"].cash}\t({profit}%)')
-        print(f'\tTrades:\t{len(bots[bot]["bot"].orderbook)}')
-        print(f'\tCharges: {bots[bot]["bot"].charges}')
+            #Sleep to align running to near start of minute
+            time.sleep(60 - current_time.second + 2)
+            last_minute = current_time.minute+1
+            while (current_time.hour < 15 or (current_time.hour > 15 and current_time.minute<30)):
+                log(f'\nRun loop once: ', 'info')
+                #df = get_dataframe(stock='^NSEI', exchange='NSE', timeframe='1m', online=True, use_yahoo=True)
+                for bot in bots:
+                    #Run only if an epoch has elapsed
+                    if (int(bot[0:-1])<60 and (current_time.minute-1)%int(bot[0:-1])==0) or \
+                        ((bots[bot]['last_run'] is not None) and (int(bot[0:-1])==60 and current_time.hour > bots[bot]['last_run'].hour)) :
+                        log(f'TF {bot} scheduled', 'info')
+                        bots[bot]['scheduled'] = True
 
-    for bot in bots:
-        print(f'TF {bot}: Orderbook')
-        for order in bots[bot]["bot"].orderbook:
-            print(order)
+                    if bots[bot]['scheduled']:
+                        #s_df = get_dataframe(stock='^NSEI', market='NSE', timeframe=bot, online=True, use_yahoo=True, date=None)
+                        s_df = get_dataframe(stock='NIFTY', market='NSE', timeframe=bot, online=True, use_yahoo=False, date=None)
+                        if s_df.index[-2].to_pydatetime().day != datetime.datetime.today().day:
+                            log('Skip stale entries', 'info')
+                        else:
+                            bots[bot]['scheduled'] = False
+                            bots[bot]['last_run'] = current_time
+                            # if bots[bot]['resampler'] is not None:
+                            #     s_df = df.resample(bots[bot]['resampler']).apply(logic)
+                            # else:
+                            #     s_df = df
+                            #log(f'Running', 'info')
+                            bots[bot]['bot'].next(s_df)
+                #Done processing, now fetch next candle or wait until next minute
+                last_minute = current_time.minute
+                current_time = datetime.datetime.now()
+                if current_time.minute > last_minute:
+                    time.sleep(60 - current_time.second)
+        except:
+            log('Exception', 'error')
+            pass
+    dump_botinfo()
 
 if __name__ == "__main__":
     set_loglevel('debug')

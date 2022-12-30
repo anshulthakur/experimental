@@ -458,7 +458,7 @@ def main(backtest=False):
             time.sleep(60 - current_time.second + 2)
             last_minute = current_time.minute+1
             while (current_time.hour < 15 or (current_time.hour > 15 and current_time.minute<30)):
-                log(f'\nRun loop once: ', 'info')
+                #log(f'\nRun loop once: ', 'info')
                 #df = get_dataframe(stock='^NSEI', exchange='NSE', timeframe='1m', online=True, use_yahoo=True)
                 for bot in bots:
                     #Run only if an epoch has elapsed

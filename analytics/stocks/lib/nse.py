@@ -3,8 +3,10 @@ import datetime
 import requests
 import time
 import urllib.parse
+import json
+from .logging import log
+import pandas as pd
 
-from logging import log
 ApiList = {
     "GLOSSARY" : '/api/cmsContent?url:/glossary',
     "HOLIDAY_TRADING" : '/api/holiday-master?type:trading',
@@ -39,22 +41,33 @@ def getDateRangeChunks(startDate, endDate, chunkInDays):
     return dateRanges
 
 class NseIndia(object):
-    def __init__(self):
+    def __init__(self, timeout=10, legacy = False):
         self.baseUrl = 'https://www.nseindia.com'
         self.legacyBaseUrl = 'https://www1.nseindia.com'
         self.cookieMaxAge = 60 # should be in seconds
         self.cookies = []
         self.cookieExpiry = datetime.datetime.now() + datetime.timedelta(seconds=self.cookieMaxAge)
+        user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.35'
         self.baseHeaders = {
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive'
+            "accept-encoding": "gzip, deflate, br",
+            "accept":
+            """text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9""",
+            "accept-language": "en-US,en;q=0.9",
+            "host": "www.nseindia.com",
+            "referer": "https://www.nseindia.com",
+            'Connection': 'keep-alive',
+            "user-agent": user_agent
         }
+        
+        self.timeout = timeout
+        self.legacy = legacy
         self.session = requests.Session()
+        self.session.headers.update(self.baseHeaders)
     
     def getNseCookies(self):
+        log('getNseCookies', 'debug')
         if self.cookieExpiry <= datetime.datetime.now():
-            response = self.session.get(self.baseUrl, headers=self.baseHeaders)
+            response = self.session.get(self.legacyBaseUrl if self.legacy else self.baseUrl, timeout=self.timeout)
             setCookies = response.headers['set-cookie']
             cookies = []
             for cookie in setCookies:
@@ -74,23 +87,20 @@ class NseIndia(object):
      @returns JSON data from NSE India
     '''
     def getData(self, url):
+        log('getData', 'debug')
         retries = 0
         hasError = True
         while hasError:
             hasError = False
-            while (self.noOfConnections >= 5):
-                time.sleep(0.5)
-            self.noOfConnections +=1
             try:
                 response = self.session.get(url, 
                                         headers= self.baseHeaders.update(map('Cookie', self.getNseCookies())),
+                                        timeout=self.timeout
                                         )
-                self.noOfConnections -=1
-                return response.data
+                return response.text
             except:
                 hasError = True
                 retries +=1
-                self.noOfConnections -=1
                 if (retries >= 10):
                     raise
     
@@ -100,6 +110,7 @@ class NseIndia(object):
      @returns 
      '''
     def getDataByEndpoint(self, apiEndpoint, isLegacy = False):
+        log('getDataByEndpoint', 'debug')
         if not isLegacy:
             return self.getData(url = self.baseUrl + apiEndpoint)
         else:
@@ -109,6 +120,7 @@ class NseIndia(object):
      @returns List of NSE equity symbols
      '''
     def getAllStockSymbols(self):
+        log('getAllStockSymbols', 'debug')
         data = self.getDataByEndpoint(ApiList.MARKET_DATA_PRE_OPEN)
         symbols = []
         for obj in data:
@@ -120,6 +132,7 @@ class NseIndia(object):
      @returns 
     '''
     def getEquityDetails(self, symbol):
+        log('getEquityDetails', 'debug')
         return self.getDataByEndpoint(f"/api/quote-equity?symbol={urllib.parse.urlencode(symbol)}")
 
     '''
@@ -127,6 +140,7 @@ class NseIndia(object):
      @returns 
     '''
     def getEquityTradeInfo(self, symbol):
+        log('getEquityTradeInfo', 'debug')
         return self.getDataByEndpoint(f"/api/quote-equity?symbol={urllib.parse.urlencode(symbol)}&section=trade_info")
     
     '''
@@ -134,6 +148,7 @@ class NseIndia(object):
      @returns 
     '''
     def getEquityCorporateInfo(self, symbol):
+        log('getEquityCorporateInfo', 'debug')
         return self.getDataByEndpoint(f"/api/quote-equity?symbol={urllib.parse.urlencode(symbol)}&section=corp_info")
     
     '''
@@ -142,6 +157,7 @@ class NseIndia(object):
      @returns 
     '''
     def getEquityIntradayData(self, symbol, isPreOpenData = False):
+        log('getEquityIntradayData', 'debug')
         details = self.getEquityDetails(symbol)
         identifier = details.info.identifier
         url = f"/api/chart-databyindex?index={identifier}"
@@ -155,6 +171,7 @@ class NseIndia(object):
      @returns 
     '''
     def getEquityHistoricalData(self, symbol, range=None): 
+        log('getEquityHistoricalData', 'debug')
         if (range is None):
             data =  self.getEquityDetails(symbol)
             range = { 'start': datetime.datetime.strptime(data['metadata']['listingDate'], '%D/%M/%Y'), 
@@ -178,6 +195,7 @@ class NseIndia(object):
      @returns 
     '''
     def getEquitySeries(self, symbol):
+        log('getEquitySeries', 'debug')
         return self.getDataByEndpoint(f"/api/historical/cm/equity/series?symbol={urllib.parse.urlencode(symbol)}")
 
     '''
@@ -185,6 +203,7 @@ class NseIndia(object):
      @returns 
     '''
     def getEquityStockIndices(self, index):
+        log('getEquityStockIndices', 'debug')
         return self.getDataByEndpoint(f"/api/equity-stockIndices?index={urllib.parse.urlencode(index)}")
 
     '''
@@ -192,11 +211,13 @@ class NseIndia(object):
      @param isPreOpenData 
      @returns 
     '''
-    def getIndexIntradayData(self, index, isPreOpenData = False): 
+    def getIndexIntradayData(self, index, isPreOpenData = False):
+        log('getIndexIntradayData', 'debug') 
         endpoint = f"/api/chart-databyindex?index={index}&indices=true"
         if (isPreOpenData):
             endpoint += '&preopen=true'
-        return self.getDataByEndpoint(endpoint)
+        data = json.loads(self.getDataByEndpoint(endpoint))
+        return {'data': data['grapthData']}
 
     '''
      @param index 
@@ -204,7 +225,8 @@ class NseIndia(object):
      @returns 
     '''
     def getIndexHistoricalData(index, range):
-        dateRanges = getDateRangeChunks(rang['start'], range['end'], 360)
+        log('getIndexHistoricalData', 'debug') 
+        dateRanges = getDateRangeChunks(range['start'], range['end'], 360)
         '''
         const promises = dateRanges.map(async (dateRange) => {
             const endpoint = '/products/dynaContent/equities/indices/historicalindices.jsp' +

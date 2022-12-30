@@ -46,7 +46,7 @@ class NseIndia(object):
     def __init__(self, timeout=10, legacy = False):
         self.baseUrl = 'https://www.nseindia.com'
         self.legacyBaseUrl = 'https://www1.nseindia.com'
-        self.cookieMaxAge = 60 # should be in seconds
+        self.cookieMaxAge = 120 # should be in seconds
         self.cookies = []
         self.cookieExpiry = datetime.datetime.now() + datetime.timedelta(seconds=self.cookieMaxAge)
         user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.35'

@@ -8,6 +8,7 @@ from stocks.models import Listing, Stock, Market
 from lib.logging import set_loglevel, log
 from lib.tradingview import convert_timeframe_to_quant, get_tvfeed_instance, Interval
 from lib.retrieval import get_stock_listing
+from lib.nse import NseIndia
 
 import datetime
 import time
@@ -451,6 +452,7 @@ def main(backtest=False):
                 df_store[bot]['index'] +=1
 
     else:
+        nseObj = NseIndia(legacy=True)
         try:
             # using now() to get current time
             current_time = datetime.datetime.now()
@@ -460,6 +462,7 @@ def main(backtest=False):
             while (current_time.hour < 15 or (current_time.hour > 15 and current_time.minute<30)):
                 #log(f'\nRun loop once: ', 'info')
                 #df = get_dataframe(stock='^NSEI', exchange='NSE', timeframe='1m', online=True, use_yahoo=True)
+                #df = nseObj.getIndexIntradayData(index='NIFTY 50', resample=None)
                 for bot in bots:
                     #Run only if an epoch has elapsed
                     if (int(bot[0:-1])<60 and (current_time.minute-1)%int(bot[0:-1])==0) or \
@@ -470,6 +473,8 @@ def main(backtest=False):
                     if bots[bot]['scheduled']:
                         #s_df = get_dataframe(stock='^NSEI', market='NSE', timeframe=bot, online=True, use_yahoo=True, date=None)
                         s_df = get_dataframe(stock='NIFTY', market='NSE', timeframe=bot, online=True, use_yahoo=False, date=None)
+                        #s_df = df.resample(bot+'in').ohlc() #make it 'min' (for minute)
+                        #s_df = s_df.droplevel(level=0, axis=1)
                         if s_df.index[-2].to_pydatetime().day != datetime.datetime.today().day:
                             log('Skip stale entries', 'info')
                         else:

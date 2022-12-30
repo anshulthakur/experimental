@@ -4,5 +4,5 @@ import json
 
 set_loglevel('debug')
 market  = nse.NseIndia(legacy=True)
-data = market.getIndexIntradayData(index='NIFTY 50')
-print(json.dumps(data, indent=2))
+data = market.getIndexIntradayData(index='NIFTY 50', resample='5min')
+print(data.head(20))

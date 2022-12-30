@@ -1,11 +1,13 @@
 #Port of https://github.com/hi-imcodeman/stock-nse-india
 import datetime
+from dateutil import tz
 import requests
 import time
 import urllib.parse
 import json
 from .logging import log
 import pandas as pd
+import numpy as np
 
 ApiList = {
     "GLOSSARY" : '/api/cmsContent?url:/glossary',
@@ -211,13 +213,28 @@ class NseIndia(object):
      @param isPreOpenData 
      @returns 
     '''
-    def getIndexIntradayData(self, index, isPreOpenData = False):
+    def getIndexIntradayData(self, index, isPreOpenData = False, resample=None):
         log('getIndexIntradayData', 'debug') 
         endpoint = f"/api/chart-databyindex?index={index}&indices=true"
         if (isPreOpenData):
             endpoint += '&preopen=true'
         data = json.loads(self.getDataByEndpoint(endpoint))
-        return {'data': data['grapthData']}
+        india_tz= tz.gettz('UTC')
+        df = pd.DataFrame.from_records(data['grapthData'], columns=['datetime', 'close'])
+        df['datetime'] = pd.to_datetime(df['datetime'], unit='ms')
+        df.drop_duplicates(['datetime'], inplace=True)
+        df.set_index('datetime', inplace=True)
+        df.sort_index(inplace=True)
+
+        logic = {'open'  : 'first',
+                 'high'  : 'max',
+                 'low'   : 'min',
+                 'close' : 'last'}
+        if resample is not None and isinstance(resample, str):
+            df = df.resample(resample).ohlc()
+            df = df.droplevel(level=0, axis=1)
+            #df = df.resample(resample).apply(logic)
+        return df
 
     '''
      @param index 

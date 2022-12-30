@@ -4,6 +4,7 @@ import requests
 import time
 import urllib.parse
 
+from logging import log
 ApiList = {
     "GLOSSARY" : '/api/cmsContent?url:/glossary',
     "HOLIDAY_TRADING" : '/api/holiday-master?type:trading',
@@ -41,20 +42,19 @@ class NseIndia(object):
     def __init__(self):
         self.baseUrl = 'https://www.nseindia.com'
         self.legacyBaseUrl = 'https://www1.nseindia.com'
-        self.cookies = ''
-        self.cookieUsedCount = 0
         self.cookieMaxAge = 60 # should be in seconds
+        self.cookies = []
         self.cookieExpiry = datetime.datetime.now() + datetime.timedelta(seconds=self.cookieMaxAge)
-        self.noOfConnections = 0
         self.baseHeaders = {
             'Accept-Language': 'en-US,en;q=0.9',
             'Accept-Encoding': 'gzip, deflate, br',
             'Connection': 'keep-alive'
         }
+        self.session = requests.Session()
     
     def getNseCookies(self):
-        if self.cookies == '' or self.cookieUsedCount > 10 or  self.cookieExpiry <= datetime.datetime.now():
-            response = requests.get(self.baseUrl, headers=self.baseHeaders)
+        if self.cookieExpiry <= datetime.datetime.now():
+            response = self.session.get(self.baseUrl, headers=self.baseHeaders)
             setCookies = response.headers['set-cookie']
             cookies = []
             for cookie in setCookies:
@@ -63,12 +63,10 @@ class NseIndia(object):
                 cookieEntry = cookieKeyValue.split('=')
                 if (cookieEntry[0] in requiredCookies):
                     cookies.append(cookieKeyValue)
-
+            log(f"Cookies: {cookies}", "debug")
             self.cookies = cookies.join('; ')
-            self.cookieUsedCount = 0
             self.cookieExpiry = datetime.datetime.now() + datetime.timedelta(seconds=self.cookieMaxAge)
 
-        self.cookieUsedCount += 1
         return self.cookies
 
     '''
@@ -84,7 +82,7 @@ class NseIndia(object):
                 time.sleep(0.5)
             self.noOfConnections +=1
             try:
-                response = requests.get(url, 
+                response = self.session.get(url, 
                                         headers= self.baseHeaders.update(map('Cookie', self.getNseCookies())),
                                         )
                 self.noOfConnections -=1

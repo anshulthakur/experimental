@@ -24,3 +24,8 @@ class CsvSource(SourceNode):
 class YahooSource(SourceNode):
     def __init__(self, symbol, timeframe):
         super().__init__()
+
+class NseSource(SourceNode):
+    def __init__(self, symbol, timeframe):
+        super().__init__()
+

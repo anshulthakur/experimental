@@ -1,1 +1,1 @@
-from graph import FlowGraph, FlowGraphNode
+from .graph import FlowGraph, FlowGraphNode

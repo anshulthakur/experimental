@@ -1,6 +1,9 @@
 import asyncio
 import aiohttp
 import json
+import sys, os
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 from lib.logging import log, set_loglevel
 
 import time
@@ -91,27 +94,27 @@ async def main():
     signal.signal(signal.SIGINT, signal_handler)
 
     # create and start the new thread
-    thread = Broker(queue=queue)
-    thread.start()
+    #thread = Broker(queue=queue)
+    #thread.start()
 
     # Create a flowgraph
-    fg = FlowGraph()
+    fg = FlowGraph(name='FlowGraph')
 
     # Add a dataframe source 
-    source = TradingViewSource(symbol='NIFTY', exchange='NSE', timeframe='1m')
+    source = TradingViewSource(name='TradingView', symbol='NIFTY', exchange='NSE', timeframe='1m')
     fg.add_node(source)
 
     # Add some indicator nodes to the flowgraph
-    node1 = IndicatorNode(indicators=[{'tagname': 'RSI', 'indicator': 'RSI', 'length': 14}])
-    node2 = IndicatorNode(indicators=[{'tagname': 'EMA10', 'indicator': 'EMA', 'length': 10},
-                                      {'tagname': 'EMA20', 'indicator': 'EMA', 'length': 20}
+    node1 = IndicatorNode(name='RSI', indicators=[{'tagname': 'RSI', 'type': 'RSI', 'length': 14}])
+    node2 = IndicatorNode(name='EMA', indicators=[{'tagname': 'EMA10', 'type': 'EMA', 'length': 10},
+                                      {'tagname': 'EMA20', 'type': 'EMA', 'length': 20}
                                      ])
     fg.add_node(node1)
     fg.add_node(node2)
 
     # Add some sink nodes 
-    sink1 = FileSink(filename='/tmp/RsiDump.csv')
-    sink2 = FileSink(filename='/tmp/EmaDump.csv')
+    sink1 = FileSink(name='RSIDump', filename='/tmp/RsiDump.csv')
+    sink2 = FileSink(name='EMADump', filename='/tmp/EmaDump.csv')
     fg.add_node(sink1)
     fg.add_node(sink2)
 
@@ -121,22 +124,20 @@ async def main():
     fg.connect(node1, sink1)
     fg.connect(node2, sink2)
 
+    fg.display()
     # Create a scheduler
-    scheduler = Scheduler(1) # 1 second scheduler
+    #scheduler = Scheduler(1) # 1 second scheduler
 
     # register some flowgraphs with the scheduler
-    scheduler.register(fg)
+    #scheduler.register(fg)
 
     # start the scheduler
-    running = True
-    while running:
-        await scheduler.run()
+    #running = True
+    #while running:
+        #await scheduler.run()
         #await asyncio.sleep(scheduler.interval)
 
-        
-        
-
-    thread.join()
+    #thread.join()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())#main()

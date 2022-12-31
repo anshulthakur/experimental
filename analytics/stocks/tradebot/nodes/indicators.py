@@ -1,17 +1,17 @@
-from ..base import FlowGraphNode
+from tradebot.base import FlowGraphNode
 import talib as ta
 from talib.abstract import *
-from ...lib.logging import log
+from lib.logging import log
 
 class IndicatorNode(FlowGraphNode):
-    def __init__(self, indicators=[]):
+    def __init__(self, indicators=[], **kwargs):
         self.indicators = {}
         for indicator in indicators:
             if indicator['tagname'] in self.indicators:
                 log(f"Indicator with tagname {indicator['tagname']} already exists in Node.", 'error')
                 raise Exception(f"Indicator with tagname {indicator['tagname']} already exists in Node.")
             self.add_indicator(indicator)
-        super().__init__()
+        super().__init__(**kwargs)
     
     def add_indicator(self, indicator={}):
         if indicator['tagname'] in self.indicators:

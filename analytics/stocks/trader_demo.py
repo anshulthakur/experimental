@@ -14,6 +14,7 @@ import datetime
 import time
 
 import signal, os
+from traceback import format_tb
 
 def signal_handler(signum, frame):
     signame = signal.Signals(signum).name
@@ -461,20 +462,22 @@ def main(backtest=False):
             last_minute = current_time.minute+1
             while (current_time.hour < 15 or (current_time.hour > 15 and current_time.minute<30)):
                 #log(f'\nRun loop once: ', 'info')
+                
                 #df = get_dataframe(stock='^NSEI', exchange='NSE', timeframe='1m', online=True, use_yahoo=True)
-                #df = nseObj.getIndexIntradayData(index='NIFTY 50', resample=None)
+                df = nseObj.getIndexIntradayData(index='NIFTY 50', resample=None)
                 for bot in bots:
                     #Run only if an epoch has elapsed
-                    if (int(bot[0:-1])<60 and (current_time.minute-1)%int(bot[0:-1])==0) or \
+                    if (int(bot[0:-1])<60 and ((current_time.minute > 0) and (current_time.minute-1)%int(bot[0:-1])==0)) or \
                         ((bots[bot]['last_run'] is not None) and (int(bot[0:-1])==60 and current_time.hour > bots[bot]['last_run'].hour)) :
-                        log(f'TF {bot} scheduled', 'info')
+                        log(f'\nTF {bot} scheduled', 'info')
                         bots[bot]['scheduled'] = True
 
                     if bots[bot]['scheduled']:
                         #s_df = get_dataframe(stock='^NSEI', market='NSE', timeframe=bot, online=True, use_yahoo=True, date=None)
-                        s_df = get_dataframe(stock='NIFTY', market='NSE', timeframe=bot, online=True, use_yahoo=False, date=None)
-                        #s_df = df.resample(bot+'in').ohlc() #make it 'min' (for minute)
-                        #s_df = s_df.droplevel(level=0, axis=1)
+                        #s_df = get_dataframe(stock='NIFTY', market='NSE', timeframe=bot, online=True, use_yahoo=False, date=None)
+                        s_df = df.resample(bot+'in').ohlc() #make it 'min' (for minute)
+                        s_df = s_df.droplevel(level=0, axis=1)
+                        s_df.rename(columns={"open": "Open", "high": "High", "low": "Low", "close":"Close"}, inplace=True)
                         if s_df.index[-2].to_pydatetime().day != datetime.datetime.today().day:
                             log('Skip stale entries', 'info')
                         else:
@@ -493,6 +496,13 @@ def main(backtest=False):
                     time.sleep(60 - current_time.second)
         except:
             log('Exception', 'error')
+            tb_type = sys.exc_info()[0]
+            tb_value = sys.exc_info()[1]
+            tb_info = format_tb(sys.exc_info()[2])
+            tb_output = ''
+            for line in tb_info:
+                tb_output += line
+            log(f"Exception: {tb_type}\n{tb_value}\n{tb_output}", "error")
             pass
     dump_botinfo()
 

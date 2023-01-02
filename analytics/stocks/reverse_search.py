@@ -304,6 +304,9 @@ def main(reference, timeframe, delta, stock=None, logscale=False,
     elif timeframe == Interval.in_4_hour:
         print('4 Hourly')
         n_bars = max((d.years*52) + (d.months*5) + d.weeks+1, len(r_df))+10
+    elif timeframe == Interval.in_2_hour:
+        print('2 Hourly')
+        n_bars = max((d.years*52) + (d.months*5) + d.weeks+1, len(r_df))+10
     else:
         print('Daily')
         n_bars = max(500, len(r_df))+10

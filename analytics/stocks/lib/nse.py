@@ -46,7 +46,7 @@ class NseIndia(object):
     def __init__(self, timeout=10, legacy = False):
         self.baseUrl = 'https://www.nseindia.com'
         self.legacyBaseUrl = 'https://www1.nseindia.com'
-        self.cookieMaxAge = 120 # should be in seconds
+        self.cookieMaxAge = 300 # should be in seconds
         self.cookies = []
         self.cookieExpiry = datetime.datetime.now() + datetime.timedelta(seconds=self.cookieMaxAge)
         user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.35'
@@ -67,8 +67,8 @@ class NseIndia(object):
         self.session.headers.update(self.baseHeaders)
     
     def getNseCookies(self):
-        log('getNseCookies', 'debug')
-        if self.cookieExpiry <= datetime.datetime.now():
+        #log('getNseCookies', 'debug')
+        if len(self.cookies)==0 or self.cookieExpiry <= datetime.datetime.now():
             response = self.session.get(self.legacyBaseUrl if self.legacy else self.baseUrl, timeout=self.timeout)
             setCookies = response.headers['set-cookie']
             cookies = []
@@ -79,7 +79,7 @@ class NseIndia(object):
                 if (cookieEntry[0] in requiredCookies):
                     cookies.append(cookieKeyValue)
             log(f"Cookies: {cookies}", "debug")
-            self.cookies = cookies.join('; ')
+            self.cookies = '; '.join(cookies)
             self.cookieExpiry = datetime.datetime.now() + datetime.timedelta(seconds=self.cookieMaxAge)
 
         return self.cookies
@@ -89,14 +89,14 @@ class NseIndia(object):
      @returns JSON data from NSE India
     '''
     def getData(self, url):
-        log('getData', 'debug')
+        #log('getData', 'debug')
         retries = 0
         hasError = True
         while hasError:
             hasError = False
             try:
                 response = self.session.get(url, 
-                                        headers= self.baseHeaders.update(map('Cookie', self.getNseCookies())),
+                                        headers= self.baseHeaders, #.update(map('Cookie', self.getNseCookies())),
                                         timeout=self.timeout
                                         )
                 return response.text
@@ -112,7 +112,7 @@ class NseIndia(object):
      @returns 
      '''
     def getDataByEndpoint(self, apiEndpoint, isLegacy = False):
-        log('getDataByEndpoint', 'debug')
+        #log('getDataByEndpoint', 'debug')
         if not isLegacy:
             return self.getData(url = self.baseUrl + apiEndpoint)
         else:
@@ -214,7 +214,7 @@ class NseIndia(object):
      @returns 
     '''
     def getIndexIntradayData(self, index, isPreOpenData = False, resample=None):
-        log('getIndexIntradayData', 'debug') 
+        #log('getIndexIntradayData', 'debug') 
         endpoint = f"/api/chart-databyindex?index={index}&indices=true"
         if (isPreOpenData):
             endpoint += '&preopen=true'

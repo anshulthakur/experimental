@@ -91,6 +91,7 @@ class FlowGraph(object):
         # code for displaying the flowgraph goes here
         for node in self.roots:
             node.display_connections()
+        print('\n')
 
     async def emit(self, signal_data, emitting_node):
         for node in self.nodes:

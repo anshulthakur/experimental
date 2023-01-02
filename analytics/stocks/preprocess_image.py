@@ -3,7 +3,7 @@ Created on 17-Oct-2022
 
 @author: Anshul
 '''
-from PIL import Image
+from PIL import Image, ImageFilter
 from numpy import asarray, array
 
 transform_rule = {'blue': 'white',
@@ -40,14 +40,77 @@ def classify(rgb_tuple):
     #    print_debug(color, rgb_tuple)
     return color
 
-def main(img_name):
-    print('Preprocessing: images/{}.png'.format(args.file))
+def replace_colors(img):
+    # Create a new image with the same size
+    im2 = Image.new(img.mode, img.size, 0)
+    for x in range(0, img.width):
+        for y in range(0, img.height):
+            # Get the pixel and its neighbors
+            pixel = img.getpixel((x, y))
+            im2.putpixel((x, y), 
+                        colors[transform_rule[min(transform_rule.keys(), key=lambda x: sum((a - b) ** 2 for a, b in zip(colors[x], pixel)))]])
+    return im2
+
+def smoothen_neighbourhoods(im):
+    from collections import Counter
+    # Create a new image with the same size
+    im2 = Image.new(im.mode, im.size, 0)
+
+    # Iterate over each pixel in the image
+    neighborhood_size = 2
+    for x in range(neighborhood_size, im.width - neighborhood_size):
+        for y in range(neighborhood_size, im.height - neighborhood_size):
+            # Get the pixel and its neighbors
+            pixel = im.getpixel((x, y))
+            neighbors = [im.getpixel((x + dx, y + dy)) for dx, dy in [(-neighborhood_size, 0), 
+                                                                      (neighborhood_size, 0), 
+                                                                      (0, -neighborhood_size), 
+                                                                      (0, neighborhood_size)]]
+
+            # Check if the majority of the neighbors have the same color as the pixel
+            if sum(1 for n in neighbors if n == pixel) > 2:
+                # Set the pixel value in the output image
+                im2.putpixel((x, y), pixel)
+            else:
+                # Calculate the mode color of the neighbors
+                modes = Counter(neighbors).most_common(2)
+                mode_color = modes[0][0]
+                #if mode_color == colors['white']:
+                #Edge smoothening
+                if len(modes)>1 and (modes[1][1]/modes[0][1] >= 1/3):
+                    mode_color = modes[1][0]
+
+                # Find the closest color in the transform rule
+                closest_color = min(transform_rule.keys(), key=lambda x: sum((a - b) ** 2 for a, b in zip(colors[x], mode_color)))
+
+                # Set the pixel value in the output image
+                im2.putpixel((x, y), colors[transform_rule[closest_color]])
+    return im2
+
+def variant2(img_name):
     base_name = img_name
     if len(img_name.split('.'))>=2 and img_name.split('.')[-1] in ['jpg', 'jpeg', 'png']:
         base_name = ''.join(img_name.split('.')[0:-1])
     else:
         img_name = img_name+'.png'
+    print('Preprocessing: {}'.format(args.file))
 
+    
+    
+    #Replace colors
+    im = replace_colors(Image.open(img_name))
+    im2 = smoothen_neighbourhoods(im)
+    
+    # Save the output image
+    im2.save(base_name+'_crop_2.png')
+
+def main(img_name):
+    base_name = img_name
+    if len(img_name.split('.'))>=2 and img_name.split('.')[-1] in ['jpg', 'jpeg', 'png']:
+        base_name = ''.join(img_name.split('.')[0:-1])
+    else:
+        img_name = img_name+'.png'
+    print('Preprocessing: {}'.format(args.file))
     #img = Image.open('images/'+img_name+'.png').convert('RGB')
     numpydata = array( Image.open(img_name).convert('RGB'))
     #numpydata = asarray(img)
@@ -76,4 +139,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.file is not None and len(args.file)>0:
         fname = args.file
-    main(fname)
+    #main(fname)
+    variant2(fname)

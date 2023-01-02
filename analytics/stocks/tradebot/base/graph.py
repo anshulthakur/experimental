@@ -7,6 +7,7 @@ class FlowGraphNode(object):
         self._flowgraph = None
         self.is_root = True
         self.name = name
+        self.mode = None
 
     @property
     def flowgraph(self):
@@ -30,8 +31,8 @@ class FlowGraphNode(object):
     def display_connections(self):
         for connection in self.connections:
             if self.is_root:
-                print(f"\n{self}:", end=" ")
-            print(f"{connection}:", end=" ")
+                print(f"\n{self}", end=" ")
+            print(f"-> {connection}", end=" ")
             connection.display_connections()
 
     def __str__(self):
@@ -39,11 +40,15 @@ class FlowGraphNode(object):
 
 
 class FlowGraph(object):
-    def __init__(self, name=None, frequency=None):
+    def __init__(self, name=None, frequency=None, mode='buffered'):
         self.name = name
         self._frequency = frequency
         self.nodes = []
         self.roots = []
+        self.mode = mode
+        if self.mode not in ['stream', 'buffered', 'backtest']:
+            log(f'Unrecognized mode "{self.mode}".', 'error')
+            raise Exception(f'Unrecognized mode "{self.mode}".')
 
     @property
     def frequency(self):
@@ -66,6 +71,7 @@ class FlowGraph(object):
             raise Exception('Class of node must be FlowGraphNode or inherited from it')
         self.nodes.append(node)
         self.roots.append(node)
+        node.mode = self.mode
         log(f'Added {node} to flowgraph {self}', 'debug')
 
     def connect(self, from_node, to_node):
@@ -85,7 +91,8 @@ class FlowGraph(object):
     def run(self):
         # code for running the flowgraph goes here
         # Start from the first node in the flowgraph and run to completion
-        pass
+        for node in self.roots:
+            node.next()
 
     def display(self):
         # code for displaying the flowgraph goes here

@@ -12,15 +12,15 @@ from threading import Thread
 
 from base import FlowGraph
 from base.scheduler import AsyncScheduler as Scheduler
-from nodes import IndicatorNode, TradingViewSource, FileSink
+from nodes import IndicatorNode, TradingViewSource, FileSink, Resampler
 
 import signal, os
 
 def signal_handler(signum, frame):
     signame = signal.Signals(signum).name
     print(f'Signal handler called with signal {signame} ({signum})')
-    global running
-    running = False
+    global scheduler
+    scheduler.stop()
 
 # define an async callback function to be registered with a node
 async def signal_callback(signal_data, emitting_node):
@@ -88,7 +88,7 @@ queue = asyncio.Queue()
 running = False
 
 async def main():
-    global running
+    global scheduler
     set_loglevel('debug')
     # Set the signal handler and a 5-second alarm
     signal.signal(signal.SIGINT, signal_handler)
@@ -98,7 +98,7 @@ async def main():
     #thread.start()
 
     # Create a flowgraph
-    fg = FlowGraph(name='FlowGraph')
+    fg = FlowGraph(name='FlowGraph', mode='backtest')
 
     # Add a dataframe source 
     source = TradingViewSource(name='TradingView', symbol='NIFTY', exchange='NSE', timeframe='1m')
@@ -118,24 +118,27 @@ async def main():
     fg.add_node(sink1)
     fg.add_node(sink2)
 
+    #Add frequency scaling
+    resampler = Resampler(interval=5) #Running on a 5min scale
+    fg.add_node(resampler)
+
     # connect the nodes together
     fg.connect(source, node1)
     fg.connect(source, node2)
     fg.connect(node1, sink1)
     fg.connect(node2, sink2)
+    fg.connect(resampler, source)
 
     fg.display()
     # Create a scheduler
-    #scheduler = Scheduler(1) # 1 second scheduler
+    scheduler = Scheduler(1) # 1 second scheduler
 
     # register some flowgraphs with the scheduler
-    #scheduler.register(fg)
+    scheduler.register(fg)
 
     # start the scheduler
-    #running = True
-    #while running:
-        #await scheduler.run()
-        #await asyncio.sleep(scheduler.interval)
+    await scheduler.run()
+    #await asyncio.sleep(scheduler.interval)
 
     #thread.join()
 

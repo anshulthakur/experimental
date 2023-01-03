@@ -24,3 +24,11 @@ class IndicatorNode(FlowGraphNode):
         elif indicator['type'] == 'EMA':
             indicator_obj['method'] = ta.EMA
             indicator_obj['attributes'] = {'timeperiod', indicator.get('length', 10)}
+        self.indicators[indicator['tagname']] = indicator_obj
+
+    async def next(self, **kwargs):
+        df = kwargs.get('data')
+        for indicator in self.indicators:
+            df[indicator] = self.indicators[indicator]['method'](df, **self.indicators[indicator]['attributes'])
+        for node in self.connections:
+            await node.next(data = df)

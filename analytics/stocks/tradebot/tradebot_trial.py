@@ -12,7 +12,7 @@ from threading import Thread
 
 from base import FlowGraph
 from base.scheduler import AsyncScheduler as Scheduler
-from nodes import IndicatorNode, TradingViewSource, FileSink, Resampler
+from nodes import IndicatorNode, NseSource, FileSink, Resampler
 
 import signal, os
 
@@ -101,7 +101,7 @@ async def main():
     fg = FlowGraph(name='FlowGraph', mode='backtest')
 
     # Add a dataframe source 
-    source = TradingViewSource(name='TradingView', symbol='NIFTY', exchange='NSE', timeframe='1m')
+    source = NseSource(name='NSE', symbol='NIFTY 50', timeframe='1m')
     fg.add_node(source)
 
     # Add some indicator nodes to the flowgraph

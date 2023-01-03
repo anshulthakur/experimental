@@ -30,6 +30,6 @@ class AsyncScheduler(object):
         while self.running:
             if self.mode in ['buffered', 'backtest']:
                 for flowgraph in self.flowgraphs:
-                    await flowgraph.run(datetime.datetime.now())
+                    await flowgraph.run(tick=datetime.datetime.now())
             else:
                 pass

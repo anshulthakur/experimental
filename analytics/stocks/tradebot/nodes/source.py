@@ -84,7 +84,7 @@ class NseSource(SourceNode):
         self.last_ts = None #Last index served
         super().__init__(**kwargs)
 
-    async def next(self):
+    async def next(self, **kwargs):
         if self.df == None:
             self.df = self.source.getIndexIntradayData(index='NIFTY 50', resample=self.timeframe)
         elif self.mode in ['buffered', 'stream']:
@@ -95,9 +95,9 @@ class NseSource(SourceNode):
                 self.last_ts = df.index[-1]
 
                 for node in self.connections:
-                    await node.next(df)
+                    await node.next(data = df)
         else:
             if self.last_ts == None:
                 self.last_ts = self.df.index[-1]
                 for node in self.connections:
-                    await node.next(self.df)
+                    await node.next(data = self.df)

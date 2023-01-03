@@ -35,6 +35,9 @@ class FlowGraphNode(object):
             print(f"-> {connection}", end=" ")
             connection.display_connections()
 
+    async def next(self, **kwargs):
+        pass
+
     def __str__(self):
         return self.name
 
@@ -88,11 +91,11 @@ class FlowGraph(object):
             self.roots.remove(to_node)
             to_node.is_root = False
 
-    def run(self):
+    async def run(self, **kwargs):
         # code for running the flowgraph goes here
         # Start from the first node in the flowgraph and run to completion
         for node in self.roots:
-            node.next()
+            await node.next(**kwargs)
 
     def display(self):
         # code for displaying the flowgraph goes here

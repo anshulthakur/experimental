@@ -13,3 +13,7 @@ class FileSink(SinkNode):
         #Will save dataframe to a file
         self.filename = filename
         super().__init__(**kwargs)
+    
+    async def next(self, **kwargs):
+        
+        return await super().next(**kwargs)

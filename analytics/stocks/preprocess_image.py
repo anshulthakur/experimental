@@ -139,5 +139,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.file is not None and len(args.file)>0:
         fname = args.file
-    #main(fname)
+    main(fname)
     variant2(fname)

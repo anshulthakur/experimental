@@ -101,14 +101,23 @@ async def main():
     fg = FlowGraph(name='FlowGraph', mode='backtest')
 
     # Add a dataframe source 
-    source = NseSource(name='NSE', symbol='NIFTY 50', timeframe='1m')
+    source = NseSource(name='NSE', symbol='NIFTY 50', timeframe='5min')
     fg.add_node(source)
 
     # Add some indicator nodes to the flowgraph
-    node1 = IndicatorNode(name='RSI', indicators=[{'tagname': 'RSI', 'type': 'RSI', 'length': 14}])
-    node2 = IndicatorNode(name='EMA', indicators=[{'tagname': 'EMA10', 'type': 'EMA', 'length': 10},
-                                      {'tagname': 'EMA20', 'type': 'EMA', 'length': 20}
-                                     ])
+    node1 = IndicatorNode(name='RSI', indicators=[{'tagname': 'RSI', 
+                                                    'type': 'RSI', 
+                                                    'length': 14,
+                                                    'column': 'close'}])
+    node2 = IndicatorNode(name='EMA', indicators=[{'tagname': 'EMA10', 
+                                                    'type': 'EMA', 
+                                                    'length': 10,
+                                                    'column': 'close'},
+                                                  {'tagname': 'EMA20', 
+                                                    'type': 'EMA', 
+                                                    'length': 20,
+                                                    'column': 'close'}
+                                                ])
     fg.add_node(node1)
     fg.add_node(node2)
 
@@ -119,7 +128,7 @@ async def main():
     fg.add_node(sink2)
 
     #Add frequency scaling
-    resampler = Resampler(interval=5) #Running on a 5min scale
+    resampler = Resampler(interval=5*60, name='Resampler') #Running on a 5min scale
     fg.add_node(resampler)
 
     # connect the nodes together
@@ -131,13 +140,14 @@ async def main():
 
     fg.display()
     # Create a scheduler
-    scheduler = Scheduler(1) # 1 second scheduler
+    scheduler = Scheduler(interval=1, mode='backtest') # 1 second scheduler
 
     # register some flowgraphs with the scheduler
     scheduler.register(fg)
 
     # start the scheduler
     await scheduler.run()
+    scheduler.stop()
     #await asyncio.sleep(scheduler.interval)
 
     #thread.join()

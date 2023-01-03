@@ -15,5 +15,7 @@ class FileSink(SinkNode):
         super().__init__(**kwargs)
     
     async def next(self, **kwargs):
-        
-        return await super().next(**kwargs)
+        log(f'{self}:', 'debug')
+        df = kwargs.get('data')
+        log(f'{df.tail(1)}', 'debug')
+        return

@@ -2,10 +2,12 @@ from tradebot.base import FlowGraphNode
 from lib.logging import log
 
 class TimeResampler(FlowGraphNode):
-    def __init__(self, interval):
+    def __init__(self, interval, **kwargs):
         self.interval = interval
         self.reset_ticks = self.interval_to_ticks(self.interval)
         self.elapsed_ticks = 0
+
+        super().__init__(**kwargs)
 
     def interval_to_ticks(self, interval):
         if isinstance(interval, str):
@@ -30,7 +32,8 @@ class TimeResampler(FlowGraphNode):
             return interval
 
     async def next(self, **kwargs):
-        tick = kwargs.pop('tick', None)
+        tick = kwargs.get('tick', None)
+        #log(f'{self}: {tick}', 'debug')
         if self.elapsed_ticks==0:
             for node in self.connections:
                 await node.next(**kwargs)

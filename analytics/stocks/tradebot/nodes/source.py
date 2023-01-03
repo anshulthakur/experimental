@@ -82,20 +82,32 @@ class NseSource(SourceNode):
         self.source = NseIndia(timeout=10, legacy=True)
         self.df = None
         self.last_ts = None #Last index served
+        self.index = None
         super().__init__(**kwargs)
 
     async def next(self, **kwargs):
-        if self.df == None:
+        log(f'{self}: {kwargs}', 'debug')
+        if self.df is None:
+            log('Fetch data', 'debug')
             self.df = self.source.getIndexIntradayData(index='NIFTY 50', resample=self.timeframe)
         elif self.mode in ['buffered', 'stream']:
+            log('Re-fetch data', 'debug')
             self.df = self.source.getIndexIntradayData(index='NIFTY 50', resample=self.timeframe)
+            self.df = self.df.loc[self.last_ts:].copy()
         if self.mode in ['backtest', 'buffered']:
-            for i in range(0, len(self.df)):
-                df = self.df.iloc[0:i].copy()
-                self.last_ts = df.index[-1]
-
-                for node in self.connections:
-                    await node.next(data = df)
+            if self.index is None:
+                self.index = 0
+            if self.index < len(self.df):
+                df = self.df.iloc[0:self.index+1].copy()
+                if len(df)>0:
+                    self.last_ts = df.index[-1]
+                    log(f'{df.tail(1)}', 'debug')
+                    for node in self.connections:
+                        await node.next(data = df.copy())
+                else:
+                    log('No data to pass', 'debug')
+                    return
+                self.index +=1
         else:
             if self.last_ts == None:
                 self.last_ts = self.df.index[-1]

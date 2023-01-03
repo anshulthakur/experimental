@@ -22,7 +22,7 @@ class AsyncScheduler(object):
         elif self.mode == 'buffered' and mode == 'stream':
             self.mode = mode
         
-    async def stop(self):
+    def stop(self):
         self.running = False
     
     async def run(self):

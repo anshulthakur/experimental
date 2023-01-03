@@ -7,6 +7,8 @@ class FlowGraphNode(object):
         self._flowgraph = None
         self.is_root = True
         self.name = name
+        if name is None:
+            raise Exception('name must be provided')
         self.mode = None
 
     @property

@@ -14,8 +14,14 @@ class FileSink(SinkNode):
         self.filename = filename
         super().__init__(**kwargs)
     
-    async def next(self, **kwargs):
+    async def next(self, connection=None, **kwargs):
+        if not self.ready(connection, **kwargs):
+            log(f'{self}: Not ready yet', 'debug')
+            return
         log(f'{self}:', 'debug')
-        df = kwargs.get('data')
-        log(f'{df.tail(1)}', 'debug')
+        for conn in self.inputs:
+            df = self.inputs[conn]
+            log(f'{conn}', 'debug')
+            log(f'{df.tail(1)}', 'debug')
+        self.consume()
         return

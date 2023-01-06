@@ -7,10 +7,14 @@ class FlowGraphNode(object):
         self._flowgraph = None
         self.is_root = True
         self.name = name
+        self.inputs = {}
         if name is None:
             raise Exception('name must be provided')
         self.mode = None
 
+    def get_connection_name(self, node):
+        name = f"{self.name.replace(' ','_')}_{node.name.replace(' ','_')}"
+        return name
     @property
     def flowgraph(self):
         return self._flowgraph
@@ -21,7 +25,11 @@ class FlowGraphNode(object):
 
     def connect(self, node):
         log(f'Connect {node} to {self}', 'debug')
-        self.connections.append(node)
+        self.connections.append((node, self.get_connection_name(node)))
+        node.add_input(f"{self.name}_{node.name}")
+
+    def add_input(self, name):
+        self.inputs[name] = None
 
     async def emit(self, signal_data):
         for callback in self.callbacks:
@@ -30,14 +38,38 @@ class FlowGraphNode(object):
     async def register(self, callback):
         self.callbacks.append(callback)
 
-    def display_connections(self):
-        for connection in self.connections:
+    def display_connections(self, offset=0):
+        disp = ''
+        for connection,name in self.connections:
             if self.is_root:
-                print(f"\n{self}", end=" ")
-            print(f"-> {connection}", end=" ")
+                disp = f"\n{self}"
+                print(disp, end=" ")
+                offset = len(disp)
+            disp = f"--{name}--> {connection}"
+            offset += len(disp)
+            print(disp, end=" ")
             connection.display_connections()
+            print(f"\n{' '*offset}", end=' ')
 
-    async def next(self, **kwargs):
+    def ready(self, connection, **kwargs):
+        if self.is_root:
+            return True
+        if connection is not None:
+            self.inputs[connection] = kwargs.get('data')
+        else:
+            raise Exception('Non-root node must have connection name explicitly passed')
+        for connections in self.inputs:
+            if self.inputs[connections] is None:
+                #Not all inputs are received yet
+                return False
+        return True
+
+    def consume(self):
+        for connections in self.inputs:
+            if self.inputs[connections] is not None:
+                self.inputs[connections] = None
+
+    async def next(self, connection=None, **kwargs):
         pass
 
     def __str__(self):
@@ -97,7 +129,7 @@ class FlowGraph(object):
         # code for running the flowgraph goes here
         # Start from the first node in the flowgraph and run to completion
         for node in self.roots:
-            await node.next(**kwargs)
+            await node.next(connection=None, **kwargs)
 
     def display(self):
         # code for displaying the flowgraph goes here

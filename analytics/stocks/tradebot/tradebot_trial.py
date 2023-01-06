@@ -122,11 +122,13 @@ async def main():
     fg.add_node(node2)
 
     # Add some sink nodes 
-    sink1 = FileSink(name='RSIDump', filename='/tmp/RsiDump.csv')
-    sink2 = FileSink(name='EMADump', filename='/tmp/EmaDump.csv')
-    fg.add_node(sink1)
-    fg.add_node(sink2)
-
+    #sink1 = FileSink(name='RSIDump', filename='/tmp/RsiDump.csv')
+    #sink2 = FileSink(name='EMADump', filename='/tmp/EmaDump.csv')
+    #fg.add_node(sink1)
+    #fg.add_node(sink2)
+    sink3 = FileSink(name='CombinedDump', filename='/tmp/CombinedDump.csv')
+    fg.add_node(sink3)
+    
     #Add frequency scaling
     resampler = Resampler(interval=5*60, name='Resampler') #Running on a 5min scale
     fg.add_node(resampler)
@@ -134,8 +136,10 @@ async def main():
     # connect the nodes together
     fg.connect(source, node1)
     fg.connect(source, node2)
-    fg.connect(node1, sink1)
-    fg.connect(node2, sink2)
+    #fg.connect(node1, sink1)
+    fg.connect(node1, sink3)
+    #fg.connect(node2, sink2)
+    fg.connect(node2, sink3)
     fg.connect(resampler, source)
 
     fg.display()

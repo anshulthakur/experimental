@@ -7,7 +7,7 @@ class SourceNode(FlowGraphNode):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def next(self):
+    def next(self, connection, **kwargs):
         pass
 
 class TradingViewSource(SourceNode):
@@ -85,8 +85,11 @@ class NseSource(SourceNode):
         self.index = None
         super().__init__(**kwargs)
 
-    async def next(self, **kwargs):
+    async def next(self, connection=None, **kwargs):
         log(f'{self}: {kwargs}', 'debug')
+        if not self.ready(connection, **kwargs):
+            log(f'{self}: Not ready yet', 'debug')
+            return
         if self.df is None:
             log('Fetch data', 'debug')
             self.df = self.source.getIndexIntradayData(index='NIFTY 50', resample=self.timeframe)
@@ -102,8 +105,9 @@ class NseSource(SourceNode):
                 if len(df)>0:
                     self.last_ts = df.index[-1]
                     log(f'{df.tail(1)}', 'debug')
-                    for node in self.connections:
-                        await node.next(data = df.copy())
+                    for node,connection in self.connections:
+                        await node.next(connection=connection, data = df.copy())
+                    self.consume()
                 else:
                     log('No data to pass', 'debug')
                     return
@@ -111,5 +115,6 @@ class NseSource(SourceNode):
         else:
             if self.last_ts == None:
                 self.last_ts = self.df.index[-1]
-                for node in self.connections:
-                    await node.next(data = self.df)
+                for node,connection in self.connections:
+                    await node.next(connection=connection, data = self.df)
+                self.consume()

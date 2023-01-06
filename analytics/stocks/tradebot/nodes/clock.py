@@ -31,12 +31,16 @@ class TimeResampler(FlowGraphNode):
         else:
             return interval
 
-    async def next(self, **kwargs):
-        tick = kwargs.get('tick', None)
+    async def next(self, connection=None, **kwargs):
+        if not self.ready(connection, **kwargs):
+            log(f'{self}: Not ready yet', 'debug')
+            return
+        tick = kwargs.get('data', None)
         #log(f'{self}: {tick}', 'debug')
         if self.elapsed_ticks==0:
-            for node in self.connections:
-                await node.next(**kwargs)
+            for node,connection in self.connections:
+                await node.next(connection=connection, **kwargs)
+            self.consume()
         self.elapsed_ticks += 1
         if self.elapsed_ticks == self.reset_ticks:
             self.elapsed_ticks = 0

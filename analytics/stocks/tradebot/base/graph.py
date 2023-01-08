@@ -40,16 +40,16 @@ class FlowGraphNode(object):
 
     def display_connections(self, offset=0):
         disp = ''
+        parent_offset = offset
         for connection,name in self.connections:
             if self.is_root:
-                disp = f"\n{self}"
+                disp = f"\n[{self}]"
                 print(disp, end=" ")
-                offset = len(disp)
-            disp = f"--{name}--> {connection}"
-            offset += len(disp)
+                parent_offset += len(disp)
+            disp = f"+-({name})--> [{connection}]"
             print(disp, end=" ")
-            connection.display_connections()
-            print(f"\n{' '*offset}", end=' ')
+            connection.display_connections(offset = parent_offset+len(disp))
+            print(f"\n{' '*parent_offset}", end=' ')
 
     def ready(self, connection, **kwargs):
         if self.is_root:

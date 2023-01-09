@@ -7,6 +7,7 @@ class FlowGraphNode(object):
         self._flowgraph = None
         self.is_root = True
         self.name = name
+        self.multi_input = False #By default, single input
         self.inputs = {}
         if name is None:
             raise Exception('name must be provided')
@@ -29,6 +30,8 @@ class FlowGraphNode(object):
         node.add_input(f"{self.name}_{node.name}")
 
     def add_input(self, name):
+        if not self.multi_input and len(self.inputs)==1:
+            raise Exception(f"Cannot add more than one connection to {self.name}")
         self.inputs[name] = None
 
     async def emit(self, signal_data):
@@ -51,11 +54,14 @@ class FlowGraphNode(object):
             connection.display_connections(offset = parent_offset+len(disp))
             print(f"\n{' '*parent_offset}", end=' ')
 
-    def ready(self, connection, **kwargs):
+    def ready(self, connection=None, **kwargs):
         if self.is_root:
             return True
         if connection is not None:
             self.inputs[connection] = kwargs.get('data')
+        elif connection is None and self.multi_input is False:
+            for connection in self.inputs: #Should iterate only once
+                self.inputs[connection] = kwargs.get('data')
         else:
             raise Exception('Non-root node must have connection name explicitly passed')
         for connections in self.inputs:

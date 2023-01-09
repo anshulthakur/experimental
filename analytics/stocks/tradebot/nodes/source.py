@@ -86,7 +86,7 @@ class NseSource(SourceNode):
         super().__init__(**kwargs)
 
     async def next(self, connection=None, **kwargs):
-        log(f'{self}: {kwargs}', 'debug')
+        #log(f'{self}: {kwargs}', 'debug')
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
             return
@@ -104,17 +104,19 @@ class NseSource(SourceNode):
                 df = self.df.iloc[0:self.index+1].copy()
                 if len(df)>0:
                     self.last_ts = df.index[-1]
-                    log(f'{df.tail(1)}', 'debug')
+                    #log(f'{df.tail(1)}', 'debug')
                     for node,connection in self.connections:
-                        await node.next(connection=connection, data = df.copy())
+                        await node.next(connection=connection, data = df.copy(deep=True))
                     self.consume()
                 else:
                     log('No data to pass', 'debug')
                     return
                 self.index +=1
+            else:
+                return
         else:
             if self.last_ts == None:
                 self.last_ts = self.df.index[-1]
                 for node,connection in self.connections:
-                    await node.next(connection=connection, data = self.df)
+                    await node.next(connection=connection, data = self.df.copy(deep=True))
                 self.consume()

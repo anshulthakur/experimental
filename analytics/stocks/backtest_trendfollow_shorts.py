@@ -84,7 +84,7 @@ class ShorterBot(Strategy):
                 self.direction = 'UP'
                 log(f'New support: {self.supports[-1]}', 'debug')
         elif self.data.Close[-1] < self.data.Close[-2]:
-            if len(self.supports)==0:
+            if len(self.resistances)==0:
                 #Moving down for the first time. Mark resistance
                 self.resistances.append((self.data.df.index[-2], self.data.Close[-2]))
                 self.direction = 'DOWN'

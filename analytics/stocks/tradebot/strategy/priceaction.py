@@ -3,6 +3,8 @@ from lib.logging import log
 import numpy as np
 from tradebot.base.signals import Resistance, Support
 
+from tradebot.base.trading import BaseBot, Broker
+
 class EvolvingSupportResistance(FlowGraphNode):
     def __init__(self, resistance_basis='close', support_basis='close', **kwargs):
         super().__init__(signals= [Resistance, Support], **kwargs)
@@ -70,3 +72,37 @@ class EvolvingSupportResistance(FlowGraphNode):
         for node,connection in self.connections:
             await node.next(connection=connection, data = s_df.copy())
         self.consume()
+
+class LongBot(FlowGraphNode, BaseBot, Broker):
+    def __init__(self, **kwargs):
+        self.sl = None
+        self.resistance = None
+        self.support = None
+        super().__init__(**kwargs)
+    
+    async def next(self, connection=None, **kwargs):
+        if not self.ready(connection, **kwargs):
+            log(f'{self}: Not ready yet', 'debug')
+            return
+        df = kwargs.get('data')
+        if self.position and self.sl > df['close'][-1]:
+            self.close_position(df['close'][-1], date=df.index[-1].to_pydatetime())
+            log(f'SL Hit {df["close"][-1]}. Total Charges (so far): {self.charges}', 'info')
+        if self.resistance is not None and df['close'][-1] > self.resistance:
+            self.resistance = None
+            if not self.position:
+                #Go long if we are above resistance
+                log(f"Go long: {df['close'][-1]}", 'info')
+                self.sl = self.support
+                self.buy(df['close'][-1], date=df.index[-1].to_pydatetime())
+
+    async def handle_signal(self, signal):
+        if signal.name() == Resistance.name():
+            self.resistance = signal.value
+        elif signal.name() == Support.name():
+            self.support = signal.value
+            if self.position:
+                self.sl = self.support
+                log(f'Update stop loss: {self.sl}', 'info')
+        else:
+            log(f"Unknown signal {signal.name()}")

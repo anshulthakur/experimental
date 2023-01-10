@@ -11,7 +11,7 @@ from base import FlowGraph
 from base.scheduler import AsyncScheduler as Scheduler
 from nodes import DataFrameAggregator, Resampler, NseSource
 
-from strategy.priceaction import EvolvingSupportResistance
+from strategy.priceaction import EvolvingSupportResistance, LongBot
 from tradebot.base.signals import Resistance, Support
 
 import signal, os
@@ -42,6 +42,11 @@ async def main():
     res_sup_node = EvolvingSupportResistance(name="SuppRes")
     fg.add_node(res_sup_node)
 
+    #TraderBot
+    longbot = LongBot(name='LongBot', cash=20000000, lot_size=75)
+    fg.add_node(longbot)
+    fg.register_signal_handler([Resistance, Support], longbot)
+
     # Add some sink nodes 
     sink = DataFrameAggregator(name='Sink', filename='/tmp/ResistanceSupport.csv')
     fg.add_node(sink)
@@ -55,7 +60,8 @@ async def main():
     fg.connect(resampler, source)
     fg.connect(source, res_sup_node)
     fg.connect(res_sup_node, sink)
-    
+    fg.connect(res_sup_node, longbot)
+
     fg.display()
     # Create a scheduler
     scheduler = Scheduler(interval=1, mode='backtest') # 1 second scheduler

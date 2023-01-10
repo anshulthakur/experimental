@@ -1,7 +1,8 @@
 from lib.logging import log
 import copy
 class FlowGraphNode(object):
-    def __init__(self, name=None, connections=[], signals=[]):
+    def __init__(self, name=None, connections=[], signals=[], **kwargs):
+        print(kwargs)
         self.connections = copy.deepcopy(connections)
         self._flowgraph = None
         self.is_root = True
@@ -15,6 +16,7 @@ class FlowGraphNode(object):
         if name is None:
             raise Exception('name must be provided')
         self.mode = None
+        super().__init__()
 
     def get_connection_name(self, node):
         name = f"{self.name.replace(' ','_')}_{node.name.replace(' ','_')}"

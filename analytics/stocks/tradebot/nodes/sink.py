@@ -1,5 +1,7 @@
 from tradebot.base import FlowGraphNode
 from lib.logging import log
+
+from tradebot.base.signals import *
 import pandas as pd 
 
 class SinkNode(FlowGraphNode):
@@ -51,4 +53,11 @@ class DataFrameAggregator(SinkNode):
             #log(f'{conn}', 'debug')
             #log(f'{self.df.tail(10)}', 'debug')
         self.consume()
+        return
+    
+    async def handle_signal(self, signal):
+        if signal.name() in [Resistance.name(),Support.name()]:
+            log(f"[{signal.timestamp}] {signal.name()} : {signal.value} ({signal.index})", 'debug')
+        else:
+            log(f"Unknown signal {signal.name()}")
         return

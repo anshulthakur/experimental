@@ -12,6 +12,7 @@ from base.scheduler import AsyncScheduler as Scheduler
 from nodes import DataFrameAggregator, Resampler, NseSource
 
 from strategy.priceaction import EvolvingSupportResistance
+from tradebot.base.signals import Resistance, Support
 
 import signal, os
 
@@ -44,6 +45,7 @@ async def main():
     # Add some sink nodes 
     sink = DataFrameAggregator(name='Sink', filename='/tmp/ResistanceSupport.csv')
     fg.add_node(sink)
+    fg.register_signal_handler([Resistance, Support], sink)
     
     #Add frequency scaling
     resampler = Resampler(interval=5*60, name='Resampler') #Running on a 5min scale

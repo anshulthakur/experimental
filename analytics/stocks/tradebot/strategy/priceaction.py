@@ -1,15 +1,16 @@
 from tradebot.base import FlowGraphNode
 from lib.logging import log
 import numpy as np
+from tradebot.base.signals import Resistance, Support
 
 class EvolvingSupportResistance(FlowGraphNode):
     def __init__(self, resistance_basis='close', support_basis='close', **kwargs):
+        super().__init__(signals= [Resistance, Support], **kwargs)
         self.resistances = []
         self.supports = []
         self.direction = 'UNKNOWN'
         self.resistance_basis = resistance_basis
         self.support_basis = support_basis
-        super().__init__(**kwargs)
 
     async def next(self, connection=None, **kwargs):
         if not self.ready(connection, **kwargs):
@@ -27,39 +28,45 @@ class EvolvingSupportResistance(FlowGraphNode):
                 #Moving up for the first time. Mark support
                 self.supports.append((df.index[-2], df[self.support_basis][-2]))
                 self.direction = 'UP'
-                log(f'New support: {self.supports[-1]}', 'debug')
+                #log(f'New support: {self.supports[-1]}', 'debug')
                 s_df['support'] = df[self.support_basis][-2]
+                await self.emit(Support(index=df.index[-2], value=df[self.support_basis][-2], timestamp=df.index[-1]))
             elif (len(self.resistances)>0) and (self.direction == 'UP') and (df['close'][-1] > self.resistances[-1][1]):
                 #Crossed resistance. Mark it as support
                 last_resistance = self.resistances.pop()
                 self.supports.append(last_resistance)
-                log(f'New resistance turned support: {self.supports[-1]}', 'debug')
+                #log(f'New resistance turned support: {self.supports[-1]}', 'debug')
                 s_df['support'] = last_resistance[1]
+                await self.emit(Support(index=last_resistance[0], value=last_resistance[1], timestamp=df.index[-1]))
             elif (self.direction == 'DOWN'):
                 #Could be turning around, mark support
                 self.supports.append((df.index[-2], df[self.support_basis][-2]))
                 self.direction = 'UP'
-                log(f'New support: {self.supports[-1]}', 'debug')
+                #log(f'New support: {self.supports[-1]}', 'debug')
                 s_df['support'] = df[self.support_basis][-2]
+                await self.emit(Support(index=df.index[-2], value=df[self.support_basis][-2], timestamp=df.index[-1]))
         elif df['close'][-1] < df['close'][-2]:
             if len(self.resistances)==0:
                 #Opening downtrend. Mark as first resistance
                 self.resistances.append((df.index[-2], df[self.resistance_basis][-2]))
                 self.direction = 'DOWN'
-                log(f'New resistance: {self.resistances[-1]}', 'debug')
+                #log(f'New resistance: {self.resistances[-1]}', 'debug')
                 s_df['resistance'] = df[self.resistance_basis][-2]
+                await self.emit(Resistance(index=df.index[-2], value=df[self.resistance_basis][-2], timestamp=df.index[-1]))
             elif self.direction == 'UP':
                 #Price changed direction, mark resistance
                 self.resistances.append((df.index[-2], df[self.resistance_basis][-2]))
                 self.direction = 'DOWN'
-                log(f'New resistance: {self.resistances[-1]}', 'debug')
+                #log(f'New resistance: {self.resistances[-1]}', 'debug')
                 s_df['resistance'] = df[self.resistance_basis][-2]
+                await self.emit(Resistance(index=df.index[-2], value=df[self.resistance_basis][-2], timestamp=df.index[-1]))
             elif (self.direction == 'DOWN') and len(self.supports)>0 and (df['close'][-1] < self.supports[-1][1]):
                 #Downtrend broke support, mark it as resistance now
                 last_support = self.supports.pop()
                 self.resistances.append(last_support)
-                log(f'New resistance from support: {self.resistances[-1]}', 'debug')
+                #log(f'New resistance from support: {self.resistances[-1]}', 'debug')
                 s_df['resistance'] = last_support[1]
+                await self.emit(Resistance(index=last_support[0], value=last_support[1], timestamp=df.index[-1]))
         for node,connection in self.connections:
             await node.next(connection=connection, data = s_df.copy())
         self.consume()

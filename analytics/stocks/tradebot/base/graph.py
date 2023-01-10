@@ -1,12 +1,15 @@
 from lib.logging import log
 import copy
 class FlowGraphNode(object):
-    def __init__(self, name=None, connections=[]):
-        self.callbacks = []
+    def __init__(self, name=None, connections=[], signals=[]):
         self.connections = copy.deepcopy(connections)
         self._flowgraph = None
         self.is_root = True
         self.name = name
+        self.signals = signals
+        self.callbacks = {}
+        for signal in self.signals:
+            self.callbacks[signal.name()] = []
         self.multi_input = False #By default, single input
         self.inputs = {}
         if name is None:
@@ -16,6 +19,7 @@ class FlowGraphNode(object):
     def get_connection_name(self, node):
         name = f"{self.name.replace(' ','_')}_{node.name.replace(' ','_')}"
         return name
+
     @property
     def flowgraph(self):
         return self._flowgraph
@@ -34,12 +38,20 @@ class FlowGraphNode(object):
             raise Exception(f"Cannot add more than one connection to {self.name}")
         self.inputs[name] = None
 
-    async def emit(self, signal_data):
-        for callback in self.callbacks:
-            callback(signal_data)
+    async def emit(self, signal):
+        if signal.name() not in self.callbacks:
+            raise Exception(f'Unsupported emit for signal {signal.name()}')
+        for callback in self.callbacks[signal.name()]:
+            await callback(signal)
 
-    async def register(self, callback):
-        self.callbacks.append(callback)
+    def register(self, signal, callback):
+        if signal.name() not in self.callbacks:
+            raise Exception(f"{self} does not support signal {signal.name()}")
+        self.callbacks[signal.name()].append(callback)
+
+    async def handle_signal(self, signal):
+        log(f"Received signal {signal.name()}.", 'debug')
+        return
 
     def display_connections(self, offset=0):
         disp = ''
@@ -81,13 +93,13 @@ class FlowGraphNode(object):
     def __str__(self):
         return self.name
 
-
 class FlowGraph(object):
     def __init__(self, name=None, frequency=None, mode='buffered'):
         self.name = name
         self._frequency = frequency
         self.nodes = []
         self.roots = []
+        self.signals = {}
         self.mode = mode
         if self.mode not in ['stream', 'buffered', 'backtest']:
             log(f'Unrecognized mode "{self.mode}".', 'error')
@@ -115,6 +127,11 @@ class FlowGraph(object):
         self.nodes.append(node)
         self.roots.append(node)
         node.mode = self.mode
+        for signal in node.signals:
+            if signal.name() in self.signals:
+                self.signals[signal.name()].append(node)
+            else:
+                self.signals[signal.name()] = [node]
         log(f'Added {node} to flowgraph {self}', 'debug')
 
     def connect(self, from_node, to_node):
@@ -143,14 +160,12 @@ class FlowGraph(object):
             node.display_connections()
         print('\n')
 
-    async def emit(self, signal_data, emitting_node):
-        for node in self.nodes:
-            for callback in node.callbacks:
-                await callback(signal_data, emitting_node)
-
-    async def register(self, callback, registering_node):
-        if registering_node in self.nodes:
-            registering_node.callbacks.append(callback)
+    def register_signal_handler(self, signals, node):
+        if node in self.nodes:
+            for signal in signals:
+                if signal.name() in self.signals:
+                    for s in self.signals[signal.name()]:
+                        s.register(signal, node.handle_signal)
         else:
             raise ValueError("Node is not in flowgraph")
 

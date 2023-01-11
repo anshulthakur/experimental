@@ -23,7 +23,7 @@ ApiList = {
     "MARKET_DATA_PRE_OPEN" : '/api/market-data-pre-open?key:ALL',
     "MERGED_DAILY_REPORTS_CAPITAL" : '/api/merged-daily-reports?key:favCapital',
     "MERGED_DAILY_REPORTS_DERIVATIVES" : '/api/merged-daily-reports?key:favDerivatives',
-    "MERGED_DAILY_REPORTS_DEBT" : '/api/merged-daily-reports?key:favDebt'
+    "MERGED_DAILY_REPORTS_DEBT" : '/api/merged-daily-reports?key:favDebt',
 }
 
 def getDateRangeChunks(startDate, endDate, chunkInDays):
@@ -65,6 +65,7 @@ class NseIndia(object):
         self.legacy = legacy
         self.session = requests.Session()
         self.session.headers.update(self.baseHeaders)
+        self.session.get(self.legacyBaseUrl if self.legacy else self.baseUrl, timeout=self.timeout) #Save cookies
     
     def getNseCookies(self):
         #log('getNseCookies', 'debug')
@@ -90,6 +91,7 @@ class NseIndia(object):
     '''
     def getData(self, url):
         #log('getData', 'debug')
+        #print(url)
         retries = 0
         hasError = True
         while hasError:
@@ -99,6 +101,7 @@ class NseIndia(object):
                                         headers= self.baseHeaders, #.update(map('Cookie', self.getNseCookies())),
                                         timeout=self.timeout
                                         )
+                print(response.status_code)
                 return response.text
             except:
                 hasError = True
@@ -205,8 +208,12 @@ class NseIndia(object):
      @returns 
     '''
     def getEquityStockIndices(self, index):
-        log('getEquityStockIndices', 'debug')
-        return self.getDataByEndpoint(f"/api/equity-stockIndices?index={urllib.parse.urlencode(index)}")
+        #log('getEquityStockIndices', 'debug')
+        data = json.loads(self.getDataByEndpoint(f"/api/equity-stockIndices?index={index}"))
+        india_tz= tz.gettz('UTC')
+        timestamp = data['timestamp']
+        df = pd.DataFrame.from_records(data['data'], columns=['symbol', 'lastPrice'])
+        return df
 
     '''
      @param index 

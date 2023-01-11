@@ -12,7 +12,7 @@ from base.scheduler import AsyncScheduler as Scheduler
 from nodes import DataFrameAggregator, Resampler, NseSource
 
 from strategy.priceaction import EvolvingSupportResistance, LongBot
-from tradebot.base.signals import Resistance, Support
+from tradebot.base.signals import Resistance, Support, EndOfData
 
 import signal, os
 
@@ -39,18 +39,18 @@ async def main():
     source = NseSource(name='NSE', symbol='NIFTY 50', timeframe='5min')
     fg.add_node(source)
 
-    res_sup_node = EvolvingSupportResistance(name="SuppRes")
+    res_sup_node = EvolvingSupportResistance(name="SuppRes", support_basis='low', resistance_basis='high')
     fg.add_node(res_sup_node)
 
     #TraderBot
     longbot = LongBot(name='LongBot', cash=20000000, lot_size=75)
     fg.add_node(longbot)
-    fg.register_signal_handler([Resistance, Support], longbot)
+    fg.register_signal_handler([Resistance, Support, EndOfData], longbot)
 
     # Add some sink nodes 
     sink = DataFrameAggregator(name='Sink', filename='/tmp/ResistanceSupport.csv')
     fg.add_node(sink)
-    fg.register_signal_handler([Resistance, Support], sink)
+    fg.register_signal_handler([Resistance, Support, EndOfData], sink)
     
     #Add frequency scaling
     resampler = Resampler(interval=5*60, name='Resampler') #Running on a 5min scale

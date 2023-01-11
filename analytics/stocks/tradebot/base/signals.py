@@ -10,6 +10,17 @@ class BaseSignal(object):
     def __str__(self):
         return self.name
 
+class EndOfData(BaseSignal):
+    @classmethod
+    def name(cls):
+        return 'EndOfData'
+    def __init__(self, timestamp, **kwargs):
+        self.timestamp = timestamp
+        super().__init__(**kwargs)
+    
+    def __str__(self):
+        return f"{self.name}[{self.timestamp.to_pydatetime()}] End of data"
+
 class Resistance(BaseSignal):
     @classmethod
     def name(cls):

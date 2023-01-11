@@ -2,6 +2,7 @@ from tradebot.base import FlowGraphNode
 from lib.logging import log
 
 from lib.nse import NseIndia
+from tradebot.base.signals import EndOfData
 
 class SourceNode(FlowGraphNode):
     def __init__(self, **kwargs):
@@ -76,6 +77,7 @@ class NseSource(SourceNode):
                         return f'{timeframe[0:-1]//(24*30)}M'
 
     def __init__(self, symbol, timeframe, is_index=True, **kwargs):
+        super().__init__(signals= [EndOfData], **kwargs)
         self.timeframe = self.sanitize_timeframe(timeframe)
         self.symbol = symbol
 
@@ -83,7 +85,8 @@ class NseSource(SourceNode):
         self.df = None
         self.last_ts = None #Last index served
         self.index = None
-        super().__init__(**kwargs)
+        self.ended = False
+        #super().__init__(**kwargs)
 
     async def next(self, connection=None, **kwargs):
         #log(f'{self}: {kwargs}', 'debug')
@@ -113,6 +116,9 @@ class NseSource(SourceNode):
                     return
                 self.index +=1
             else:
+                if not self.ended:
+                    await self.emit(EndOfData(timestamp=self.df.index[-1]))
+                    self.ended = True
                 return
         else:
             if self.last_ts == None:

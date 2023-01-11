@@ -1,7 +1,8 @@
 from lib.logging import log
+from .graph import BaseClass
 import datetime
 
-class Position(object):
+class Position(BaseClass):
     def __init__(self, buy=None, sell=None, quantity=1):
         if buy is not None and sell is not None:
             log(f'Cannot have both buy and sell in a single order', 'error')
@@ -23,9 +24,9 @@ class Position(object):
         self.profit = (self.sell - self.buy)*self.quantity
         log(f'Closed position. Profit = {self.profit}', 'info')
 
-class Broker(object):
+class Broker(BaseClass):
     def __init__(self, **kwargs):
-        print(kwargs)
+        #print(kwargs)
         super().__init__()
 
     def get_charges(self, buy=True, price=0, quantity=0, segment='equity'):
@@ -73,9 +74,9 @@ class Broker(object):
         return margin
 
 
-class BaseBot(object):
+class BaseBot(BaseClass):
     def __init__(self, cash=0, lot_size=1, **kwargs):
-        print(kwargs)
+        #print(kwargs)
         self.orderbook = []
         self.position = None
         self.charges = 0
@@ -183,3 +184,14 @@ class BaseBot(object):
                 #log(f'{self.orderbook[-1]}', 'info')
                 log(f'Cash: {self.cash} Charges: {self.charges}')
         self.position = None
+
+    def summary(self):
+            profit = ((self.cash - self.initial_cash)/self.initial_cash)*100
+            print(f'\tFinal capital:\t{self.cash}\t({profit}%)')
+            print(f'\tTrades:\t{len(self.orderbook)}')
+            print(f'\tCharges: {self.charges}')
+
+    def get_orderbook(self):
+        print(f'Orderbook')
+        for order in self.orderbook:
+            print(order)

@@ -1,7 +1,7 @@
 from tradebot.base import FlowGraphNode
 from lib.logging import log
 import numpy as np
-from tradebot.base.signals import Resistance, Support
+from tradebot.base.signals import Resistance, Support, EndOfData
 
 from tradebot.base.trading import BaseBot, Broker
 
@@ -87,14 +87,15 @@ class LongBot(FlowGraphNode, BaseBot, Broker):
         df = kwargs.get('data')
         if self.position and self.sl > df['close'][-1]:
             self.close_position(df['close'][-1], date=df.index[-1].to_pydatetime())
+            self.sl = 0
             log(f'SL Hit {df["close"][-1]}. Total Charges (so far): {self.charges}', 'info')
         if self.resistance is not None and df['close'][-1] > self.resistance:
             self.resistance = None
             if not self.position:
                 #Go long if we are above resistance
-                log(f"Go long: {df['close'][-1]}", 'info')
                 self.sl = self.support
                 self.buy(df['close'][-1], date=df.index[-1].to_pydatetime())
+                log(f"Go long: {df['close'][-1]} SL: {self.sl}", 'info')
 
     async def handle_signal(self, signal):
         if signal.name() == Resistance.name():
@@ -104,5 +105,8 @@ class LongBot(FlowGraphNode, BaseBot, Broker):
             if self.position:
                 self.sl = self.support
                 log(f'Update stop loss: {self.sl}', 'info')
+        elif signal.name() == EndOfData.name():
+            self.summary()
+            self.get_orderbook()
         else:
             log(f"Unknown signal {signal.name()}")

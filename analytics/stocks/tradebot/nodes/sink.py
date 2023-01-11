@@ -58,6 +58,8 @@ class DataFrameAggregator(SinkNode):
     async def handle_signal(self, signal):
         if signal.name() in [Resistance.name(),Support.name()]:
             log(f"[{signal.timestamp}] {signal.name()} : {signal.value} ({signal.index})", 'debug')
+        elif signal.name() == EndOfData.name():
+            pass
         else:
             log(f"Unknown signal {signal.name()}")
         return

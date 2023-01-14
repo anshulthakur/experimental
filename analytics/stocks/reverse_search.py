@@ -54,12 +54,12 @@ def calc_rmse(actual, predic):
     #print(predic.mean())
     return mean_squared_error(actual - actual.mean(), predic - predic.mean())
 
-def cached(name, df=None):
+def cached(name, df=None, timeframe=Interval.in_daily):
     import json
     cache_file = '.cache.json'
     overwrite = False
     try:
-        with open(cache_dir+cache_file, 'r') as fd:
+        with open(cache_dir+'/'+str(timeframe.value)+'/'+cache_file, 'r') as fd:
             progress = json.load(fd)
             try:
                 date = datetime.datetime.strptime(progress['date'], '%d-%m-%Y')
@@ -80,10 +80,10 @@ def cached(name, df=None):
         overwrite=True
     
     if overwrite:
-        with open(cache_dir+cache_file, 'w') as fd:
+        with open(cache_dir+'/'+str(timeframe.value)+'/'+cache_file, 'w') as fd:
             fd.write(json.dumps({'date':datetime.datetime.today().strftime('%d-%m-%Y')}))
     
-    f = cache_dir+name+'.csv'
+    f = cache_dir+'/'+str(timeframe.value)+'/'+name+'.csv'
     if df is None:
         if os.path.isfile(f):
             #Get from cache if it exists
@@ -207,7 +207,7 @@ def get_dataframe(stock, market, timeframe, duration, date=datetime.datetime.now
         if symbol in nse_map:
             symbol = nse_map[symbol]
         
-        s_df = cached(symbol)
+        s_df = cached(name=symbol, timeframe=timeframe)
         if s_df is not None:
             #print('Found in Cache')
             pass
@@ -221,7 +221,7 @@ def get_dataframe(stock, market, timeframe, duration, date=datetime.datetime.now
                             extended_session=False,
                         )
                 if s_df is not None:
-                    cached(symbol, s_df)
+                    cached(name=symbol, df=s_df, timeframe=timeframe)
             except:
                 s_df = None
     else:
@@ -249,6 +249,7 @@ def main(reference, timeframe, delta, stock=None, logscale=False,
         print('Use delta')
     try:
         create_directory(cache_dir)
+        create_directory(cache_dir+'/'+str(timeframe.value)+'/')
     except:
         print('Error creating folder')
     
@@ -303,10 +304,13 @@ def main(reference, timeframe, delta, stock=None, logscale=False,
         n_bars = max((d.years*52) + (d.months*5) + d.weeks+1, len(r_df))+10
     elif timeframe == Interval.in_4_hour:
         print('4 Hourly')
-        n_bars = max((d.years*52) + (d.months*5) + d.weeks+1, len(r_df))+10
+        n_bars = max(500, len(r_df))+10
     elif timeframe == Interval.in_2_hour:
         print('2 Hourly')
-        n_bars = max((d.years*52) + (d.months*5) + d.weeks+1, len(r_df))+10
+        n_bars = max(500, len(r_df))+10
+    elif timeframe == Interval.in_1_hour:
+        print('Hourly')
+        n_bars = max(500, len(r_df))+10
     else:
         print('Daily')
         n_bars = max(500, len(r_df))+10

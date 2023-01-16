@@ -51,7 +51,7 @@ class DataFrameAggregator(SinkNode):
             else: 
                 self.df = pd.concat([self.df, self.inputs[conn]], join='outer', sort=True) 
             #log(f'{conn}', 'debug')
-            #log(f'{self.df.tail(10)}', 'debug')
+            log(f'{self.df.tail(1)}', 'debug')
         self.consume()
         return
     
@@ -59,6 +59,7 @@ class DataFrameAggregator(SinkNode):
         if signal.name() in [Resistance.name(),Support.name()]:
             log(f"[{signal.timestamp}] {signal.name()} : {signal.value} ({signal.index})", 'debug')
         elif signal.name() == EndOfData.name():
+            log("Received end of data", 'debug')
             pass
         else:
             log(f"Unknown signal {signal.name()}")

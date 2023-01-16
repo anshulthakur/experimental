@@ -1,5 +1,7 @@
 from lib.logging import log
 import datetime 
+import time
+
 class AsyncScheduler(object):
     def __init__(self, interval, mode='stream'):
         self.mode = mode
@@ -31,5 +33,7 @@ class AsyncScheduler(object):
             if self.mode in ['buffered', 'backtest']:
                 for flowgraph in self.flowgraphs:
                     await flowgraph.run(data=datetime.datetime.now())
+                    #log('Sleeping', 'debug')
+                    time.sleep(0.1)
             else:
                 pass

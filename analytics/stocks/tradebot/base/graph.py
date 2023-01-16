@@ -6,7 +6,7 @@ class BaseClass(object):
 
 class FlowGraphNode(BaseClass):
     def __init__(self, name=None, connections=[], signals=[], **kwargs):
-        print(kwargs)
+        #print(kwargs)
         self.connections = copy.deepcopy(connections)
         self._flowgraph = None
         self.is_root = True

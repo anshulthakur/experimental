@@ -101,7 +101,7 @@ class NseIndia(object):
                                         headers= self.baseHeaders, #.update(map('Cookie', self.getNseCookies())),
                                         timeout=self.timeout
                                         )
-                print(response.status_code)
+                #log(f"Response code: {response.status_code}", 'debug')
                 return response.text
             except:
                 hasError = True
@@ -212,7 +212,14 @@ class NseIndia(object):
         data = json.loads(self.getDataByEndpoint(f"/api/equity-stockIndices?index={index}"))
         india_tz= tz.gettz('UTC')
         timestamp = data['timestamp']
-        df = pd.DataFrame.from_records(data['data'], columns=['symbol', 'lastPrice'])
+        stocks = {}
+        for symbol in data['data']:
+            if symbol['symbol'].strip() != 'NIFTY TOTAL MARKET':
+                stocks[symbol['symbol']] = [symbol['lastPrice']]
+        #log(stocks, 'debug')
+        df = pd.DataFrame.from_dict(stocks)
+        df['datetime'] = datetime.datetime.strptim(timestamp, "%d-%b-%Y %H:%M%S")
+        df.set_index('datetime', inplace=True)
         return df
 
     '''

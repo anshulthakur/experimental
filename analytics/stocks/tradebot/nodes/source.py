@@ -37,11 +37,11 @@ class NseSource(SourceNode):
                     if int(timeframe[0:-3]) < 60:
                         return f'{timeframe[0:-3]}Min'
                     if int(timeframe[0:-3]) < 60*24:
-                        return f'{timeframe[0:-1]//60}H'
+                        return f'{timeframe[0:-3]//60}H'
                     if int(timeframe[0:-3]) < 60*24*7:
-                        return f'{timeframe[0:-1]//(60*7)}W'
+                        return f'{timeframe[0:-3]//(60*7)}W'
                     if int(timeframe[0:-3]) < 60*24*30:
-                        return f'{timeframe[0:-1]//(60*30)}M'
+                        return f'{timeframe[0:-3]//(60*30)}M'
                 return timeframe
             log(f'Timeframe "{timeframe[-1]}" cannot be interpreted')
         elif not isinstance(timeframe, str):
@@ -199,18 +199,21 @@ class NseMultiStockSource(SourceNode):
         if self.df is None:
             log('Fetch data', 'debug')
             self.df = self.source.getEquityStockIndices(index='NIFTY TOTAL MARKET')
-            log(self.df.head(10), 'debug')
-            self.df['datetime'] = kwargs.get('data')
-            self.df.set_index('datetime', inplace=True)
-            self.df.sort_index(inplace=True)
+            #log(self.df.head(10), 'debug')
+            #self.df['datetime'] = kwargs.get('data')
+            #self.df.set_index('datetime', inplace=True)
+            #self.df.sort_index(inplace=True)
         else:
             log('Re-fetch data', 'debug')
             df = self.source.getEquityStockIndices(index='NIFTY TOTAL MARKET')
-            df['datetime'] = kwargs.get('data')
-            df.set_index('datetime', inplace=True)
-            df.sort_index(inplace=True)
+            #df['datetime'] = kwargs.get('data')
+            #df.set_index('datetime', inplace=True)
+            #df.sort_index(inplace=True)
+            #log(df.tail(10), 'debug')
             self.df = pd.concat([self.df, df], join='outer', sort=True)
-            self.df = self.df.loc[self.last_ts:].copy()
+            self.df.drop_duplicates(inplace=True)
+            #self.df = self.df.loc[self.last_ts:].copy()
+        log(self.df.tail(10), 'debug')
         if self.index is None:
             self.index = 0
         if self.index < len(self.df):

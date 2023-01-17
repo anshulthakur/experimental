@@ -45,7 +45,7 @@ async def main():
     fg.register_signal_handler([Resistance, Support, EndOfData], sink)
     
     #Add frequency scaling
-    resampler = Resampler(interval=1*60, name='Resampler') #Running on a 1min scale
+    resampler = Resampler(interval=1*90, name='Resampler') #Running on a 1min 30s scale (rate of update of NSE website data)
     fg.add_node(resampler)
 
     # connect the nodes together
@@ -55,7 +55,7 @@ async def main():
 
     fg.display()
     # Create a scheduler
-    scheduler = Scheduler(interval=1, mode='backtest') # 1 second scheduler
+    scheduler = Scheduler(interval='1s', mode='stream') # 1 second scheduler
 
     # register some flowgraphs with the scheduler
     scheduler.register(fg)

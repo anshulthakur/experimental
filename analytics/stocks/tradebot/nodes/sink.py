@@ -50,8 +50,9 @@ class DataFrameAggregator(SinkNode):
                 self.df = self.inputs[conn]
             else: 
                 self.df = pd.concat([self.df, self.inputs[conn]], join='outer', sort=True) 
+                self.df.drop_duplicates(inplace=True)
             #log(f'{conn}', 'debug')
-            log(f'{self.df.tail(1)}', 'debug')
+            log(f'{self.df.tail(5)}', 'debug')
         self.consume()
         return
     

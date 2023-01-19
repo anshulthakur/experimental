@@ -39,3 +39,44 @@ class IndicatorNode(FlowGraphNode):
         for node,connection in self.connections:
             await node.next(connection=connection, data = df)
         self.consume()
+
+class Indicator(FlowGraphNode):
+    '''
+    The output of this node is just the last value (row) of the indicator
+    '''
+    def __init__(self, indicators=[], **kwargs):
+        self.indicators = {}
+        for indicator in indicators:
+            if indicator['tagname'] in self.indicators:
+                log(f"Indicator with tagname {indicator['tagname']} already exists in Node.", 'error')
+                raise Exception(f"Indicator with tagname {indicator['tagname']} already exists in Node.")
+            self.add_indicator(indicator)
+        super().__init__(**kwargs)
+    
+    def add_indicator(self, indicator={}):
+        if indicator['tagname'] in self.indicators:
+            log(f"Indicator with tagname {indicator['tagname']} already exists in Node.", 'error')
+            raise Exception(f"Indicator with tagname {indicator['tagname']} already exists in Node.")
+        indicator_obj = {'indicator': indicator['type']}
+        if indicator['type'] == 'RSI':
+            indicator_obj['method'] = ta.RSI
+            indicator_obj['column'] = indicator.get('column', 'close')
+            indicator_obj['attributes'] = {'timeperiod': indicator.get('length', 14)}
+        elif indicator['type'] == 'EMA':
+            indicator_obj['method'] = ta.EMA
+            indicator_obj['column'] = indicator.get('column', 'close')
+            indicator_obj['attributes'] = {'timeperiod': indicator.get('length', 10)}
+        self.indicators[indicator['tagname']] = indicator_obj
+
+    async def next(self, connection=None, **kwargs):
+        if not self.ready(connection, **kwargs):
+            log(f'{self}: Not ready yet', 'debug')
+            return
+        df = kwargs.get('data')
+        log(f'{self}: {df.tail(0)}', 'debug')
+        #https://stackoverflow.com/questions/40225683/how-to-simply-add-a-column-level-to-a-pandas-dataframe
+        for indicator in self.indicators:
+            s_df = self.indicators[indicator]['method'](df[self.indicators[indicator]['column']], **self.indicators[indicator]['attributes'])
+        for node,connection in self.connections:
+            await node.next(connection=connection, data = s_df.tail(1))
+        self.consume()

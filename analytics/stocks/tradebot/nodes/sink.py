@@ -11,6 +11,33 @@ class SinkNode(FlowGraphNode):
     def put(self, value):
         pass
 
+class DataFrameSink(SinkNode):
+    def __init__(self, **kwargs):
+        #Will save dataframe to a file
+        self.multi_input = True
+        super().__init__(**kwargs)
+    
+    async def next(self, connection=None, **kwargs):
+        if not self.ready(connection, **kwargs):
+            log(f'{self}: Not ready yet', 'debug')
+            return
+        log(f'{self}:', 'debug')
+        for conn in self.inputs:
+            df = self.inputs[conn]
+            #log(f'{conn}', 'debug')
+            log(f'{df.tail(1)}', 'debug')
+        self.consume()
+        return
+    
+    async def handle_signal(self, signal):
+        if signal.name() == EndOfData.name():
+            log("Received end of data", 'debug')
+            pass
+        else:
+            log(f"Unknown signal {signal.name()}")
+        return
+
+
 class FileSink(SinkNode):
     def __init__(self, filename, **kwargs):
         #Will save dataframe to a file
@@ -32,7 +59,7 @@ class FileSink(SinkNode):
 
 
 class DataFrameAggregator(SinkNode):
-    def __init__(self, filename, **kwargs):
+    def __init__(self, filename=None, **kwargs):
         #Will save dataframe to a file
         self.filename = filename
         self.multi_input = False
@@ -52,7 +79,7 @@ class DataFrameAggregator(SinkNode):
                 self.df = pd.concat([self.df, self.inputs[conn]], join='outer', sort=True) 
                 self.df.drop_duplicates(inplace=True)
             #log(f'{conn}', 'debug')
-            log(f'{self.df.tail(5)}', 'debug')
+            log(f'{self.df.tail(1)}', 'debug')
         self.consume()
         return
     

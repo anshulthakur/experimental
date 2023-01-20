@@ -97,8 +97,12 @@ class Indicator(FlowGraphNode):
         '''
         #df.columns = pd.MultiIndex.from_product([df.columns, ['close']])
         #https://stackoverflow.com/questions/40225683/how-to-simply-add-a-column-level-to-a-pandas-dataframe
-        for indicator in self.indicators:
-            s_df = df.apply(lambda x: self.indicators[indicator]['method'](x, **self.indicators[indicator]['attributes']))
-        for node,connection in self.connections:
-            await node.next(connection=connection, data = s_df.tail(1))
+        if len(list(df.columns))==1:
+            for indicator in self.indicators:
+                df[indicator] = df.apply(lambda x: self.indicators[indicator]['method'](x, **self.indicators[indicator]['attributes']))
+            for node,connection in self.connections:
+                await node.next(connection=connection, data = df.tail(1))
+        else:
+            for indicator in self.indicators:
+                df[indicator] = df.apply(lambda x: self.indicators[indicator]['method'](x, **self.indicators[indicator]['attributes']))
         self.consume()

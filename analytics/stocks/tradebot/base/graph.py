@@ -20,6 +20,7 @@ class FlowGraphNode(BaseClass):
         if name is None:
             raise Exception('name must be provided')
         self.mode = None
+        self.input_types = None
         super().__init__(**kwargs)
 
     def get_connection_name(self, node):
@@ -73,6 +74,9 @@ class FlowGraphNode(BaseClass):
             print(f"\n{' '*parent_offset}", end=' ')
 
     def ready(self, connection=None, **kwargs):
+        if self.input_types is not None and self.input_types!=type(kwargs.get('data')).__name__:
+            raise Exception(f"Input types across various inputs must be consistent. Excepted: {self.input_types}, received: {type(kwargs.get('data')).__name__}")
+        self.input_types = type(kwargs.get('data')).__name__
         if self.is_root:
             return True
         if connection is not None:

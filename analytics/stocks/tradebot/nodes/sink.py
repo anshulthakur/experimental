@@ -11,6 +11,43 @@ class SinkNode(FlowGraphNode):
     def put(self, value):
         pass
 
+    async def handle_signal(self, signal):
+        if signal.name() == EndOfData.name():
+            log("Received end of data", 'debug')
+            pass
+        else:
+            log(f"Unknown signal {signal.name()}")
+        return
+
+class Sink(SinkNode):
+    def __init__(self, **kwargs):
+        self.multi_input = True
+        super().__init__(strict = False, **kwargs)
+    
+    async def next(self, connection=None, **kwargs):
+        if not self.ready(connection, **kwargs):
+            log(f'{self}: Not ready yet', 'debug')
+            return
+        log(f'{self}:', 'debug')
+        for conn in self.inputs:
+            df = self.inputs[conn]
+            if type(df).__name__ == 'DataFrame':
+                #log(f'{conn}', 'debug')
+                log(f'{df.tail(1)}', 'debug')
+            else:
+                log(f'{df}', 'debug')
+        self.consume()
+        return
+    
+    async def handle_signal(self, signal):
+        if signal.name() == EndOfData.name():
+            log("Received end of data", 'debug')
+            pass
+        else:
+            log(f"Unknown signal {signal.name()}")
+        return
+
+
 class DataFrameSink(SinkNode):
     def __init__(self, **kwargs):
         #Will save dataframe to a file

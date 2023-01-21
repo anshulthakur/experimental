@@ -5,6 +5,8 @@ from lib.nse import NseIndia
 from tradebot.base.signals import EndOfData
 import pandas as pd
 
+from lib.tradingview import convert_timeframe_to_quant, get_tvfeed_instance, Interval
+
 class SourceNode(FlowGraphNode):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -13,8 +15,84 @@ class SourceNode(FlowGraphNode):
         pass
 
 class TradingViewSource(SourceNode):
-    def __init__(self, symbol, exchange, timeframe, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, symbol=None, exchange='NSE', timeframe='1d', **kwargs):
+        super().__init__(signals= [EndOfData], **kwargs)
+        self.timeframe = convert_timeframe_to_quant(timeframe)
+        username = 'AnshulBot'
+        password = '@nshulthakur123'
+        self.tv = get_tvfeed_instance(username, password)
+        self.exchange = exchange
+        if symbol is None:
+            raise Exception(f"Symbol must not be None")
+        self.symbol = symbol.strip().replace('&', '_').replace('-', '_')
+        self.duration = 500
+
+        nse_map = {'UNITDSPR': 'MCDOWELL_N',
+                    'MOTHERSUMI': 'MSUMI'}
+        if self.symbol in nse_map:
+            self.symbol = nse_map[self.symbol]
+        log(f'Symbol: {self.symbol}, Exchange: {self.exchange}, TF: {self.timeframe.value}, Duration: {self.duration}', 'debug')
+        self.df = None
+
+        self.last_ts = None #Last index served
+        self.index = None
+        self.ended = False
+
+    async def next(self, connection, **kwargs):
+        #log(f'{self}: {kwargs}', 'debug')
+        if not self.ready(connection, **kwargs):
+            log(f'{self}: Not ready yet', 'debug')
+            return
+        if self.ended:
+            return
+        if self.df is None:
+            self.df = self.tv.get_hist(
+                            self.symbol,
+                            self.exchange,
+                            interval=self.timeframe,
+                            n_bars=self.duration,
+                            extended_session=False,
+                        )
+            if (self.df is None) or (self.df is not None and len(self.df)==0):
+                log('Skip {}'.format(self.symbol), logtype='warning')
+                return
+        elif self.mode in ['buffered', 'stream']:
+            log('Re-fetch data', 'debug')
+            self.df = self.tv.get_hist(
+                            self.symbol,
+                            self.exchange,
+                            interval=self.interval,
+                            n_bars=self.duration,
+                            extended_session=False,
+                        )
+            self.df = self.df.loc[self.last_ts:].copy()
+        
+        if self.mode in ['backtest', 'buffered']:
+            if self.index is None:
+                self.index = 0
+            if self.index < len(self.df):
+                df = self.df.iloc[0:self.index+1].copy()
+                if len(df)>0:
+                    self.last_ts = df.index[-1]
+                    #log(f'{df.tail(1)}', 'debug')
+                    for node,connection in self.connections:
+                        await node.next(connection=connection, data = df.copy(deep=True))
+                    self.consume()
+                else:
+                    log('No data to pass', 'debug')
+                    return
+                self.index +=1
+            else:
+                if not self.ended:
+                    await self.emit(EndOfData(timestamp=self.df.index[-1]))
+                    self.ended = True
+                return
+        else:
+            if self.last_ts == None:
+                self.last_ts = self.df.index[-1]
+                for node,connection in self.connections:
+                    await node.next(connection=connection, data = self.df.copy(deep=True))
+                self.consume()
 
 class DbSource(SourceNode):
     def __init__(self, symbol, exchange, timeframe, **kwargs):
@@ -93,6 +171,8 @@ class NseSource(SourceNode):
         #log(f'{self}: {kwargs}', 'debug')
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
+            return
+        if self.ended:
             return
         if self.df is None:
             log('Fetch data', 'debug')
@@ -196,6 +276,8 @@ class NseMultiStockSource(SourceNode):
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
             return
+        if self.ended:
+            return
         if self.df is None:
             log('Fetch data', 'debug')
             self.df = self.source.getEquityStockIndices(index='NIFTY TOTAL MARKET')
@@ -213,7 +295,7 @@ class NseMultiStockSource(SourceNode):
             self.df = pd.concat([self.df, df], join='outer', sort=True)
             self.df.drop_duplicates(inplace=True)
             #self.df = self.df.loc[self.last_ts:].copy()
-        log(self.df.tail(10), 'debug')
+        #log(self.df.tail(10), 'debug')
         if self.index is None:
             self.index = 0
         if self.index < len(self.df):

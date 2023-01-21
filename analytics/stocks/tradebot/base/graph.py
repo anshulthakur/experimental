@@ -5,7 +5,7 @@ class BaseClass(object):
         super().__init__()
 
 class FlowGraphNode(BaseClass):
-    def __init__(self, name=None, connections=[], signals=[], **kwargs):
+    def __init__(self, name=None, strict = True, connections=[], signals=[], **kwargs):
         #print(kwargs)
         self.connections = copy.deepcopy(connections)
         self._flowgraph = None
@@ -21,6 +21,7 @@ class FlowGraphNode(BaseClass):
             raise Exception('name must be provided')
         self.mode = None
         self.input_types = None
+        self.strict = strict
         super().__init__(**kwargs)
 
     def get_connection_name(self, node):
@@ -74,7 +75,7 @@ class FlowGraphNode(BaseClass):
             print(f"\n{' '*parent_offset}", end=' ')
 
     def ready(self, connection=None, **kwargs):
-        if self.input_types is not None and self.input_types!=type(kwargs.get('data')).__name__:
+        if self.strict and self.input_types is not None and self.input_types!=type(kwargs.get('data')).__name__:
             raise Exception(f"Input types across various inputs must be consistent. Excepted: {self.input_types}, received: {type(kwargs.get('data')).__name__}")
         self.input_types = type(kwargs.get('data')).__name__
         if self.is_root:

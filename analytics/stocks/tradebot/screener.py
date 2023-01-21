@@ -9,7 +9,8 @@ from threading import Thread
 
 from base import FlowGraph
 from base.scheduler import AsyncScheduler as Scheduler
-from nodes import DataFrameSink, Resampler, NseMultiStockSource, Indicator
+from nodes import Sink, Resampler, NseMultiStockSource, Indicator, DataFrameSink, TradingViewSource, ColumnFilter
+from strategy.screen import EMA_RSI_Screen
 
 from tradebot.base.signals import EndOfData
 
@@ -31,39 +32,57 @@ async def main():
     fg = FlowGraph(name='FlowGraph', mode='backtest')
 
     # Add a dataframe source 
-    source = NseMultiStockSource(name='NSE', timeframe='1min')
+    source = TradingViewSource(name='Stock', symbol='KABRAEXTRU', exchange='NSE', timeframe='1d')
     fg.add_node(source)
 
+    #Add a column filter node
+    filterNode = ColumnFilter(name='Formatter', map = {'close': 'close'})
+    fg.add_node(filterNode)
+
     # Add indicator nodes
-    node_ema = Indicator(name='EMA', indicators=[{'tagname': 'EMA20', 
+    node_indicators = Indicator(name='Indicators', indicators=[{'tagname': 'EMA20', 
                                                         'type': 'EMA', 
                                                         'length': 20,
                                                         'column': 'close'},
-                                                        {'tagname': 'EMA200', 
-                                                         'type': 'EMA', 
-                                                         'length': 200,
-                                                         'column': 'close'}
+                                                {'tagname': 'EMA200', 
+                                                    'type': 'EMA', 
+                                                    'length': 200,
+                                                    'column': 'close'},
+                                                {'tagname': 'RSI', 
+                                                    'type': 'RSI', 
+                                                    'length': 14,
+                                                    'column': 'close'}
                                                     ])
-    fg.add_node(node_ema)
+    fg.add_node(node_indicators)
+
+    # Add screener node
+    screener = EMA_RSI_Screen(name="EMA-RSI-Screen")
+    fg.add_node(screener)
 
     # Add some sink nodes 
-    sink = DataFrameSink(name='Sink')
+    sink = Sink(name='Sink')
     fg.add_node(sink)
     fg.register_signal_handler([EndOfData], sink)
-    
+
+    df_sink = DataFrameSink(name='DF-Sink')
+    fg.add_node(df_sink)
+    fg.register_signal_handler([EndOfData], df_sink)
+
     #Add frequency scaling
-    resampler = Resampler(interval=1*90, name='Resampler') #Running on a 1min 30s scale (rate of update of NSE website data)
+    resampler = Resampler(interval=1, name='Resampler') #Running on a 1min 30s scale (rate of update of NSE website data)
     fg.add_node(resampler)
 
     # connect the nodes together
     fg.connect(resampler, source)
-    fg.connect(source, node_ema)
-    fg.connect(node_ema, sink)
-
+    fg.connect(source, filterNode)
+    fg.connect(filterNode, node_indicators)
+    fg.connect(node_indicators, screener)
+    fg.connect(screener, sink)
+    fg.connect(node_indicators, df_sink)
 
     fg.display()
     # Create a scheduler
-    scheduler = Scheduler(interval='1s', mode='stream') # 1 second scheduler
+    scheduler = Scheduler(interval='1s', mode='backtest') # 1 second scheduler
 
     # register some flowgraphs with the scheduler
     scheduler.register(fg)

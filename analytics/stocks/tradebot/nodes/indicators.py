@@ -74,7 +74,7 @@ class Indicator(FlowGraphNode):
             log(f'{self}: Not ready yet', 'debug')
             return
         df = kwargs.get('data')
-        log(f'{self}: {df.tail(0)}', 'debug')
+        #log(f'{self}: \n{df.tail(1)}', 'debug')
         '''
         Here, we add a multi-level index in order to support multiple indicators in a single node.
         This is like:
@@ -99,7 +99,7 @@ class Indicator(FlowGraphNode):
         #https://stackoverflow.com/questions/40225683/how-to-simply-add-a-column-level-to-a-pandas-dataframe
         if len(list(df.columns))==1:
             for indicator in self.indicators:
-                df[indicator] = df.apply(lambda x: self.indicators[indicator]['method'](x, **self.indicators[indicator]['attributes']))
+                df[indicator] = self.indicators[indicator]['method'](df['close'], **self.indicators[indicator]['attributes'])
             for node,connection in self.connections:
                 await node.next(connection=connection, data = df.tail(1))
         else:

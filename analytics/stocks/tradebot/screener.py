@@ -32,27 +32,28 @@ async def main():
     fg = FlowGraph(name='FlowGraph', mode='backtest')
 
     # Add a dataframe source 
-    source = TradingViewSource(name='Stock', symbol='KABRAEXTRU', exchange='NSE', timeframe='1d')
+    #source = TradingViewSource(name='Stock', symbol='KABRAEXTRU', exchange='NSE', timeframe='1d')
+    source = NseMultiStockSource(name='Stock', symbol='KABRAEXTRU', exchange='NSE', timeframe='1d')
     fg.add_node(source)
 
     #Add a column filter node
-    filterNode = ColumnFilter(name='Formatter', map = {'close': 'close'})
-    fg.add_node(filterNode)
+    #filterNode = ColumnFilter(name='Formatter', map = {'close': 'close'})
+    #fg.add_node(filterNode)
 
     # Add indicator nodes
     node_indicators = Indicator(name='Indicators', indicators=[{'tagname': 'EMA20', 
-                                                        'type': 'EMA', 
-                                                        'length': 20,
-                                                        'column': 'close'},
-                                                {'tagname': 'EMA200', 
-                                                    'type': 'EMA', 
-                                                    'length': 200,
-                                                    'column': 'close'},
-                                                {'tagname': 'RSI', 
-                                                    'type': 'RSI', 
-                                                    'length': 14,
-                                                    'column': 'close'}
-                                                    ])
+                                                                'type': 'EMA', 
+                                                                'length': 20,
+                                                                'column': 'close'},
+                                                               {'tagname': 'EMA200', 
+                                                                'type': 'EMA', 
+                                                                'length': 200,
+                                                                'column': 'close'},
+                                                               {'tagname': 'RSI', 
+                                                                'type': 'RSI', 
+                                                                'length': 14,
+                                                                'column': 'close'}
+                                                               ])
     fg.add_node(node_indicators)
 
     # Add screener node
@@ -74,8 +75,9 @@ async def main():
 
     # connect the nodes together
     fg.connect(resampler, source)
-    fg.connect(source, filterNode)
-    fg.connect(filterNode, node_indicators)
+    #fg.connect(source, filterNode)
+    #fg.connect(filterNode, node_indicators)
+    fg.connect(source, node_indicators)
     fg.connect(node_indicators, screener)
     fg.connect(screener, sink)
     fg.connect(node_indicators, df_sink)

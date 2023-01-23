@@ -95,7 +95,6 @@ class Indicator(FlowGraphNode):
         What we can do is, if there is only a single column, we can drop the level, but that would 
         make the design a bit convoluted
         '''
-        #df.columns = pd.MultiIndex.from_product([df.columns, ['close']])
         #https://stackoverflow.com/questions/40225683/how-to-simply-add-a-column-level-to-a-pandas-dataframe
         if len(list(df.columns))==1:
             for indicator in self.indicators:
@@ -103,6 +102,28 @@ class Indicator(FlowGraphNode):
             for node,connection in self.connections:
                 await node.next(connection=connection, data = df.tail(1))
         else:
+            columns = list(df.columns)
+            #log(df.tail(1), 'debug')
+            ind_df = {}
+            #for column in columns:
+            #    log(column, 'debug')
             for indicator in self.indicators:
-                df[indicator] = df.apply(lambda x: self.indicators[indicator]['method'](x, **self.indicators[indicator]['attributes']))
+                #log(indicator, 'debug')
+                #df.apply(lambda x: log(x[(column, 'close')], 'debug'), axis=0)
+                #df[(column,indicator)] = df.apply(lambda x: self.indicators[indicator]['method'](x[(column, 'close')], **self.indicators[indicator]['attributes']), axis=0)
+                s_df = df.apply(lambda x: self.indicators[indicator]['method'](x, **self.indicators[indicator]['attributes']), axis=0)
+                ind_df[indicator] = s_df
+            #Now add a level to all the DFs and concat
+            df.columns = pd.MultiIndex.from_product([df.columns, ['close']])
+            for indicator in ind_df:
+                ind_df[indicator].columns = pd.MultiIndex.from_product([ind_df[indicator].columns, [indicator]])
+            ind_df['close'] = df
+            #for indicator in ind_df:
+            #    df = df.merge(ind_df[indicator], how='left', left_index=True, right_index=True)
+            n_df = pd.concat([ind_df[d] for d in ind_df], axis='columns', names=[columns, [col for col in ind_df]])
+
+            n_df = n_df.reindex(
+                            pd.MultiIndex.from_product([columns, ["close"]+ [indicator for indicator in self.indicators]]), axis=1
+                        )
+            log(n_df, 'debug')
         self.consume()

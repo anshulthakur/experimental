@@ -218,7 +218,7 @@ class NseIndia(object):
                 stocks[symbol['symbol']] = [symbol['lastPrice']]
         #log(stocks, 'debug')
         df = pd.DataFrame.from_dict(stocks)
-        df['datetime'] = datetime.datetime.strptim(timestamp, "%d-%b-%Y %H:%M%S")
+        df['datetime'] = datetime.datetime.strptime(timestamp, "%d-%b-%Y %H:%M:%S")
         df.set_index('datetime', inplace=True)
         return df
 

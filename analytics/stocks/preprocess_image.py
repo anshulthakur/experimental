@@ -8,7 +8,7 @@ from numpy import asarray, array
 
 transform_rule = {'blue': 'white',
                   'white': 'white',
-                  'black': 'white',
+                  'black': 'black',
                   'red': 'red',
                   'green': 'green'}
 red_candle = ['red']

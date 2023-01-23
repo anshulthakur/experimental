@@ -22,14 +22,19 @@ def print_debug(*args):
     return
 
 color_scheme = {'candlesticks': {
-                                'body': ['green', 'red'],
-                                'border': ['green', 'red'],
-                                #'border': ['black']
+                                'body': ['white', 'black'],
+                                #'border': ['green', 'red'],
+                                'border': ['black']
                                 },
                 'bars': {
                     'body': ['green', 'red']
                 }
                 }
+
+candle_color_options = {
+    'green': ['green', 'white'],
+    'red': ['red', 'black']
+}
 
 def classify(rgb_tuple):
     #https://stackoverflow.com/questions/36439384/classifying-rgb-values-in-python
@@ -98,10 +103,10 @@ def main(filename, ohlc_type='candlestick', find_tops=False):
                     break 
                 candle_width = candle['body_start_right'][1] - candle['body_start_left'][1]
                 if candle_width>3 and (candle['body_end_left'][0] - candle['body_start_left'][0] >= 3): #Arbitrary for now(it could be a doji)
-                    if classify(numpydata[row+floor((candle['body_end_left'][0] - candle['body_start_left'][0])/2)][col+floor(candle_width/2)])=='green':
+                    if classify(numpydata[row+floor((candle['body_end_left'][0] - candle['body_start_left'][0])/2)][col+floor(candle_width/2)]) in candle_color_options['green']:
                         #Green Candle body
                         candle['color'] = 'green'
-                    elif classify(numpydata[row+floor((candle['body_end_left'][0] - candle['body_start_left'][0])/2)][col+floor(candle_width/2)])=='red':
+                    elif classify(numpydata[row+floor((candle['body_end_left'][0] - candle['body_start_left'][0])/2)][col+floor(candle_width/2)]) in candle_color_options['red']:
                         #Red Candle body
                         candle['color'] = 'red'
                     elif classify(numpydata[row+floor((candle['body_end_left'][0] - candle['body_start_left'][0])/2)][col+floor(candle_width/2)])=='black':

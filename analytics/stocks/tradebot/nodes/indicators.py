@@ -104,13 +104,18 @@ class Indicator(FlowGraphNode):
         else:
             columns = list(df.columns)
             #log(df.tail(1), 'debug')
+            '''
+            #Variant 1: Simple for small number of columns, but pandas cries performance for large number of columns
+            df.columns = pd.MultiIndex.from_product([df.columns, ['close']])
+            for column in columns:
+              for indicator in self.indicators:
+                df[(column,indicator)] = self.indicators[indicator]['method'](df[(column,'close')], **self.indicators[indicator]['attributes'])
+            df = df.reindex(
+                            pd.MultiIndex.from_product([columns, ["close"]+ [indicator for indicator in self.indicators]]), axis=1
+                        )
+            '''
             ind_df = {}
-            #for column in columns:
-            #    log(column, 'debug')
             for indicator in self.indicators:
-                #log(indicator, 'debug')
-                #df.apply(lambda x: log(x[(column, 'close')], 'debug'), axis=0)
-                #df[(column,indicator)] = df.apply(lambda x: self.indicators[indicator]['method'](x[(column, 'close')], **self.indicators[indicator]['attributes']), axis=0)
                 s_df = df.apply(lambda x: self.indicators[indicator]['method'](x, **self.indicators[indicator]['attributes']), axis=0)
                 ind_df[indicator] = s_df
             #Now add a level to all the DFs and concat
@@ -118,8 +123,6 @@ class Indicator(FlowGraphNode):
             for indicator in ind_df:
                 ind_df[indicator].columns = pd.MultiIndex.from_product([ind_df[indicator].columns, [indicator]])
             ind_df['close'] = df
-            #for indicator in ind_df:
-            #    df = df.merge(ind_df[indicator], how='left', left_index=True, right_index=True)
             n_df = pd.concat([ind_df[d] for d in ind_df], axis='columns', names=[columns, [col for col in ind_df]])
 
             n_df = n_df.reindex(

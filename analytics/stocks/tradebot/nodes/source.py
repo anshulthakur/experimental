@@ -260,7 +260,7 @@ class NseMultiStockSource(SourceNode):
                     if int(timeframe[0:-1]) >= 24*30:
                         return f'{timeframe[0:-1]//(24*30)}M'
 
-    def __init__(self, timeframe, is_index=True, **kwargs):
+    def __init__(self, timeframe, is_index=True, offline=False, **kwargs):
         super().__init__(signals= [EndOfData], **kwargs)
         self.timeframe = self.sanitize_timeframe(timeframe)
 
@@ -280,11 +280,15 @@ class NseMultiStockSource(SourceNode):
             return
         if self.df is None:
             log('Fetch data', 'debug')
-            self.df = self.source.getEquityStockIndices(index='NIFTY TOTAL MARKET')
-            #log(self.df.head(10), 'debug')
-            #self.df['datetime'] = kwargs.get('data')
-            #self.df.set_index('datetime', inplace=True)
-            #self.df.sort_index(inplace=True)
+            if self.mode in ['backtest', 'buffered']:
+                #Get previous data on this timeframe from DB or tradingview
+                pass
+            else:
+                self.df = self.source.getEquityStockIndices(index='NIFTY TOTAL MARKET')
+                #log(self.df.head(10), 'debug')
+                #self.df['datetime'] = kwargs.get('data')
+                #self.df.set_index('datetime', inplace=True)
+                #self.df.sort_index(inplace=True)
         else:
             log('Re-fetch data', 'debug')
             df = self.source.getEquityStockIndices(index='NIFTY TOTAL MARKET')

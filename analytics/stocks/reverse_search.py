@@ -188,7 +188,8 @@ def compare_stock_info(r_df, s_df, delta, emit=False, logscale=False, match='clo
     return c
 
 def get_dataframe(stock, market, timeframe, duration, date=datetime.datetime.now(), offline=False):
-    if timeframe not in [Interval.in_monthly, 
+    if timeframe not in [Interval.in_3_months,
+                         Interval.in_monthly, 
                          Interval.in_weekly, 
                          Interval.in_daily]:
         offline = False
@@ -299,6 +300,9 @@ def main(reference, timeframe, delta, stock=None, logscale=False,
     if timeframe == Interval.in_monthly:
         print('Monthly')
         n_bars = max((d.years*12) + d.months+1, len(r_df))+10
+    elif timeframe == Interval.in_3_months:
+        print('3 Monthly')
+        n_bars = max((d.years*4) + d.months+1, len(r_df))+10
     elif timeframe == Interval.in_weekly:
         print('Weekly')
         n_bars = max((d.years*52) + (d.months*5) + d.weeks+1, len(r_df))+10

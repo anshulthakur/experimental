@@ -32,6 +32,7 @@ class Interval(enum.Enum):
     in_daily = "1D"
     in_weekly = "1W"
     in_monthly = "1M"
+    in_3_months = "3M"
 
 
 def convert_timeframe_to_quant(timeframe):
@@ -54,7 +55,10 @@ def convert_timeframe_to_quant(timeframe):
     elif timeframe[-1].lower()=='w':
         return Interval.in_weekly
     elif timeframe[-1]=='M':
-        return Interval.in_monthly
+        if int(timeframe[-2])==1:
+            return Interval.in_monthly
+        elif int(timeframe[-2])==3:
+            return Interval.in_3_months
     else:
         print(f'Unknown timeframe {timeframe}')
         return Interval.in_15_minute

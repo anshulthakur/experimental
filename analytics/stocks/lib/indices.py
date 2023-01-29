@@ -1,23 +1,21 @@
 
 import os
 import sys
-import ..settings
 import csv
 import pandas as pd
 import numpy as np
 from pandas.tseries.frequencies import to_offset
 import datetime
 
-import django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'rest.settings')
-os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
-django.setup()
-
 from stocks.models import Stock, Market
 from lib.tradingview import TvDatafeed, Interval, convert_timeframe_to_quant, get_tvfeed_instance
 from lib.retrieval import get_stock_listing
+import settings
 from settings import project_dirs
 from lib.cache import cached
+from lib.logging import log
+
+import pytz
 
 index_data_dir = project_dirs['reports']
 member_dir = index_data_dir+'/members/'
@@ -97,11 +95,11 @@ INDICES = {"NIFTY 50":"Nifty_50",
            "NIFTY50 EQUAL WEIGHT": "NIFTY50_Equal_Weight"
         }
 
-def load_index_members(sector, members, date, interval=Interval.in_weekly, 
+def load_index_members(sector, members, date=datetime.datetime.now(), interval=Interval.in_weekly, 
                         entries=50, online=True, start_date=None, end_date=None):
-    print('========================')
-    print(f'Loading for {sector}')
-    print('========================')
+    log('========================', 'debug')
+    log(f'Loading for {sector}', 'debug')
+    log('========================', 'debug')
 
     username = 'AnshulBot'
     password = '@nshulthakur123'
@@ -112,32 +110,34 @@ def load_index_members(sector, members, date, interval=Interval.in_weekly,
     if online:
         tv = get_tvfeed_instance(username, password)
         #print(duration, type(duration))
+    df = None 
 
+    pacific = pytz.timezone('US/Pacific')
+    india = pytz.timezone('Asia/Calcutta')
+    s_list = []
     for stock in members:
         try:
             if not online:
+                
                 stock_obj = Stock.objects.get(symbol=stock, market=Market.objects.get(name="NSE"))
                 s_df = get_stock_listing(stock_obj, duration=entries, last_date = date)
                 s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume', 'delivery', 'trades'])
                 #print(s_df.head())
                 if len(s_df)==0:
-                    print('Skip {}'.format(stock_obj))
+                    log('Skip {}'.format(stock_obj), 'info')
                     continue
+                s_df.reset_index(inplace = True)
                 s_df.rename(columns={'close': stock,
                                      'date': 'datetime'},
                             inplace = True)
-                s_df.reset_index(inplace = True)
-                s_df['datetime'] = pd.to_datetime(s_df['datetime'], format='%d-%m-%Y')
+                s_df['datetime'] = pd.to_datetime(s_df['datetime'], format='%d-%m-%Y %H:%M:%S')
                 s_df.set_index('datetime', inplace = True)
                 s_df = s_df.sort_index()
                 s_df = s_df.reindex(columns = [stock])
                 s_df = s_df[~s_df.index.duplicated(keep='first')]
                 if start_date is not None and end_date is not None:
                     s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
-                if df is None:
-                    df = s_df
-                else:
-                    df[stock] = s_df[stock]
+                s_list.append(s_df)
             else:
                 symbol = stock.strip().replace('&', '_')
                 symbol = symbol.replace('-', '_')
@@ -160,38 +160,39 @@ def load_index_members(sector, members, date, interval=Interval.in_weekly,
                     if s_df is not None:
                         cached(name=symbol, df=s_df, timeframe=interval)
                 if s_df is None:
-                    print(f'Error fetching information on {symbol}')
+                    log(f'Error fetching information on {symbol}', 'warning')
                 else:
                     s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume'])
                     #print(s_df.head())
                     if len(s_df)==0:
-                        print('Skip {}'.format(symbol))
+                        log('Skip {}'.format(symbol), 'info')
                         continue
                     s_df.reset_index(inplace = True)
                     s_df.rename(columns={'close': stock},
                                inplace = True)
                     #print(s_df.columns)
                     #pd.to_datetime(df['DateTime']).dt.date
-                    s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y').dt.date
+                    s_df['datetime'] = pd.to_datetime(s_df['datetime'], format='%d-%m-%Y %H:%M:%S')
                     #s_df.drop_duplicates(inplace = True, subset='date')
-                    s_df.set_index('date', inplace = True)
+                    s_df.set_index('datetime', inplace = True)
+                    s_df.index = s_df.index.tz_localize(pacific).tz_convert(india).tz_convert(None)
                     s_df = s_df.sort_index()
                     s_df = s_df.reindex(columns = [stock])
                     s_df = s_df[~s_df.index.duplicated(keep='first')]
                     #print(s_df.index.values[0], type(s_df.index.values[0]))
-                    #print(pd.to_datetime(start_date).date(), type(pd.to_datetime(start_date).date()))
-                    s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
+                    if start_date is not None and end_date is not None:
+                        #print(pd.to_datetime(start_date).date(), type(pd.to_datetime(start_date).date()))
+                        s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
                     #print(s_df.loc[start_date:end_date])
                     #print(s_df.head(10))
                     #print(s_df[s_df.index.duplicated(keep=False)])
-                    if df is None:
-                        df = s_df
-                    else:
-                        df[stock] = s_df[stock]
+                    s_list.append(s_df)
                     #df[stock] = s_df[stock]
         except Stock.DoesNotExist:
-            print(f'{stock} values do not exist')
+            log(f'{stock} values do not exist', 'error')
+    df = pd.concat(s_list, axis='columns')
     df = df[~df.index.duplicated(keep='first')]
+    df.sort_index(inplace=True)
     #print(df.head(10))
     return df
 
@@ -212,7 +213,7 @@ def load_members(sector, members, date, sampling=Interval.in_weekly, entries=50,
     
     if date is not None:
         df = df[:date.strftime('%Y-%m-%d')]
-    if sampling=='w':
+    if sampling.value =='1W':
         #Resample weekly
         logic = {}
         for cols in df.columns:
@@ -232,7 +233,7 @@ def load_members(sector, members, date, sampling=Interval.in_weekly, entries=50,
 
     #print(np.datetime64(date))
     duration = np.datetime64(datetime.datetime.today())-start_date
-    if sampling=='w':
+    if sampling.value=='1W':
         duration = duration.astype('timedelta64[W]')/np.timedelta64(1, 'W')
     else:
         duration = duration.astype('timedelta64[D]')/np.timedelta64(1, 'D')
@@ -242,7 +243,7 @@ def load_members(sector, members, date, sampling=Interval.in_weekly, entries=50,
     username = 'AnshulBot'
     password = '@nshulthakur123'
     tv = None
-    interval = convert_timeframe_to_quant(sampling)
+    interval = sampling
     if online:
         tv = get_tvfeed_instance(username, password)
     #print(duration, type(duration))
@@ -325,7 +326,7 @@ def load_members(sector, members, date, sampling=Interval.in_weekly, entries=50,
 def get_index_members(name):
     members = []
     if name not in INDICES:#MEMBER_MAP:
-        print(f'{name} not in list')
+        log(f'{name} not in list', 'error')
         return members
     #with open('./indices/members/'+MEMBER_MAP[name], 'r', newline='') as csvfile:
     with open(f'{member_dir}{INDICES[name]}.csv', 'r', newline='') as csvfile:

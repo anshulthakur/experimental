@@ -3,6 +3,7 @@ from lib.logging import log
 
 from tradebot.base.signals import *
 import pandas as pd 
+import json
 
 class SinkNode(FlowGraphNode):
     def __init__(self, **kwargs):
@@ -34,6 +35,8 @@ class Sink(SinkNode):
             if type(df).__name__ == 'DataFrame':
                 #log(f'{conn}', 'debug')
                 log(f'{df.tail(1)}', 'debug')
+            elif type(df).__name__ == 'dict':
+                log(json.dumps(df, indent=2), 'debug')
             else:
                 log(f'{df}', 'debug')
         self.consume()

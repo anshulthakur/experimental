@@ -3,6 +3,12 @@ import asyncio
 import sys, os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
+
+import django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'settings')
+os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
+django.setup()
+
 from lib.logging import log, set_loglevel
 
 from threading import Thread
@@ -33,7 +39,7 @@ async def main():
 
     # Add a dataframe source 
     #source = TradingViewSource(name='Stock', symbol='KABRAEXTRU', exchange='NSE', timeframe='1d')
-    source = NseMultiStockSource(name='Stock', symbol='KABRAEXTRU', exchange='NSE', timeframe='1d')
+    source = NseMultiStockSource(name='Source', exchange='NSE', timeframe='15m', offline=False, offset=200)
     fg.add_node(source)
 
     #Add a column filter node

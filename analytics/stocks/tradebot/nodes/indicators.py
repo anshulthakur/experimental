@@ -128,5 +128,7 @@ class Indicator(FlowGraphNode):
             n_df = n_df.reindex(
                             pd.MultiIndex.from_product([columns, ["close"]+ [indicator for indicator in self.indicators]]), axis=1
                         )
-            log(n_df, 'debug')
+            #log(n_df, 'debug')
+            for node,connection in self.connections:
+                await node.next(connection=connection, data = n_df.tail(1))
         self.consume()

@@ -1,16 +1,19 @@
 from lib.tradingview import Interval
+from lib.misc import create_directory
 import datetime
 import os
 from settings import project_dirs
-
+import pandas as pd
 
 def cached(name, df=None, timeframe=Interval.in_daily):
     import json
     cache_file = '.cache.json'
     overwrite = False
     cache_dir = project_dirs['cache']
+    create_directory(cache_dir)
+    create_directory(os.path.join(cache_dir,str(timeframe.value)))
     try:
-        with open(cache_dir+'/'+str(timeframe.value)+'/'+cache_file, 'r') as fd:
+        with open(os.path.join(cache_dir,str(timeframe.value),cache_file), 'r') as fd:
             progress = json.load(fd)
             try:
                 date = datetime.datetime.strptime(progress['date'], '%d-%m-%Y')
@@ -20,9 +23,10 @@ def cached(name, df=None, timeframe=Interval.in_daily):
                     pass #Cache hit
                 else:
                     if df is None:#Cache is outdated. Clear it first
-                        for f in os.listdir(cache_dir):
-                            if f != cache_dir+cache_file:
-                                os.remove(os.path.join(cache_dir, f))
+                        for f in os.listdir(os.path.join(cache_dir,str(timeframe.value))):
+                            if f != os.path.join(cache_dir,str(timeframe.value),cache_file):
+                                #Remove all files except the cache json meta file
+                                os.remove(os.path.join(cache_dir,str(timeframe.value), f))
                     overwrite = True
             except:
                 #Doesn't look like a proper date time
@@ -31,10 +35,10 @@ def cached(name, df=None, timeframe=Interval.in_daily):
         overwrite=True
     
     if overwrite:
-        with open(cache_dir+'/'+str(timeframe.value)+'/'+cache_file, 'w') as fd:
+        with open(os.path.join(cache_dir, str(timeframe.value), cache_file), 'w') as fd:
             fd.write(json.dumps({'date':datetime.datetime.today().strftime('%d-%m-%Y')}))
     
-    f = cache_dir+'/'+str(timeframe.value)+'/'+name+'.csv'
+    f = os.path.join(cache_dir, str(timeframe.value), name+'.csv')
     if df is None:
         if os.path.isfile(f):
             #Get from cache if it exists

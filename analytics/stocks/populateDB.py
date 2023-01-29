@@ -73,8 +73,28 @@ def parse_bse_bhav(reader, symbols, fname):
                 continue
             if deliveries is None:
                 deliveries = parse_bse_delivery(dateval)
-            stock = Stock.objects.get(sid=row.get('SC_CODE'),
+            try:
+                stock = Stock.objects.get(sid=row.get('SC_CODE'),
                                         market=market)
+            except Stock.MultipleObjectsReturned:
+                print(f"Trying to handle multiple entries for SID: {row.get('SC_CODE')}")
+                s = Stock.objects.filter(sid=row.get('SC_CODE'),
+                                        market=market)
+                if len(s)>2:
+                    raise Exception(f"Can't handle conflict of more than 2 values for SID {row.get('SC_CODE')}")
+                stock = s[1]
+                try:
+                    l = Listing.objects.get(stock=stock)
+                except:
+                    #Found the culprit
+                    symbol = stock.symbol
+                    stock.delete()
+                    stock = s[0]
+                    stock.symbol= symbol
+                    stock.save()
+                    #Though we don't need to redo it, but raise again if issues found
+                    stock = Stock.objects.get(sid=row.get('SC_CODE'),
+                                                market=market)
             try:
                 #listing = Listing.objects.filter(stock=stock, date__contains = dateval)
                 #if len(listing) == 0:
@@ -181,18 +201,18 @@ def get_active_scrips(market):
                                 name=member.get('name'))
             company.save()
         try:
-            stock = Stock.objects.get(symbol=member.get('symbol'), market=market)
+            stock = Stock.objects.get(symbol=member.get('symbol').replace('*',''), market=market)
         except Stock.DoesNotExist:
             stock = Stock(face_value=int(float(member.get('facevalue'))),
                           market = market,
-                          symbol=member.get('symbol'),
+                          symbol=member.get('symbol').replace('*',''),
                           content_object=company
                          )
             if market.name=='BSE':
                 stock.sid = member.get('security')
             stock.save()
         if market.name=='NSE':
-            symbols[member.get('symbol')] = stock
+            symbols[member.get('symbol').replace('*','')] = stock
         elif market.name=='BSE':
             symbols[member.get('security')] = stock
     return symbols

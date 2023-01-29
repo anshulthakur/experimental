@@ -34,6 +34,17 @@ class Interval(enum.Enum):
     in_monthly = "1M"
     in_3_months = "3M"
 
+    def to_days(self):
+        if self.value in ["1", "3", "5", "15", "30", "45"]:
+            return int(self.value)/(24*60)
+        elif self.value in ["1H", "2H", "3H", "4H"]:
+            return int(self.value)/(24)
+        elif self.value == '1D':
+            return int(self.value[0])
+        elif self.value == '1W':
+            return int(self.value[0]*7)
+        elif self.value in ['1M', '3M']:
+            return int(self.value[0]*30)
 
 def convert_timeframe_to_quant(timeframe):
     if timeframe[-1]=='m':

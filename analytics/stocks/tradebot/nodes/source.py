@@ -5,6 +5,8 @@ from lib.nse import NseIndia
 from tradebot.base.signals import EndOfData
 import pandas as pd
 
+from lib.indices import get_index_members, load_index_members
+
 from lib.tradingview import convert_timeframe_to_quant, get_tvfeed_instance, Interval
 
 class SourceNode(FlowGraphNode):
@@ -282,6 +284,12 @@ class NseMultiStockSource(SourceNode):
             log('Fetch data', 'debug')
             if self.mode in ['backtest', 'buffered']:
                 #Get previous data on this timeframe from DB or tradingview
+                members = get_index_members(sector='NIFTY TOTAL MARKET')
+                self.df = load_index_members(index='NIFTY TOTAL MARKET', 
+                                        members=members, 
+                                        load_index=False, 
+                                        entries=210,
+                                        sampling=self.timeframe)
                 pass
             else:
                 self.df = self.source.getEquityStockIndices(index='NIFTY TOTAL MARKET')

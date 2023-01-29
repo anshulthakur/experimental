@@ -13,149 +13,201 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'rest.settings')
 os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 django.setup()
 
-from stocks.models import Listing, Stock
+from stocks.models import Stock, Market
 from lib.tradingview import TvDatafeed, Interval, convert_timeframe_to_quant, get_tvfeed_instance
 from lib.retrieval import get_stock_listing
+from settings import project_dirs
+from lib.cache import cached
 
-index_data_dir = '../reports/'
-member_dir = '../reports/members/'
-plotpath = index_data_dir+'plots/'
-cache_dir = index_data_dir+'cache/'
-
-INDICES = ["Nifty_50",
-           "Nifty_Auto",
-           "Nifty_Bank",
-           "Nifty_Energy",
-           "Nifty_Financial_Services",
-           "Nifty_FMCG",
-           "Nifty_IT",
-           "Nifty_Media",
-           "Nifty_Metal",
-           "Nifty_MNC",
-           "Nifty_Pharma",
-           "Nifty_PSU_Bank",
-           "Nifty_Realty",
-           "Nifty_India_Consumption",
-           "Nifty_Commodities",
-           "Nifty_Infrastructure",
-           "Nifty_PSE",
-           "Nifty_Services_Sector",
-           "Nifty_Growth_Sectors_15",
-           "NIFTY_SME_EMERGE",
-           "Nifty_Oil_&_Gas",
-           "Nifty_Healthcare_Index",
-           "Nifty_Total_Market",
-           "Nifty_India_Digital",
-           "Nifty_Mobility",
-           "Nifty_India_Defence",
-           "Nifty_Financial_Services_Ex_Bank",
-           "Nifty_Housing",
-           "Nifty_Transportation_&_Logistics",
-           "Nifty_MidSmall_Financial_Services",
-           "Nifty_MidSmall_Healthcare",
-           "Nifty_MidSmall_IT_&_Telecom",
-           "Nifty_Consumer_Durables",
-           "Nifty_Non_Cyclical_Consumer",
-           "Nifty_India_Manufacturing",
-           "Nifty_Next_50",
-           "Nifty_100",
-           "Nifty_200",
-           "Nifty_500",
-           "Nifty_Midcap_50",
-           "NIFTY_Midcap_100",
-           "NIFTY_Smallcap_100",
-           #"Nifty_Dividend_Opportunities_50",
-           #"Nifty_Low_Volatility_50",
-           #"Nifty_Alpha_50",
-           #"Nifty_High_Beta_50",
-           "Nifty100_Equal_Weight",
-           "Nifty100_Liquid_15",
-           "Nifty_CPSE",
-           "Nifty50_Value_20",
-           "Nifty_Midcap_Liquid_15",
-           "NIFTY100_Quality_30",
-           "Nifty_Private_Bank",
-           "Nifty_Smallcap_250",
-           "Nifty_Smallcap_50",
-           "Nifty_MidSmallcap_400",
-           "Nifty_Midcap_150",
-           "Nifty_Midcap_Select",
-           "NIFTY_LargeMidcap_250",
-           "Nifty_Financial_Services_25_50",
-           "Nifty500_Multicap_50_25_25",
-           "Nifty_Microcap_250",
-           "Nifty200_Momentum_30",
-           "NIFTY100_Alpha_30",
-           "NIFTY500_Value_50",
-           "Nifty100_Low_Volatility_30",
-           "NIFTY_Alpha_Low_Volatility_30",
-           "NIFTY_Quality_Low_Volatility_30",
-           "NIFTY_Alpha_Quality_Low_Volatility_30",
-           "NIFTY_Alpha_Quality_Value_Low_Volatility_30",
-           "NIFTY200_Quality_30",
-           "NIFTY_Midcap150_Quality_50",
-           "Nifty200_Alpha_30",
-           "Nifty_Midcap150_Momentum_50",
-           "NIFTY50_Equal_Weight",
-           "Nifty_Total_Market",
-           ]
+index_data_dir = project_dirs['reports']
+member_dir = index_data_dir+'/members/'
+plotpath = index_data_dir+'/plots/'
 
 
-def cached(name, df=None):
-    import json
-    cache_file = '.cache.json'
-    overwrite = False
-    try:
-        with open(cache_dir+cache_file, 'r') as fd:
-            progress = json.load(fd)
-            try:
-                date = datetime.datetime.strptime(progress['date'], '%d-%m-%Y')
-                if date.day == datetime.datetime.today().day and \
-                    date.month == datetime.datetime.today().month and \
-                    date.year == datetime.datetime.today().year:
-                    pass #Cache hit
+INDICES = {"NIFTY 50":"Nifty_50",
+           "NIFTY AUTO":"Nifty_Auto",
+           "NIFTY BANK":"Nifty_Bank",
+           "NIFTY ENERGY": "Nifty_Energy",
+           "NIFTY FINANCIAL SERVICES": "Nifty_Financial_Services",
+           "NIFTY FMCG": "Nifty_FMCG",
+           "NIFTY IT": "Nifty_IT",
+           "NIFTY MEDIA": "Nifty_Media",
+           "NIFTY METAL": "Nifty_Metal",
+           "NIFTY MNC": "Nifty_MNC",
+           "NIFTY PHARMA": "Nifty_Pharma",
+           "NIFTY PSU BANK": "Nifty_PSU_Bank",
+           "NIFTY REALTY": "Nifty_Realty",
+           "NIFTY INDIA CONSUMPTION": "Nifty_India_Consumption",
+           "NIFTY COMMODITIES": "Nifty_Commodities",
+           "NIFTY INFRASTRUCTURE": "Nifty_Infrastructure",
+           "NIFTY PSE": "Nifty_PSE",
+           "NIFTY SERVICES SECTOR": "Nifty_Services_Sector",
+           "NIFTY GROWTH SECTORS 15": "Nifty_Growth_Sectors_15",
+           "NIFTY SME EMERGE": "NIFTY_SME_EMERGE",
+           "NIFTY OIL & GAS": "Nifty_Oil_&_Gas",
+           "NIFTY HEALTHCARE INDEX": "Nifty_Healthcare_Index",
+           "NIFTY TOTAL MARKET": "Nifty_Total_Market",
+           "NIFTY INDIA DIGITAL": "Nifty_India_Digital",
+           "NIFTY MOBILITY": "Nifty_Mobility",
+           "NIFTY INDIA DEFENCE": "Nifty_India_Defence",
+           "NIFTY FINANCIAL SERVICES EX BANK": "Nifty_Financial_Services_Ex_Bank",
+           "NIFTY HOUSING": "Nifty_Housing",
+           "NIFTY TRANSPORTATION & LOGISTICS": "Nifty_Transportation_&_Logistics",
+           "NIFTY MIDSMALL FINANCIAL SERVICES": "Nifty_MidSmall_Financial_Services",
+           "NIFTY MIDSMALL HEALTHCARE": "Nifty_MidSmall_Healthcare",
+           "NIFTY MIDSMALL IT & TELECOM": "Nifty_MidSmall_IT_&_Telecom",
+           "NIFTY CONSUMER DURABLES": "Nifty_Consumer_Durables",
+           "NIFTY NON CYCLICAL CONSUMER": "Nifty_Non_Cyclical_Consumer",
+           "NIFTY INDIA MANUFACTURING": "Nifty_India_Manufacturing",
+           "NIFTY NEXT 50": "Nifty_Next_50",
+           "NIFTY 100": "Nifty_100",
+           "NIFTY 200": "Nifty_200",
+           "NIFTY 500": "Nifty_500",
+           "NIFTY MIDCAP 50": "Nifty_Midcap_50",
+           "NIFTY MIDCAP 100": "NIFTY_Midcap_100",
+           "NIFTY SMALLCAP 100": "NIFTY_Smallcap_100",
+           "NIFTY100 EQUAL WEIGHT": "Nifty100_Equal_Weight",
+           "NIFTY100 LIQUID 15": "Nifty100_Liquid_15",
+           "NIFTY CPSE": "Nifty_CPSE",
+           "NIFTY50 VALUE 20": "Nifty50_Value_20",
+           "NIFTY MIDCAP LIQUID 15": "Nifty_Midcap_Liquid_15",
+           "NIFTY100 QUALITY 30": "NIFTY100_Quality_30",
+           "NIFTY PRIVATE BANK": "Nifty_Private_Bank",
+           "NIFTY SMALLCAP 250": "Nifty_Smallcap_250",
+           "NIFTY SMALLCAP 50": "Nifty_Smallcap_50",
+           "NIFTY MIDSMALLCAP 400": "Nifty_MidSmallcap_400",
+           "NIFTY MIDCAP 150": "Nifty_Midcap_150",
+           "NIFTY MIDCAP SELECT": "Nifty_Midcap_Select",
+           "NIFTY LARGEMIDCAP 250": "NIFTY_LargeMidcap_250",
+           "NIFTY FINANCIAL SERVICES 25 50": "Nifty_Financial_Services_25_50",
+           "NIFTY500 MULTICAP 50 25 25": "Nifty500_Multicap_50_25_25",
+           "NIFTY MICROCAP 250": "Nifty_Microcap_250",
+           "NIFTY200 MOMENTUM 30": "Nifty200_Momentum_30",
+           "NIFTY100 ALPHA 30": "NIFTY100_Alpha_30",
+           "NIFTY500 VALUE 50": "NIFTY500_Value_50",
+           "NIFTY100 LOW VOLATILITY 30": "Nifty100_Low_Volatility_30",
+           "NIFTY ALPHA LOW VOLATILITY 30": "NIFTY_Alpha_Low_Volatility_30",
+           "NIFTY QUALITY LOW VOLATILITY 30": "NIFTY_Quality_Low_Volatility_30",
+           "NIFTY ALPHA QUALITY LOW VOLATILITY 30": "NIFTY_Alpha_Quality_Low_Volatility_30",
+           "NIFTY ALPHA QUALITY VALUE LOW VOLATILITY 30": "NIFTY_Alpha_Quality_Value_Low_Volatility_30",
+           "NIFTY200 QUALITY 30": "NIFTY200_Quality_30",
+           "NIFTY MIDCAP150 QUALITY 50": "NIFTY_Midcap150_Quality_50",
+           "NIFTY200 ALPHA 30": "Nifty200_Alpha_30",
+           "NIFTY MIDCAP150 MOMENTUM 50": "Nifty_Midcap150_Momentum_50",
+           "NIFTY50 EQUAL WEIGHT": "NIFTY50_Equal_Weight"
+        }
+
+def load_index_members(sector, members, date, interval=Interval.in_weekly, 
+                        entries=50, online=True, start_date=None, end_date=None):
+    print('========================')
+    print(f'Loading for {sector}')
+    print('========================')
+
+    username = 'AnshulBot'
+    password = '@nshulthakur123'
+    tv = None
+    if not online:
+        if interval.to_days()<1.0:
+            online = True
+    if online:
+        tv = get_tvfeed_instance(username, password)
+        #print(duration, type(duration))
+
+    for stock in members:
+        try:
+            if not online:
+                stock_obj = Stock.objects.get(symbol=stock, market=Market.objects.get(name="NSE"))
+                s_df = get_stock_listing(stock_obj, duration=entries, last_date = date)
+                s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume', 'delivery', 'trades'])
+                #print(s_df.head())
+                if len(s_df)==0:
+                    print('Skip {}'.format(stock_obj))
+                    continue
+                s_df.rename(columns={'close': stock,
+                                     'date': 'datetime'},
+                            inplace = True)
+                s_df.reset_index(inplace = True)
+                s_df['datetime'] = pd.to_datetime(s_df['datetime'], format='%d-%m-%Y')
+                s_df.set_index('datetime', inplace = True)
+                s_df = s_df.sort_index()
+                s_df = s_df.reindex(columns = [stock])
+                s_df = s_df[~s_df.index.duplicated(keep='first')]
+                if start_date is not None and end_date is not None:
+                    s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
+                if df is None:
+                    df = s_df
                 else:
-                    if df is None:#Cache is outdated. Clear it first
-                        for f in os.listdir(cache_dir):
-                            if f != cache_dir+cache_file:
-                                os.remove(os.path.join(cache_dir, f))
-                    overwrite = True
-            except:
-                #Doesn't look like a proper date time
-                pass
-    except:
-        overwrite=True
-    
-    if overwrite:
-        with open(cache_dir+cache_file, 'w') as fd:
-            fd.write(json.dumps({'date':datetime.datetime.today().strftime('%d-%m-%Y')}))
-    
-    f = cache_dir+name+'.csv'
-    if df is None:
-        if os.path.isfile(f):
-            #Get from cache if it exists
-            df = pd.read_csv(f)
-            df['datetime'] = pd.to_datetime(df['datetime'], format='%Y-%m-%d %H:%M:%S')
-            return df
-        return None
-    else:
-        #Cache the results
-        df.to_csv(f)
-        return None
+                    df[stock] = s_df[stock]
+            else:
+                symbol = stock.strip().replace('&', '_')
+                symbol = symbol.replace('-', '_')
+                nse_map = {'UNITDSPR': 'MCDOWELL_N',
+                           'MOTHERSUMI': 'MSUMI'}
+                if symbol in nse_map:
+                    symbol = nse_map[symbol]
+                
+                s_df = cached(name=symbol, timeframe=interval)
+                if s_df is not None:
+                    pass
+                else:
+                    s_df = tv.get_hist(
+                                symbol,
+                                'NSE',
+                                interval=interval,
+                                n_bars=entries,
+                                extended_session=False,
+                            )
+                    if s_df is not None:
+                        cached(name=symbol, df=s_df, timeframe=interval)
+                if s_df is None:
+                    print(f'Error fetching information on {symbol}')
+                else:
+                    s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume'])
+                    #print(s_df.head())
+                    if len(s_df)==0:
+                        print('Skip {}'.format(symbol))
+                        continue
+                    s_df.reset_index(inplace = True)
+                    s_df.rename(columns={'close': stock},
+                               inplace = True)
+                    #print(s_df.columns)
+                    #pd.to_datetime(df['DateTime']).dt.date
+                    s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y').dt.date
+                    #s_df.drop_duplicates(inplace = True, subset='date')
+                    s_df.set_index('date', inplace = True)
+                    s_df = s_df.sort_index()
+                    s_df = s_df.reindex(columns = [stock])
+                    s_df = s_df[~s_df.index.duplicated(keep='first')]
+                    #print(s_df.index.values[0], type(s_df.index.values[0]))
+                    #print(pd.to_datetime(start_date).date(), type(pd.to_datetime(start_date).date()))
+                    s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
+                    #print(s_df.loc[start_date:end_date])
+                    #print(s_df.head(10))
+                    #print(s_df[s_df.index.duplicated(keep=False)])
+                    if df is None:
+                        df = s_df
+                    else:
+                        df[stock] = s_df[stock]
+                    #df[stock] = s_df[stock]
+        except Stock.DoesNotExist:
+            print(f'{stock} values do not exist')
+    df = df[~df.index.duplicated(keep='first')]
+    #print(df.head(10))
+    return df
 
-def load_members(sector, members, date, sampling='w', entries=50, online=True):
+def load_members(sector, members, date, sampling=Interval.in_weekly, entries=50, online=True):
     print('========================')
     print(f'Loading for {sector}')
     print('========================')
     
-    df = pd.read_csv(f'{index_data_dir}{sector}.csv')
+    df = pd.read_csv(f'{index_data_dir}{INDICES[sector]}.csv')
     df.rename(columns={'Index Date': 'date',
-                       'Closing Index Value': sector},
-               inplace = True)
+                    'Closing Index Value': INDICES[sector]},
+            inplace = True)
     df['date'] = pd.to_datetime(df['date'], format='%d-%m-%Y')
     df.set_index('date', inplace = True)
     df = df.sort_index()
-    df = df.reindex(columns = [sector])
+    df = df.reindex(columns = [INDICES[sector]])
     df = df[~df.index.duplicated(keep='first')]
     
     if date is not None:
@@ -267,17 +319,16 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
         except Stock.DoesNotExist:
             print(f'{stock} values do not exist')
     df = df[~df.index.duplicated(keep='first')]
-    
     #print(df.head(10))
     return df
 
-def load_index_members(name):
+def get_index_members(name):
     members = []
     if name not in INDICES:#MEMBER_MAP:
         print(f'{name} not in list')
         return members
     #with open('./indices/members/'+MEMBER_MAP[name], 'r', newline='') as csvfile:
-    with open(f'{member_dir}{name}.csv', 'r', newline='') as csvfile:
+    with open(f'{member_dir}{INDICES[name]}.csv', 'r', newline='') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             members.append(row['Symbol'].strip())

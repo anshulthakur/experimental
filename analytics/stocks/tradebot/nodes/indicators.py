@@ -34,7 +34,7 @@ class IndicatorNode(FlowGraphNode):
             log(f'{self}: Not ready yet', 'debug')
             return
         df = kwargs.get('data')
-        log(f'{self}: {df.tail(0)}', 'debug')
+        log(f'{self}: {df.tail(1)}', 'debug')
         for indicator in self.indicators:
             df[indicator] = self.indicators[indicator]['method'](df[self.indicators[indicator]['column']], **self.indicators[indicator]['attributes'])
         for node,connection in self.connections:

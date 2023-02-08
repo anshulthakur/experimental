@@ -58,6 +58,7 @@ class TradingViewSource(SourceNode):
             if (self.df is None) or (self.df is not None and len(self.df)==0):
                 log('Skip {}'.format(self.symbol), logtype='warning')
                 return
+            self.df.index = self.df.index + pd.DateOffset(hours=17, minutes=45)
         elif self.mode in ['buffered', 'stream']:
             log('Re-fetch data', 'debug')
             self.df = self.tv.get_hist(

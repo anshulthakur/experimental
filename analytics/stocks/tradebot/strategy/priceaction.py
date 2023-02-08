@@ -73,6 +73,112 @@ class EvolvingSupportResistance(FlowGraphNode):
             await node.next(connection=connection, data = s_df.copy())
         self.consume()
 
+class Zigzag(FlowGraphNode):
+    def __init__(self, **kwargs):
+        super().__init__(strict=False, **kwargs)
+        self.multi_input = True
+        self.nearest_low = 0
+        self.nearest_low_val = 0
+        self.nearest_high = 0
+        self.nearest_high_val = 0
+        self.trend = 0 #We don't know at the outset (0: No trend, 1: Uptrend, -1: Downtrend)
+    
+    def get_trend_str(self, trend):
+        if trend==0:
+            return 'None'
+        if trend==1:
+            return 'Uptrend'
+        if trend==-1:
+            return 'downtrend'
+    def log_trendchange(self, trend):
+        if self.trend != trend:
+            log(f'Trend changing from {self.get_trend_str(self.trend)} to {self.get_trend_str(trend)}', 'debug')
+    
+    async def next(self, connection=None, **kwargs):
+        #log(f'{self}: {kwargs.get("data")}', 'debug')
+        if not self.ready(connection, **kwargs):
+            #log(f'{self}: Not ready yet', 'debug')
+            return
+        #First, we'll need to figure out which input is HH/HL data and which is dataframe
+        df = None
+        hh_idx = None
+        hl_idx = None
+        lh_idx = None
+        ll_idx = None
+        for inp in self.inputs:
+            if type(self.inputs[inp]).__name__ == 'DataFrame':
+                df = self.inputs[inp]
+            elif type(self.inputs[inp]).__name__ == 'dict':
+                if 'HH' in self.inputs[inp]:
+                    hh_idx = self.inputs[inp]['HH']
+                if 'HL' in self.inputs[inp]:
+                    hl_idx = self.inputs[inp]['HL']
+                if 'LH' in self.inputs[inp]:
+                    lh_idx = self.inputs[inp]['LH']
+                if 'LL' in self.inputs[inp]:
+                    ll_idx = self.inputs[inp]['LL']
+            else:
+                log(f'{type(self.inputs[inp]).__name__}', 'debug')
+                raise Exception('Unknown input received')
+        if None in [hh_idx, hl_idx, lh_idx, ll_idx]:
+            log('One of HH/HL/LH/LL values are not provided.', 'debug')
+            raise Exception('One of HH/HL/LH/LL values are not provided.')
+        #Determine the nearest high/low values
+        if len(hh_idx)> 0:
+            if hh_idx[-1] > self.nearest_high:
+                self.nearest_high = hh_idx[-1]
+                self.nearest_high_val = df.iloc[hh_idx[-1]]['close']
+        if len(lh_idx)> 0:
+            if lh_idx[-1] > self.nearest_high:
+                self.nearest_high = lh_idx[-1]
+                self.nearest_high_val = df.iloc[lh_idx[-1]]['close']
+        if len(ll_idx)> 0:
+            if ll_idx[-1] > self.nearest_low:
+                self.nearest_low = ll_idx[-1]
+                self.nearest_low_val = df.iloc[ll_idx[-1]]['close']
+        if len(hl_idx)> 0:
+            if hl_idx[-1] > self.nearest_low:
+                self.nearest_low = hl_idx[-1]
+                self.nearest_low_val = df.iloc[hl_idx[-1]]['close']
+        #Also determine trend. Here, we take the rule as gospel and do not worry about micro-trends within trends (for that we have to look at a smaller TF)
+        # If we are making a HH-HL, it is uptrend. 
+        # If LH-LL, downtrend
+        # Else, not known
+        #Line up all LH/LL/HH/HL into a single array and look into it
+        trend_array = []
+        for idx in hh_idx:
+            trend_array.append(('HH', idx, df.iloc[idx].name, df.iloc[idx]['close']))
+        for idx in hl_idx:
+            trend_array.append(('HL', idx, df.iloc[idx].name, df.iloc[idx]['close']))
+        for idx in lh_idx:
+            trend_array.append(('LH', idx, df.iloc[idx].name, df.iloc[idx]['close']))
+        for idx in ll_idx:
+            trend_array.append(('LL', idx, df.iloc[idx].name, df.iloc[idx]['close']))
+        trend_array.sort(key=lambda x: x[1])
+
+        #Now, look at the last entries
+        if len(trend_array)==0:
+            self.consume()
+            return
+
+        if trend_array[-1][0] == 'LL':
+            self.log_trendchange(-1)
+            self.trend = -1
+        elif trend_array[-1][0] == 'HH':
+            self.log_trendchange(1)
+            self.trend = 1
+        elif trend_array[-1][0] == 'HL' and trend_array[-2][0] == 'LH':
+            self.log_trendchange(0)
+            self.trend = 0 #Bearish bias
+        elif trend_array[-1][0] == 'LH' and trend_array[-2][0] == 'HL':
+            self.log_trendchange(0)
+            self.trend = 0 #Bullish bias
+        
+        for node,connection in self.connections:
+            await node.next(connection=connection, data = trend_array)
+
+        self.consume()
+        
 class LongBot(FlowGraphNode, BaseBot, Broker):
     def __init__(self, **kwargs):
         self.sl = None
@@ -96,6 +202,7 @@ class LongBot(FlowGraphNode, BaseBot, Broker):
                 self.sl = self.support
                 self.buy(df['close'][-1], date=df.index[-1].to_pydatetime())
                 log(f"Go long: {df['close'][-1]} SL: {self.sl}", 'info')
+        self.consume()
 
     async def handle_signal(self, signal):
         if signal.name() == Resistance.name():

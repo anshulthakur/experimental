@@ -4,6 +4,18 @@ from lib.logging import log
 from tradebot.base.signals import *
 import pandas as pd 
 import json
+import numpy as np
+
+#https://sebhastian.com/python-object-of-type-int64-is-not-json-serializable/
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
 
 class SinkNode(FlowGraphNode):
     def __init__(self, **kwargs):
@@ -36,7 +48,10 @@ class Sink(SinkNode):
                 #log(f'{conn}', 'debug')
                 log(f'{df.tail(1)}', 'debug')
             elif type(df).__name__ == 'dict':
-                log(json.dumps(df, indent=2), 'debug')
+                log(json.dumps(df, indent=2, cls=NpEncoder), 'debug')
+            elif type(df).__name__ == 'list':
+                for l in df:
+                    log(l, 'debug')
             else:
                 log(f'{df}', 'debug')
         self.consume()

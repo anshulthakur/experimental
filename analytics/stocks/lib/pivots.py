@@ -72,7 +72,7 @@ def getHigherHighs(data: np.array, order=5, K=2):
     K determines how many consecutive highs need to be higher.
     '''
     # Get highs
-    high_idx = argrelextrema(data, np.greater, order=5)[0]
+    high_idx = argrelextrema(data, np.greater, order=order)[0]
     highs = data[high_idx]
     # Ensure consecutive highs are higher than previous highs
     extrema = []

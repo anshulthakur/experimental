@@ -17,9 +17,9 @@ from base import FlowGraph
 from base.scheduler import AsyncScheduler as Scheduler
 from nodes import Sink, Resampler, NseMultiStockSource, Indicator, DataFrameSink, TradingViewSource, ColumnFilter
 from nodes import MinMaxDetector
-from strategy.priceaction import Zigzag
+from strategy.priceaction import Zigzag, LongBot
 
-from tradebot.base.signals import EndOfData
+from tradebot.base.signals import Resistance, Support, EndOfData
 
 import signal, os
 
@@ -48,12 +48,17 @@ async def main():
     fg.add_node(filterNode)
 
     # Add indicator nodes
-    maxmin = MinMaxDetector(name='MaxMin', lookaround=2)
+    maxmin = MinMaxDetector(name='MaxMin', lookaround=1)
     fg.add_node(maxmin)
 
     # Add trend indicator node
     trend = Zigzag(name='TrendDetector')
     fg.add_node(trend)
+
+    #TraderBot
+    longbot = LongBot(name='LongBot', cash=20000000, lot_size=100)
+    fg.add_node(longbot)
+    fg.register_signal_handler([Resistance, Support, EndOfData], longbot)
 
     # Add some sink nodes 
     sink = Sink(name='Sink')
@@ -76,7 +81,8 @@ async def main():
     fg.connect(maxmin, trend)
     fg.connect(filterNode, trend)
     fg.connect(trend, sink)
-    fg.connect(filterNode, df_sink)
+    fg.connect(filterNode, longbot)
+    fg.connect(longbot, df_sink)
 
     fg.display()
     # Create a scheduler

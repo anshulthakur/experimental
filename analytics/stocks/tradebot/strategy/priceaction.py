@@ -75,7 +75,7 @@ class EvolvingSupportResistance(FlowGraphNode):
 
 class Zigzag(FlowGraphNode):
     def __init__(self, **kwargs):
-        super().__init__(strict=False, **kwargs)
+        super().__init__(signals= [Resistance, Support], strict=False, **kwargs)
         self.multi_input = True
         self.nearest_low = 0
         self.nearest_low_val = 0
@@ -89,10 +89,10 @@ class Zigzag(FlowGraphNode):
         if trend==1:
             return 'Uptrend'
         if trend==-1:
-            return 'downtrend'
-    def log_trendchange(self, trend):
+            return 'Downtrend'
+    def log_trendchange(self, trend, tup):
         if self.trend != trend:
-            log(f'Trend changing from {self.get_trend_str(self.trend)} to {self.get_trend_str(trend)}', 'debug')
+            log(f'[{tup[2]}] Trend changing from {self.get_trend_str(self.trend)} to {self.get_trend_str(trend)}', 'debug')
     
     async def next(self, connection=None, **kwargs):
         #log(f'{self}: {kwargs.get("data")}', 'debug')
@@ -124,22 +124,42 @@ class Zigzag(FlowGraphNode):
             log('One of HH/HL/LH/LL values are not provided.', 'debug')
             raise Exception('One of HH/HL/LH/LL values are not provided.')
         #Determine the nearest high/low values
+        emit_sig = False
         if len(hh_idx)> 0:
             if hh_idx[-1] > self.nearest_high:
                 self.nearest_high = hh_idx[-1]
                 self.nearest_high_val = df.iloc[hh_idx[-1]]['close']
+                emit_sig = True
         if len(lh_idx)> 0:
             if lh_idx[-1] > self.nearest_high:
                 self.nearest_high = lh_idx[-1]
                 self.nearest_high_val = df.iloc[lh_idx[-1]]['close']
+                emit_sig = True
+        if emit_sig:
+            if df.iloc[-1]['close']<self.nearest_high_val:
+                #We're still below the last high, so that's a resistance
+                log(f"New Resistance: {df.iloc[self.nearest_high]['close']} [{df.iloc[self.nearest_high].name}]", "debug")
+                await self.emit(Resistance(index=df.iloc[self.nearest_high].name, 
+                                            value=df.iloc[self.nearest_high]['close'], 
+                                            timestamp=df.index[-1]))
+        emit_sig = False
         if len(ll_idx)> 0:
             if ll_idx[-1] > self.nearest_low:
                 self.nearest_low = ll_idx[-1]
                 self.nearest_low_val = df.iloc[ll_idx[-1]]['close']
+                emit_sig = True
         if len(hl_idx)> 0:
             if hl_idx[-1] > self.nearest_low:
                 self.nearest_low = hl_idx[-1]
                 self.nearest_low_val = df.iloc[hl_idx[-1]]['close']
+                emit_sig = True
+        if emit_sig:
+            if df.iloc[-1]['close']>self.nearest_low_val:
+                #We're still above the last low, so that's a support
+                log(f"New Support: {df.iloc[self.nearest_low]['close']} [{df.iloc[self.nearest_low].name}]", "debug")
+                await self.emit(Support(index=df.iloc[self.nearest_low].name, 
+                                            value=df.iloc[self.nearest_low]['close'], 
+                                            timestamp=df.index[-1]))
         #Also determine trend. Here, we take the rule as gospel and do not worry about micro-trends within trends (for that we have to look at a smaller TF)
         # If we are making a HH-HL, it is uptrend. 
         # If LH-LL, downtrend
@@ -157,22 +177,63 @@ class Zigzag(FlowGraphNode):
         trend_array.sort(key=lambda x: x[1])
 
         #Now, look at the last entries
-        if len(trend_array)==0:
+        if len(trend_array)<2: #Need at least 2 data points for comparison
             self.consume()
             return
 
-        if trend_array[-1][0] == 'LL':
-            self.log_trendchange(-1)
-            self.trend = -1
-        elif trend_array[-1][0] == 'HH':
-            self.log_trendchange(1)
-            self.trend = 1
-        elif trend_array[-1][0] == 'HL' and trend_array[-2][0] == 'LH':
-            self.log_trendchange(0)
-            self.trend = 0 #Bearish bias
-        elif trend_array[-1][0] == 'LH' and trend_array[-2][0] == 'HL':
-            self.log_trendchange(0)
-            self.trend = 0 #Bullish bias
+        if trend_array[-2][0] == 'LL':
+            if trend_array[-1][0] == 'LL': #Missed a LH due to window size?
+                self.log_trendchange(-1, trend_array[-1])
+                self.trend = -1
+            elif trend_array[-1][0] == 'LH': #LL-LH: Still a downtrend. Could change.
+                self.log_trendchange(-1, trend_array[-1])
+                self.trend = -1
+            elif trend_array[-1][0] == 'HH': #Whipsawing (HH-HL-HH-LL-HH)
+                self.log_trendchange(0, trend_array[-1])
+                self.trend = 0
+            elif trend_array[-1][0] == 'HL': #Missed a LH due to window size?
+                self.log_trendchange(0, trend_array[-1])
+                self.trend = 0
+        elif trend_array[-2][0] == 'HH':
+            if trend_array[-1][0] == 'LL': #Whipsawing (HH-HL-HH-LL)
+                self.log_trendchange(0, trend_array[-1])
+                self.trend = 0
+            elif trend_array[-1][0] == 'LH': #Missed a HL due to window size?
+                self.log_trendchange(0, trend_array[-1])
+                self.trend = 0
+            elif trend_array[-1][0] == 'HH': #Missed a HL due to window size?
+                self.log_trendchange(1, trend_array[-1])
+                self.trend = 1
+            elif trend_array[-1][0] == 'HL': #Still an uptrend. Could change
+                self.log_trendchange(1, trend_array[-1])
+                self.trend = 1
+        elif trend_array[-2][0] == 'HL':
+            if trend_array[-1][0] == 'LL': #Missed a LH due to window size? Trend changed
+                self.log_trendchange(-1, trend_array[-1])
+                self.trend = -1
+            elif trend_array[-1][0] == 'LH': #Could be changing trends
+                self.log_trendchange(0, trend_array[-1])
+                self.trend = 0
+            elif trend_array[-1][0] == 'HH': #Uptrend intact (trend continuation), or changed
+                self.log_trendchange(1, trend_array[-1])
+                self.trend = 1
+            elif trend_array[-1][0] == 'HL': #Missed a LH due to window size? Trend intact
+                self.log_trendchange(1, trend_array[-1])
+                self.trend = 1
+        elif trend_array[-2][0] == 'LH':
+            if trend_array[-1][0] == 'LL': #Trend continuation or changed
+                self.log_trendchange(-1, trend_array[-1])
+                self.trend = -1
+            elif trend_array[-1][0] == 'LH': #Missed a LL due to window size
+                self.log_trendchange(-1, trend_array[-1])
+                self.trend = -1
+            elif trend_array[-1][0] == 'HH': #Missed a LL/HL due to window size
+                self.log_trendchange(1, trend_array[-1])
+                self.trend = 1
+            elif trend_array[-1][0] == 'HL': #Might be turning a corner
+                self.log_trendchange(0, trend_array[-1])
+                self.trend = 0
+
         
         for node,connection in self.connections:
             await node.next(connection=connection, data = trend_array)

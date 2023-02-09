@@ -41,7 +41,7 @@ class Sink(SinkNode):
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
             return
-        log(f'{self}:', 'debug')
+        #log(f'{self}:', 'debug')
         for conn in self.inputs:
             df = self.inputs[conn]
             if type(df).__name__ == 'DataFrame':
@@ -50,8 +50,9 @@ class Sink(SinkNode):
             elif type(df).__name__ == 'dict':
                 log(json.dumps(df, indent=2, cls=NpEncoder), 'debug')
             elif type(df).__name__ == 'list':
-                for l in df:
-                    log(l, 'debug')
+                pass
+                #for l in df:
+                #    log(l, 'debug')
             else:
                 log(f'{df}', 'debug')
         self.consume()
@@ -76,11 +77,12 @@ class DataFrameSink(SinkNode):
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
             return
-        log(f'{self}:', 'debug')
+        #log(f'{self}:', 'debug')
         for conn in self.inputs:
             df = self.inputs[conn]
             #log(f'{conn}', 'debug')
-            log(f'{df.tail(1)}', 'debug')
+            #log(f'{df.tail(1)}', 'debug')
+            pass
         self.consume()
         return
     

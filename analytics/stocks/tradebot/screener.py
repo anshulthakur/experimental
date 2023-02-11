@@ -16,7 +16,7 @@ from threading import Thread
 from base import FlowGraph
 from base.scheduler import AsyncScheduler as Scheduler
 from nodes import Sink, Resampler, NseMultiStockSource, Indicator, DataFrameSink, TradingViewSource, ColumnFilter
-from strategy.screen import EMA_RSI_Screen
+from strategy.screen import EMA_RSI_Screen, Proximity_Screen, Crossover_Screen
 
 from tradebot.base.signals import EndOfData
 
@@ -39,7 +39,7 @@ async def main():
 
     # Add a dataframe source 
     #source = TradingViewSource(name='Stock', symbol='KABRAEXTRU', exchange='NSE', timeframe='1d')
-    source = NseMultiStockSource(name='Source', exchange='NSE', timeframe='15m', offline=False, offset=200)
+    source = NseMultiStockSource(name='Source', exchange='NSE', timeframe='1d', offline=True, offset=200)
     fg.add_node(source)
 
     #Add a column filter node
@@ -66,10 +66,26 @@ async def main():
     screener = EMA_RSI_Screen(name="EMA-RSI-Screen")
     fg.add_node(screener)
 
+    # Add proximity node
+    proximity = Proximity_Screen(name="Proximity-Scanner", what='close', near='EMA20', by=0.01, direction='up')
+    fg.add_node(proximity)
+
+    # Add crossover node
+    cross = Crossover_Screen(name="Crossover-Scanner", what='close', crosses='EMA20', direction='up')
+    fg.add_node(cross)
+
     # Add some sink nodes 
     sink = Sink(name='Sink')
     fg.add_node(sink)
     fg.register_signal_handler([EndOfData], sink)
+
+    proxy_sink = Sink(name='Proximity')
+    fg.add_node(proxy_sink)
+    fg.register_signal_handler([EndOfData], proxy_sink)
+
+    cross_sink = Sink(name='Crossovers')
+    fg.add_node(cross_sink)
+    fg.register_signal_handler([EndOfData], cross_sink)
 
     df_sink = DataFrameSink(name='DF-Sink')
     fg.add_node(df_sink)
@@ -86,6 +102,13 @@ async def main():
     fg.connect(source, node_indicators)
     fg.connect(node_indicators, screener)
     fg.connect(screener, sink)
+
+    fg.connect(node_indicators, proximity)
+    fg.connect(proximity, proxy_sink)
+
+    fg.connect(node_indicators, cross)
+    fg.connect(cross, cross_sink)
+
     fg.connect(node_indicators, df_sink)
 
     fg.display()

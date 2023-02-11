@@ -118,7 +118,6 @@ def load_index_members(sector, members, date=datetime.datetime.now(), interval=I
     for stock in members:
         try:
             if not online:
-                
                 stock_obj = Stock.objects.get(symbol=stock, market=Market.objects.get(name="NSE"))
                 s_df = get_stock_listing(stock_obj, duration=entries, last_date = date)
                 s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume', 'delivery', 'trades'])

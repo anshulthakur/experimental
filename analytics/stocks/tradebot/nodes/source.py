@@ -305,11 +305,12 @@ class NseMultiStockSource(SourceNode):
                 members = get_index_members(name='NIFTY TOTAL MARKET')
                 self.df = load_index_members(sector='NIFTY TOTAL MARKET', 
                                         members=members,
-                                        entries=210,
+                                        entries=300,
                                         interval=convert_timeframe_to_quant(self.timeframe),
                                         online=not self.offline)
                 self.df.fillna(0, inplace=True)
                 #log(self.df.head(1), 'debug')
+                #log(self.df.tail(1), 'debug')
                 #log(self.df.tail(1).isnull().sum().sum(), 'debug')
                 #nan_cols = self.df.tail(1)[self.df.tail(1).columns[self.df.tail(1).isnull().any()]]
                 #log(nan_cols, 'debug')
@@ -332,6 +333,7 @@ class NseMultiStockSource(SourceNode):
                 self.df.drop_duplicates(inplace=True)
                 #self.df = self.df.loc[self.last_ts:].copy()
         #log(self.df.tail(1), 'debug')
+        #log(len(self.df), 'debug')
         if self.index is None:
             self.index = self.offset
         if self.index < len(self.df):

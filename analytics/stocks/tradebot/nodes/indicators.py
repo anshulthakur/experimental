@@ -100,7 +100,7 @@ class Indicator(FlowGraphNode):
             for indicator in self.indicators:
                 df[indicator] = self.indicators[indicator]['method'](df['close'], **self.indicators[indicator]['attributes'])
             for node,connection in self.connections:
-                await node.next(connection=connection, data = df.tail(1))
+                await node.next(connection=connection, data = df)
         else:
             columns = list(df.columns)
             #log(df.tail(1), 'debug')
@@ -130,5 +130,5 @@ class Indicator(FlowGraphNode):
                         )
             #log(n_df, 'debug')
             for node,connection in self.connections:
-                await node.next(connection=connection, data = n_df.tail(1))
+                await node.next(connection=connection, data = n_df)
         self.consume()

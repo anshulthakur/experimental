@@ -24,7 +24,9 @@ class FlowGraphNode(BaseClass):
         self.strict = strict
         super().__init__(**kwargs)
 
-    def get_connection_name(self, node):
+    def get_connection_name(self, node, tag=None):
+        if tag is not None:
+            return str(tag)
         name = f"{self.name.replace(' ','_')}_{node.name.replace(' ','_')}"
         return name
 
@@ -36,14 +38,19 @@ class FlowGraphNode(BaseClass):
     def flowgraph(self, flowgraph):
         self._flowgraph = flowgraph
 
-    def connect(self, node):
+    def connect(self, node, tag=None):
         log(f'Connect {node} to {self}', 'debug')
-        self.connections.append((node, self.get_connection_name(node)))
-        node.add_input(f"{self.name}_{node.name}")
+        self.connections.append((node, self.get_connection_name(node, tag)))
+        if tag is None:
+            node.add_input(f"{self.name}_{node.name}")
+        else:
+            node.add_input(tag)
 
     def add_input(self, name):
         if not self.multi_input and len(self.inputs)==1:
             raise Exception(f"Cannot add more than one connection to {self.name}")
+        if name in self.inputs:
+            raise Exception(f"Input for {name} already exists in {self.name}")
         self.inputs[name] = None
 
     async def emit(self, signal):
@@ -145,7 +152,7 @@ class FlowGraph(BaseClass):
                 self.signals[signal.name()] = [node]
         log(f'Added {node} to flowgraph {self}', 'debug')
 
-    def connect(self, from_node, to_node):
+    def connect(self, from_node, to_node, tag=None):
         if from_node not in self.nodes:
             log(f'{from_node} not added to flowgraph {self}', 'error')
             raise(f'{from_node} not added to flowgraph {self}')
@@ -153,7 +160,7 @@ class FlowGraph(BaseClass):
             log(f'{to_node} not added to flowgraph {self}', 'error')
             raise(f'{to_node} not added to flowgraph {self}')
 
-        from_node.connect(to_node)
+        from_node.connect(to_node, tag)
         if to_node in self.roots:
             log(f'Remove {to_node} from root list', 'debug')
             self.roots.remove(to_node)

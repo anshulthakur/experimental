@@ -2,14 +2,23 @@ from tradebot.base import FlowGraphNode
 from lib.logging import log
 import pandas as pd
 
+class BaseFilter(object):
+    def __init__(self, filter=None):
+        self.filter = filter
+        self.column_names = []
+
+    def filter(self):        
+        return self.filter
+
 class BaseScreen(FlowGraphNode):
+    epsilon = 0.00001
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.column_names = []
         self.filters = self.create_filters()
         
     def create_filters(self):
-        pass
+        return []
 
     async def next(self, connection=None, **kwargs):
         '''
@@ -59,7 +68,7 @@ class BaseScreen(FlowGraphNode):
                     output.pop(stock, None)
                     continue
                 for filter in self.filters:
-                    if filter(df[stock]) is False: #One filter failed, move to next stock
+                    if filter.filter(df[stock]) is False: #One filter failed, move to next stock
                         output.pop(stock, None)
                         break
         else:
@@ -71,7 +80,7 @@ class BaseScreen(FlowGraphNode):
                     self.consume()
                     return
             for filter in self.filters:
-                if filter(df) is False: #One filter failed, return
+                if filter.filter(df) is False: #One filter failed, return
                     self.consume()
                     return
         if len(output)>0:
@@ -81,12 +90,121 @@ class BaseScreen(FlowGraphNode):
                 await node.next(connection=connection, data = output)
         self.consume()
 
+class CustomScreen(BaseScreen):
+    def __init__(self, filters=[], **kwargs):
+        super().__init__(**kwargs)
+        self.column_names = []
+        for filter in filters:
+            self.filters.append(filter)
+            for column_name in filter.column_names:
+                if column_name not in self.column_names:
+                    self.column_names.append(column_name)
+
+class EMA_Filter(BaseFilter):
+    def __init__(self, value):
+        self.column_names = ['EMA'+str(value)]
+        self.filter = lambda x: x['close'][-1]>=x['EMA'+str(value)][-1]
+
+class RSI_Filter(BaseFilter):
+    def __init__(self, value=65):
+        self.column_names = ['RSI']
+        self.filter = lambda x: True if ((not pd.isna(x['RSI'][-1])) and x['RSI'][-1]>=value) else False
+
+
+class Crossover_Screen(BaseScreen):
+    def __init__(self,  crosses, what='close', direction='None', **kwargs):
+        super().__init__(**kwargs)
+        self.what = what
+        if type(crosses) == str:
+            self.column_names = [crosses, what]
+            self.crosses = crosses
+        elif type(crosses) == float or type(crosses) == int:
+            self.column_names = [what]
+            self.crosses = float(crosses) if crosses != 0 else self.epsilon
+        self.direction = direction.lower()
+
+        self.filters = self.create_filters()
+
+        if kwargs.get('filters', None) is not None:
+            for filter in kwargs.get('filters'):
+                self.filters.append(filter)
+                for column_name in filter.column_names:
+                    if column_name not in self.column_names:
+                        self.column_names.append(column_name)
+
+    def create_filters(self):
+        def crossover(x):
+            #log(x, 'debug')
+            if self.direction in ['none', 'up']:
+                if type(self.crosses) == float:
+                    if x[self.what][-1]>=self.crosses and x[self.what][-2]<self.crosses:
+                        return True
+                else:
+                    if x[self.what][-1]>=x[self.crosses][-1] and x[self.what][-2]<x[self.crosses][-2]:
+                        return True
+            elif self.direction in ['none', 'down']:
+                if type(self.crosses) == float:
+                    if x[self.what][-1]<self.crosses and x[self.what][-2]>=self.crosses:
+                        return True
+                else:
+                    if x[self.what][-1]<x[self.crosses][-1] and x[self.what][-2]>=x[self.crosses][-2]:
+                        return True
+            return False
+        filters = []
+        filters.append(BaseFilter(filter=crossover))
+        return filters
+
+class Proximity_Screen(BaseScreen):
+    def __init__(self,  near, by, what='close', direction='None', **kwargs):
+        super().__init__(**kwargs)
+        self.what = what
+        if type(near) == str:
+            self.column_names = [near, what]
+            self.near = near
+        elif type(near) == float or type(near) == int:
+            self.column_names = [what]
+            self.near = float(near) if near != 0 else self.epsilon
+        self.margin=by #Fraction
+        self.direction = direction.lower()
+
+        self.filters = self.create_filters()
+
+        if kwargs.get('filters', None) is not None:
+            for filter in kwargs.get('filters'):
+                self.filters.append(filter)
+                for column_name in filter.column_names:
+                    if column_name not in self.column_names:
+                        self.column_names.append(column_name)
+
+    def create_filters(self):
+        def proximity(x):
+            #log(x, 'debug')
+            if self.direction in ['none', 'up']:
+                if type(self.near) == float:
+                    if (x[self.what][-1]-self.near)/self.near <= self.margin:
+                        return True
+                else:
+                    if (x[self.what][-1]-x[self.near][-1])/x[self.near][-1] <= self.margin:
+                        return True
+            elif self.direction in ['none', 'down']:
+                if type(self.near) == float:
+                    if (self.near - x[self.what][-1])/self.near <= self.margin:
+                        return True
+                else:
+                    if (x[self.near][-1] - x[self.what][-1])/x[self.near][-1] <= self.margin:
+                        return True
+            return False
+        filters = []
+        filters.append(BaseFilter(filter=proximity))
+        return filters
+
+
+#These are implementation examples of what we have done here
 class EMA_RSI_Screen(BaseScreen):
     def create_filters(self):
-        self.column_names = ['EMA20', 'EMA200', 'RSI']
+        self.column_names = ['close', 'EMA20', 'EMA200', 'RSI']
         filters = []
-        filters.append(lambda x: x['close'][-1]>=x['EMA20'][-1])
-        filters.append(lambda x: x['EMA20'][-1]>=x['EMA200'][-1])
-        filters.append(lambda x: True if ((not pd.isna(x['RSI'][-1])) and x['RSI'][-1]>=65) else False)
+        filters.append(EMA_Filter(value=20))
+        filters.append(EMA_Filter(value=200))
+        filters.append(RSI_Filter(value=65))
         return filters
-    

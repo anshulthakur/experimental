@@ -41,7 +41,7 @@ class Sink(SinkNode):
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
             return
-        #log(f'{self}:', 'debug')
+        log(f'{self}:', 'debug')
         for conn in self.inputs:
             df = self.inputs[conn]
             if type(df).__name__ == 'DataFrame':
@@ -51,8 +51,8 @@ class Sink(SinkNode):
                 log(json.dumps(df, indent=2, cls=NpEncoder), 'debug')
             elif type(df).__name__ == 'list':
                 pass
-                #for l in df:
-                #    log(l, 'debug')
+                for l in df:
+                    log(l, 'debug')
             else:
                 log(f'{df}', 'debug')
         self.consume()
@@ -81,7 +81,7 @@ class DataFrameSink(SinkNode):
         for conn in self.inputs:
             df = self.inputs[conn]
             #log(f'{conn}', 'debug')
-            #log(f'{df.tail(1)}', 'debug')
+            log(f'{df.tail(1)}', 'debug')
             pass
         self.consume()
         return
@@ -144,6 +144,19 @@ class DataFrameAggregator(SinkNode):
         if signal.name() in [Resistance.name(),Support.name()]:
             log(f"[{signal.timestamp}] {signal.name()} : {signal.value} ({signal.index})", 'debug')
         elif signal.name() == EndOfData.name():
+            log("Received end of data", 'debug')
+            pass
+        else:
+            log(f"Unknown signal {signal.name()}")
+        return
+
+
+class Recorder(FlowGraphNode):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    async def handle_signal(self, signal):
+        if signal.name() == EndOfData.name():
             log("Received end of data", 'debug')
             pass
         else:

@@ -96,7 +96,7 @@ INDICES = {"NIFTY 50":"Nifty_50",
         }
 
 def load_index_members(sector, members, date=datetime.datetime.now(), interval=Interval.in_weekly, 
-                        entries=50, online=True, start_date=None, end_date=None):
+                        entries=50, online=True, start_date=None, end_date=None, market='NSE'):
     log('========================', 'debug')
     log(f'Loading for {sector}', 'debug')
     log('========================', 'debug')
@@ -118,7 +118,10 @@ def load_index_members(sector, members, date=datetime.datetime.now(), interval=I
     for stock in members:
         try:
             if not online:
-                stock_obj = Stock.objects.get(symbol=stock, market=Market.objects.get(name="NSE"))
+                if ':' in stock:
+                    market = stock.split(':')[0]
+                    stock = stock.split(':')[1]
+                stock_obj = Stock.objects.get(symbol=stock, market=Market.objects.get(name=market))
                 s_df = get_stock_listing(stock_obj, duration=entries, last_date = date)
                 s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume', 'delivery', 'trades'])
                 #print(s_df.head())
@@ -151,7 +154,7 @@ def load_index_members(sector, members, date=datetime.datetime.now(), interval=I
                 else:
                     s_df = tv.get_hist(
                                 symbol,
-                                'NSE',
+                                market,
                                 interval=interval,
                                 n_bars=entries,
                                 extended_session=False,

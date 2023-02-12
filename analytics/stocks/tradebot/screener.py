@@ -15,8 +15,8 @@ from threading import Thread
 
 from base import FlowGraph
 from base.scheduler import AsyncScheduler as Scheduler
-from nodes import Sink, Resampler, NseMultiStockSource, Indicator, DataFrameSink, TradingViewSource, ColumnFilter
-from strategy.screen import EMA_RSI_Screen, Proximity_Screen, Crossover_Screen
+from nodes import Sink, Resampler, NseMultiStockSource, Indicator, DataFrameSink, TradingViewSource, ColumnFilter, MultiStockSource
+from strategy.screen import EMA_RSI_Screen, Proximity_Screen, Crossover_Screen, EMA_Filter, RSI_Filter
 
 from tradebot.base.signals import EndOfData
 
@@ -39,7 +39,8 @@ async def main():
 
     # Add a dataframe source 
     #source = TradingViewSource(name='Stock', symbol='KABRAEXTRU', exchange='NSE', timeframe='1d')
-    source = NseMultiStockSource(name='Source', exchange='NSE', timeframe='1d', offline=True, offset=200)
+    #source = NseMultiStockSource(name='Source', exchange='NSE', timeframe='1d', offline=True, offset=200)
+    source = MultiStockSource(name='Source', timeframe='1d', offline=True, offset=200, member_file='portfolio.json')
     fg.add_node(source)
 
     #Add a column filter node
@@ -67,11 +68,11 @@ async def main():
     fg.add_node(screener)
 
     # Add proximity node
-    proximity = Proximity_Screen(name="Proximity-Scanner", what='close', near='EMA20', by=0.01, direction='up')
+    proximity = Proximity_Screen(name="Proximity-Scanner", what='close', near='EMA20', by=0.01, direction='up', filters=[EMA_Filter(value=200)])
     fg.add_node(proximity)
 
     # Add crossover node
-    cross = Crossover_Screen(name="Crossover-Scanner", what='close', crosses='EMA20', direction='up')
+    cross = Crossover_Screen(name="Crossover-Scanner", what='close', crosses='EMA20', direction='up', filters=[EMA_Filter(value=200)])
     fg.add_node(cross)
 
     # Add some sink nodes 

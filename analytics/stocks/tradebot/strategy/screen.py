@@ -60,6 +60,7 @@ class BaseScreen(FlowGraphNode):
 
         if len(stocks)>0:
             for stock in stocks:
+                #log(f'{stock}', 'debug')
                 for column in self.column_names:
                     if column not in columns:
                         raise Exception(f"{column} not present in input dataframe for {stock}.")
@@ -68,8 +69,10 @@ class BaseScreen(FlowGraphNode):
                     output.pop(stock, None)
                     continue
                 for filter in self.filters:
+                    #log(f'{filter}', 'debug')
                     if filter.filter(df[stock]) is False: #One filter failed, move to next stock
                         output.pop(stock, None)
+                        #log(f'Filter criteria Failed', 'debug')
                         break
         else:
             for column in self.column_names:
@@ -101,14 +104,21 @@ class CustomScreen(BaseScreen):
                     self.column_names.append(column_name)
 
 class EMA_Filter(BaseFilter):
-    def __init__(self, value):
+    def __init__(self, value, greater=True):
         self.column_names = ['EMA'+str(value)]
-        self.filter = lambda x: x['close'][-1]>=x['EMA'+str(value)][-1]
+        if greater==True:
+            self.filter = lambda x: True if x['close'][-1]>=x['EMA'+str(value)][-1] else False
+        else:
+            self.filter = lambda x: True if x['close'][-1]<=x['EMA'+str(value)][-1] else False
 
 class RSI_Filter(BaseFilter):
-    def __init__(self, value=65):
+    def __init__(self, value=65, greater=True):
         self.column_names = ['RSI']
-        self.filter = lambda x: True if ((not pd.isna(x['RSI'][-1])) and x['RSI'][-1]>=value) else False
+        if greater==True:
+            #self.filter = lambda x: True if ((not pd.isna(x['RSI'][-1])) and x['RSI'][-1]>=value) else False
+            self.filter = lambda x: True if ((not pd.isna(x['RSI'][-1])) and x['RSI'][-1]>=value) else False
+        else:
+            self.filter = lambda x: True if ((not pd.isna(x['RSI'][-1])) and x['RSI'][-1]<=value) else False
 
 
 class Crossover_Screen(BaseScreen):
@@ -127,6 +137,7 @@ class Crossover_Screen(BaseScreen):
 
         if kwargs.get('filters', None) is not None:
             for filter in kwargs.get('filters'):
+                log(f'Add custom filter to {self}', 'debug')
                 self.filters.append(filter)
                 for column_name in filter.column_names:
                     if column_name not in self.column_names:
@@ -171,6 +182,7 @@ class Proximity_Screen(BaseScreen):
 
         if kwargs.get('filters', None) is not None:
             for filter in kwargs.get('filters'):
+                log(f'Add custom filter to {self}', 'debug')
                 self.filters.append(filter)
                 for column_name in filter.column_names:
                     if column_name not in self.column_names:

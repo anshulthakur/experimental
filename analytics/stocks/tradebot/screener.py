@@ -40,7 +40,8 @@ async def main():
     # Add a dataframe source 
     #source = TradingViewSource(name='Stock', symbol='KABRAEXTRU', exchange='NSE', timeframe='1d')
     #source = NseMultiStockSource(name='Source', exchange='NSE', timeframe='1d', offline=True, offset=200)
-    source = MultiStockSource(name='Source', timeframe='1d', offline=True, offset=200, member_file='portfolio.json')
+    #source = MultiStockSource(name='Source', timeframe='1d', offline=True, offset=200, member_file='portfolio.json')
+    source = MultiStockSource(name='Source', timeframe='1d', offline=True, offset=200, member_file='nselist.json')
     fg.add_node(source)
 
     #Add a column filter node
@@ -68,25 +69,39 @@ async def main():
     fg.add_node(screener)
 
     # Add proximity node
-    proximity = Proximity_Screen(name="Proximity-Scanner", what='close', near='EMA20', by=0.01, direction='up', filters=[EMA_Filter(value=200)])
-    fg.add_node(proximity)
+    proximity_up = Proximity_Screen(name="Upside-Proximity-Scanner", what='close', near='EMA20', by=0.01, direction='up', filters=[EMA_Filter(value=200)])
+    fg.add_node(proximity_up)
+
+    proximity_down = Proximity_Screen(name="Downside-Proximity-Scanner", what='close', near='EMA20', by=0.01, direction='down', filters=[EMA_Filter(value=200)])
+    fg.add_node(proximity_down)
 
     # Add crossover node
-    cross = Crossover_Screen(name="Crossover-Scanner", what='close', crosses='EMA20', direction='up', filters=[EMA_Filter(value=200)])
-    fg.add_node(cross)
+    cross_up = Crossover_Screen(name="Upside-Crossover-Scanner", what='close', crosses='EMA20', direction='up', filters=[EMA_Filter(value=200)])
+    fg.add_node(cross_up)
+
+    cross_down = Crossover_Screen(name="Downside-Crossover-Scanner", what='close', crosses='EMA20', direction='down', filters=[EMA_Filter(value=200)])
+    fg.add_node(cross_down)
 
     # Add some sink nodes 
     sink = Sink(name='Sink')
     fg.add_node(sink)
     fg.register_signal_handler([EndOfData], sink)
 
-    proxy_sink = Sink(name='Proximity')
+    proxy_sink = Sink(name='Proximity-Upside')
     fg.add_node(proxy_sink)
     fg.register_signal_handler([EndOfData], proxy_sink)
 
-    cross_sink = Sink(name='Crossovers')
+    proxy_sink_2 = Sink(name='Proximity-Downside')
+    fg.add_node(proxy_sink_2)
+    fg.register_signal_handler([EndOfData], proxy_sink_2)
+
+    cross_sink = Sink(name='Upside-Crossovers')
     fg.add_node(cross_sink)
     fg.register_signal_handler([EndOfData], cross_sink)
+
+    cross_sink_2 = Sink(name='Downside-Crossovers')
+    fg.add_node(cross_sink_2)
+    fg.register_signal_handler([EndOfData], cross_sink_2)
 
     df_sink = DataFrameSink(name='DF-Sink')
     fg.add_node(df_sink)
@@ -104,11 +119,16 @@ async def main():
     fg.connect(node_indicators, screener)
     fg.connect(screener, sink)
 
-    fg.connect(node_indicators, proximity)
-    fg.connect(proximity, proxy_sink)
+    fg.connect(node_indicators, proximity_up)
+    fg.connect(node_indicators, proximity_down)
+    fg.connect(proximity_up, proxy_sink)
+    fg.connect(proximity_down, proxy_sink_2)
 
-    fg.connect(node_indicators, cross)
-    fg.connect(cross, cross_sink)
+    fg.connect(node_indicators, cross_up)
+    fg.connect(cross_up, cross_sink)
+
+    fg.connect(node_indicators, cross_down)
+    fg.connect(cross_down, cross_sink_2)
 
     fg.connect(node_indicators, df_sink)
 

@@ -34,7 +34,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'rest.settings')
 os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 django.setup()
 
-from stocks.models import Listing, Stock
+from stocks.models import Listing, Stock, Market
 
 #Libraries for the Plotting
 from bokeh.plotting import figure
@@ -312,7 +312,8 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
     for stock in members:
         try:
             if not online:
-                stock_obj = Stock.objects.get(sid=stock)
+                market = Market.objects.get(name='NSE')
+                stock_obj = Stock.objects.get(symbol=stock, market=market)
                 s_df = get_stock_listing(stock_obj, duration=duration, last_date = date)
                 s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume', 'delivery', 'trades'])
                 #print(s_df.head())

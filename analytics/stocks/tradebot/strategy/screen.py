@@ -193,17 +193,17 @@ class Proximity_Screen(BaseScreen):
             #log(x, 'debug')
             if self.direction in ['none', 'up']:
                 if type(self.near) == float:
-                    if (x[self.what][-1]-self.near)/self.near <= self.margin:
+                    if (x[self.what][-1] > self.near) and (x[self.what][-1]-self.near)/self.near <= self.margin:
                         return True
                 else:
-                    if (x[self.what][-1]-x[self.near][-1])/x[self.near][-1] <= self.margin:
+                    if (x[self.what][-1] > x[self.near][-1]) and (x[self.what][-1]-x[self.near][-1])/x[self.near][-1] <= self.margin:
                         return True
             elif self.direction in ['none', 'down']:
                 if type(self.near) == float:
-                    if (self.near - x[self.what][-1])/self.near <= self.margin:
+                    if (self.near > x[self.what][-1]) and (self.near - x[self.what][-1])/self.near <= self.margin:
                         return True
                 else:
-                    if (x[self.near][-1] - x[self.what][-1])/x[self.near][-1] <= self.margin:
+                    if (x[self.near][-1] > x[self.what][-1]) and (x[self.near][-1] - x[self.what][-1])/x[self.near][-1] <= self.margin:
                         return True
             return False
         filters = []

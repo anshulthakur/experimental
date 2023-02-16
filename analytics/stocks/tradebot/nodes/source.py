@@ -103,10 +103,6 @@ class DbSource(SourceNode):
     def __init__(self, symbol, exchange, timeframe, **kwargs):
         super().__init__(**kwargs)
 
-class CsvSource(SourceNode):
-    def __init__(self, filename, **kwargs):
-        self.filename = filename
-        super().__init__(**kwargs)
 
 class YahooSource(SourceNode):
     def __init__(self, symbol, timeframe, **kwargs):
@@ -512,3 +508,17 @@ class MultiStockSource(SourceNode):
                 await self.emit(EndOfData(timestamp=self.df.index[-1]))
                 self.ended = True
             return
+
+
+class FolderSource(SourceNode):
+    '''
+    Read from the folder organized as:
+    - YEAR
+        - Month
+            - Day
+                
+    '''
+    def __init__(self, filename, **kwargs):
+        self.filename = filename
+        super().__init__(**kwargs)
+

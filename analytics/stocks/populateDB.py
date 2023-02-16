@@ -31,11 +31,6 @@ def handler(signum, frame):
     print('Error dates appended to error_dates.txt')
     exit(0)
 
-def get_filelist(folder):
-    files = os.listdir(folder)
-    files = [f for f in files if os.path.isfile(folder+'/'+f) and f[-3:].strip().lower()=='csv'] #Filtering only the files.
-    return files
-
 def parse_bse_delivery(dateval):
     global error_dates
     data = {}

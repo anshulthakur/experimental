@@ -26,3 +26,8 @@ def create_directory(path):
         os.mkdir(path)
     except FileExistsError:
         pass
+
+def get_filelist(folder):
+    files = os.listdir(folder)
+    files = [f for f in files if os.path.isfile(folder+'/'+f) and f[-3:].strip().lower()=='csv'] #Filtering only the files.
+    return files

@@ -267,7 +267,7 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
     df.rename(columns={'Index Date': 'date',
                        'Closing Index Value': sector},
                inplace = True)
-    df['date'] = pd.to_datetime(df['date'], format='%d-%m-%Y')
+    df['date'] = pd.to_datetime(df['date'], format='%d-%m-%Y')+ pd.Timedelta('9 hour') +  pd.Timedelta('15 minute')
     df.set_index('date', inplace = True)
     df = df.sort_index()
     df = df.reindex(columns = [sector])
@@ -288,6 +288,7 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
     #Truncate to last n days
     df = df.iloc[-entries:]
     #print(df.head(10))
+    #print(len(df.index))
     #print(date)
     start_date = df.index.values[0]
     end_date = df.index.values[-1]
@@ -301,14 +302,16 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
         duration = duration.astype('timedelta64[D]')/np.timedelta64(1, 'D')
     
     duration = max(int(duration.astype(int))+1, entries)
-
+    #print(duration)
     username = 'AnshulBot'
     password = '@nshulthakur123'
     tv = None
     interval = convert_timeframe_to_quant(sampling)
+    #print(interval)
     if online:
         tv = get_tvfeed_instance(username, password)
     #print(duration, type(duration))
+    df_arr = [df]
     for stock in members:
         try:
             if not online:
@@ -323,7 +326,7 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
                 s_df.rename(columns={'close': stock},
                            inplace = True)
                 s_df.reset_index(inplace = True)
-                s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y')
+                s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y')+ pd.Timedelta('9 hour') +  pd.Timedelta('15 minute')
                 #s_df.drop_duplicates(inplace = True, subset='date')
                 s_df.set_index('date', inplace = True)
                 s_df = s_df.sort_index()
@@ -331,9 +334,10 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
                 s_df = s_df[~s_df.index.duplicated(keep='first')]
                 #print(s_df[s_df.index.duplicated(keep=False)])
                 s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
-                df[stock] = s_df[stock]
+                #df[stock] = s_df[stock]
+                df_arr.append(s_df)
             else:
-                print(stock)
+                #print(stock)
                 symbol = stock.strip().replace('&', '_')
                 symbol = symbol.replace('-', '_')
                 nse_map = {'UNITDSPR': 'MCDOWELL_N',
@@ -367,7 +371,7 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
                                inplace = True)
                     #print(s_df.columns)
                     #pd.to_datetime(df['DateTime']).dt.date
-                    s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y').dt.date
+                    s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y %H:%M:%S').dt.date
                     #s_df.drop_duplicates(inplace = True, subset='date')
                     s_df.set_index('date', inplace = True)
                     s_df = s_df.sort_index()
@@ -379,16 +383,35 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
                     #print(s_df.loc[start_date:end_date])
                     #print(s_df.head(10))
                     #print(s_df[s_df.index.duplicated(keep=False)])
-                    df[stock] = s_df[stock]
+                    if (pd.to_datetime(s_df.index[0]) - df.index[0]).days <7:
+                        #Handle the case of the start of the week being a holiday
+                        data = {stock: s_df[stock][0]}
+                        #print('Handle holiday')
+                        s_df = pd.concat([s_df, pd.DataFrame(data, index=[pd.to_datetime(df.index[0])])])
+                        #print(s_df.tail(10))
+                        s_df.sort_index(inplace=True)
+                        s_df.drop(s_df.index[1], inplace=True)
+                    #print(s_df.head(10))
+                    #df[stock] = s_df[stock]
+                    df_arr.append(s_df)
         except Stock.DoesNotExist:
             print(f'{stock} values do not exist')
+    #print(df_arr)
+    #Sleight of hand for now: 
+    # The issue is that index df is in format DD-MM-YYYY and others are in DD-MM-YY HH-MM-SS. concat does not add them nicely.
+    df = pd.concat(df_arr, axis=1)
+    #s_df[sector] = df
+    #print(df.tail(10))
     df = df[~df.index.duplicated(keep='first')]
-    
-    #print(df.head(10))
+    df.index.names = ['date']
+    print(df.head(10))
+    #print(s_df.head(10))
+    #print(df.tail(10))
+    #print(len(df.index))
     return df
 
 def compute_jdk(benchmark = 'Nifty_50', base_df=None):
-    #print(base_df.head(10))
+    print(base_df.head(10))
     df = base_df.copy(deep=True)
     
     df.sort_values(by='date', inplace=True, ascending=True)
@@ -479,6 +502,7 @@ def load_sectoral_indices(date, sampling, entries=50):
                inplace = True)
     df['date'] = pd.to_datetime(df['date'], format='%d-%m-%Y')
     df.set_index('date', inplace = True)
+    df.index = df.index + pd.Timedelta('9 hour') +  pd.Timedelta('15 minute')
     df = df.sort_index()
     df = df.reindex(columns = ['Nifty_50'])
     #filelist = load_file_list()
@@ -497,6 +521,7 @@ def load_sectoral_indices(date, sampling, entries=50):
         s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y')
         #s_df.drop_duplicates(inplace = True, subset='date')
         s_df.set_index('date', inplace = True)
+        s_df.index = s_df.index + pd.Timedelta('9 hour') +  pd.Timedelta('15 minute')
         s_df = s_df.sort_index()
         s_df = s_df.reindex(columns = [index])
         s_df = s_df[~s_df.index.duplicated(keep='first')]
@@ -741,7 +766,7 @@ def main(date=datetime.date.today(), sampling = 'w', online=True):
         if len(members) ==0:
             continue
         df = load_members(sector=column, members=members, date=date, sampling=sampling, entries=33, online=online)
-        #print(df.head())
+        #print(df.head(10))
         [ratio, momentum] = compute_jdk(benchmark=column, base_df = df)
         save_scatter_plots(ratio, momentum, column)
         if len(ratio) >0:

@@ -515,10 +515,74 @@ class FolderSource(SourceNode):
     Read from the folder organized as:
     - YEAR
         - Month
-            - Day
-                
     '''
-    def __init__(self, filename, **kwargs):
-        self.filename = filename
+    def __init__(self, folder, **kwargs):
+        if os.path.isdir(folder):
+            self.folder = folder
+        else:
+            raise Exception(f'Folder {folder} does not exist')
+        
         super().__init__(**kwargs)
 
+    async def next(self, connection=None, **kwargs):
+        if not self.ready(connection, **kwargs):
+            log(f'{self}: Not ready yet', 'debug')
+            return
+        if self.ended:
+            return
+        if self.df is None:
+            log('Fetch data', 'debug')
+            if self.mode in ['backtest', 'buffered']:
+                #Get previous data on this timeframe from DB or tradingview
+                members = self.get_members(name=self.memberfile)
+                self.df = load_index_members(sector=self.memberfile, 
+                                        members=members,
+                                        entries=295,
+                                        interval=convert_timeframe_to_quant(self.timeframe),
+                                        online=not self.offline)
+                self.df.fillna(0, inplace=True)
+                #log(self.df.head(1), 'debug')
+                #log(self.df.tail(1), 'debug')
+                #log(self.df.tail(1).isnull().sum().sum(), 'debug')
+                #nan_cols = self.df.tail(1)[self.df.tail(1).columns[self.df.tail(1).isnull().any()]]
+                #log(nan_cols, 'debug')
+            else:
+                self.df = self.source.getEquityStockIndices(index='NIFTY TOTAL MARKET')
+                self.df.fillna(0, inplace=True)
+                #log(self.df.head(10), 'debug')
+                #self.df['datetime'] = kwargs.get('data')
+                #self.df.set_index('datetime', inplace=True)
+                #self.df.sort_index(inplace=True)
+        else:
+            if self.mode not in ['backtest', 'buffered']:
+                log('Re-fetch data', 'debug')
+                df = self.source.getEquityStockIndices(index='NIFTY TOTAL MARKET')
+                #df['datetime'] = kwargs.get('data')
+                #df.set_index('datetime', inplace=True)
+                #df.sort_index(inplace=True)
+                #log(df.tail(10), 'debug')
+                self.df = pd.concat([self.df, df], join='outer', sort=True)
+                self.df.drop_duplicates(inplace=True)
+                #self.df = self.df.loc[self.last_ts:].copy()
+        #log(self.df.tail(1), 'debug')
+        #log(len(self.df), 'debug')
+        if self.index is None:
+            self.index = self.offset
+        if self.index < len(self.df):
+            df = self.df.iloc[0:self.index+1].copy()
+            if len(df)>0:
+                self.last_ts = df.index[-1]
+                #log(f'{df.tail(1)}', 'debug')
+                for node,connection in self.connections:
+                    await node.next(connection=connection, data = df.copy(deep=True))
+                self.consume()
+            else:
+                log('No data to pass', 'debug')
+                self.consume()
+                return
+            self.index +=1
+        else:
+            if not self.ended:
+                await self.emit(EndOfData(timestamp=self.df.index[-1]))
+                self.ended = True
+            return

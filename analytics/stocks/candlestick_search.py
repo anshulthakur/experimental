@@ -59,8 +59,13 @@ def classify(rgb_tuple):
 def main(filename, ohlc_type='candlestick', find_tops=False):
     # load the image and convert into 
     # numpy array
+    base_name = filename
+    if len(filename.split('.'))>=2 and filename.split('.')[-1] in ['jpg', 'jpeg', 'png']:
+        base_name = ''.join(filename.split('.')[0:-1])
+    else:
+        filename = filename+'.png'
     img_name = filename
-    img = Image.open('images/'+img_name+'.png').convert('RGB')
+    img = Image.open(filename).convert('RGB')
     numpydata = asarray(img)
     candles = []
 
@@ -356,7 +361,7 @@ def main(filename, ohlc_type='candlestick', find_tops=False):
     day = datetime.datetime.strptime(last_candle_date, "%d/%m/%y").date()
     print(day)
     #download_date = day - datetime.timedelta(days=delta)
-    with open('./images/'+img_name+'.csv', 'w') as fd:
+    with open('./'+base_name+'.csv', 'w') as fd:
         ii=0
         fd.write('index,date,Candle Color,Candle Length,open,close,change\n')
         for candle in candles:
@@ -368,13 +373,13 @@ def main(filename, ohlc_type='candlestick', find_tops=False):
                 fd.write(f"{ii},{dayval},{candle['color']},{candle['body_end_left'][0] - candle['body_start_left'][0]},{candle['open']},{candle['close']},{(candles[ii]['close']-candles[ii-1]['close'])/candles[ii-1]['close']}\n")
             ii+=1
             
-    r_df = pd.read_csv('./images/'+img_name+'.csv')
+    r_df = pd.read_csv('./'+base_name+'.csv')
     r_df.reset_index(inplace = True)
     r_df['date'] = pd.to_datetime(r_df['date'], format='%d/%m/%Y')
     r_df.set_index('date', inplace = True)
     r_df = r_df.sort_index()
     r_df.plot(y='close')
-    plt.savefig('./images/'+img_name+'_line.png')
+    plt.savefig('./'+base_name+'_line.png')
     
 if __name__ == "__main__":
     import argparse

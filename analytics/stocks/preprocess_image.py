@@ -105,7 +105,7 @@ def variant2(img_name):
     im2.save(base_name+'_crop_2.png')
 
 def main(img_name):
-    print('Preprocessing: images/{}.png'.format(args.file))
+    #print('Preprocessing: images/{}.png'.format(args.file))
     base_name = img_name
     if len(img_name.split('.'))>=2 and img_name.split('.')[-1] in ['jpg', 'jpeg', 'png']:
         base_name = ''.join(img_name.split('.')[0:-1])

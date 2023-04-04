@@ -10,7 +10,7 @@ import datetime
 import urllib
 import requests
 
-url_base_path = "https://www1.nseindia.com/content/indices/ind_close_all_{date}.csv" #25082022
+url_base_path = "https://archives.nseindia.com/content/indices/ind_close_all_{date}.csv" #https://archives.nseindia.com/content/indices/ind_close_all_03042023.csv
 download_path = './reports/daily/'
 index_files_path = './reports/'
 
@@ -30,12 +30,29 @@ def download_daily_data(day, silent=False):
         return filepath
     url = url_base_path.format(date=day.strftime("%d%m%Y"))
     headers = {
-            'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:57.0) Gecko/20100101 Firefox/57.0', 
-            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            "accept-encoding": "gzip, deflate, br",
+            "accept":
+            """text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7""",
+            "accept-language": "en-US,en;q=0.9,hi;q=0.8",
+            "host": "www.nseindia.com",
+            "referer": "https://www.nseindia.com/all-reports",
+            'Connection': 'keep-alive',
+            "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edg/111.0.1661.62",
+            "authority": "www.nseindia.com",
+            "upgrade-insecure-requests": "1",
             }
+
     try:
         session = requests.Session()
-        response = session.get(url, headers=headers)
+        session.headers.update(headers)
+        response = session.get('https://www.nseindia.com/all-reports')
+        #print(response.headers)
+        #print(url)
+        session.headers.update({'host': "archives.nseindia.com"})
+        response = session.get(url)
+        #print(response.request.headers)
+        #print(response.headers)
+        #print(response.text)
         response.raise_for_status()
         open(filepath, 'wb').write(response.content)
     except Exception as e:

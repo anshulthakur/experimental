@@ -22,8 +22,8 @@ def print_debug(*args):
     return
 
 color_scheme = {'candlesticks': {
-                                'body': ['white', 'black'],
-                                #'border': ['green', 'red'],
+                                #'body': ['white', 'black'],
+                                'border': ['green', 'red'],
                                 'border': ['black']
                                 },
                 'bars': {

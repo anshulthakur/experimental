@@ -18,6 +18,7 @@ from sklearn.metrics import mean_squared_error
 from lib.misc import create_directory
 from lib.retrieval import get_stock_listing
 from lib.logging import set_loglevel, log
+from lib.cache import cached
 from stocks.models import Listing, Stock, Market
 
 nse_list = 'NSE_list.csv'
@@ -54,7 +55,7 @@ def calc_rmse(actual, predic):
     #print(predic.mean())
     return mean_squared_error(actual - actual.mean(), predic - predic.mean())
 
-def cached(name, df=None, timeframe=Interval.in_daily):
+def cached_old(name, df=None, timeframe=Interval.in_daily):
     import json
     cache_file = '.cache.json'
     overwrite = False

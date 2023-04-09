@@ -26,6 +26,7 @@ from talib.abstract import *
 from talib import MA_Type
 
 from lib.tradingview import TvDatafeed, Interval, convert_timeframe_to_quant
+from lib.cache import cached
 from download_index_reports import download_historical_data
 
 #Prepare to load stock data as pandas dataframe from source. In this case, prepare django
@@ -169,7 +170,7 @@ def save_progress(index):
                                  'index': processed}))
     return
 
-def cached(name, df=None):
+def cached_old(name, df=None):
     import json
     cache_file = '.cache.json'
     overwrite = False
@@ -383,13 +384,14 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
                     #print(s_df.loc[start_date:end_date])
                     #print(s_df.head(10))
                     #print(s_df[s_df.index.duplicated(keep=False)])
-                    if (pd.to_datetime(s_df.index[0]) - df.index[0]).days <7:
+                    if ((pd.to_datetime(s_df.index[0]) - df.index[0]).days > 0) and ((pd.to_datetime(s_df.index[0]) - df.index[0]).days <7):
                         #Handle the case of the start of the week being a holiday
                         data = {stock: s_df[stock][0]}
                         #print('Handle holiday')
                         s_df = pd.concat([s_df, pd.DataFrame(data, index=[pd.to_datetime(df.index[0])])])
                         #print(s_df.tail(10))
                         s_df.sort_index(inplace=True)
+                        #print(s_df.head(10))
                         s_df.drop(s_df.index[1], inplace=True)
                     #print(s_df.head(10))
                     #df[stock] = s_df[stock]

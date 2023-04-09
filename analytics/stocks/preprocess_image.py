@@ -1,3 +1,4 @@
+#!python3
 '''
 Created on 17-Oct-2022
 
@@ -15,8 +16,8 @@ red_candle = ['red']
 green_candle = ['green']
 # transform_rule = {'blue': 'white',
 #                   'white': 'white',
-#                   'black': 'red',
-#                   'red': 'green',
+#                   'black': 'black',
+#                   'red': 'white',
 #                   'green': 'white'}
 
 colors = {"red": (255, 0, 0),
@@ -141,4 +142,4 @@ if __name__ == "__main__":
     if args.file is not None and len(args.file)>0:
         fname = args.file
     main(fname)
-    variant2(fname)
+    #variant2(fname)

@@ -6,6 +6,25 @@ from tradebot.base.signals import Resistance, Support, EndOfData
 from tradebot.base.trading import BaseBot, Broker
 
 class EvolvingSupportResistance(FlowGraphNode):
+    '''
+    This strategy is fairly simple. It defines points as resistance and supports as:
+
+    Resistance: Spot Price from where a scrip whose CMP was rising over a few periods starts to recede lower 
+    Support: Spot Price from where a scrip whose CMP was falling over a few periods starts to rise higher
+
+    From the point of start, it judges the direction of movement based on a consecutive delta. 
+    So, if P_t(1) > P_t(2), t(1)<t(2): We start with a downtrend. The place where P_t(n) < P_t_(n+1) happens is 
+    marked as support. Symmetrically, resistances.
+
+    If the next resistance value (after a downtrend changes to uptrend) is taken out, it becomes support 
+    until broken again. Similarly for supports turning into resistance.
+
+    It is very naive as it doesn't look at long term horizons or the frequency with which the support/resistance
+    were hit/taken out.
+
+    It emits a signal with new support/resistance values every time they are created. However, it does not emit
+    a signal that a support is converted to  resistance (delete support, add resistance), and vice versa.
+    '''
     def __init__(self, resistance_basis='close', support_basis='close', **kwargs):
         super().__init__(signals= [Resistance, Support], **kwargs)
         self.resistances = []
@@ -74,6 +93,12 @@ class EvolvingSupportResistance(FlowGraphNode):
         self.consume()
 
 class Zigzag(FlowGraphNode):
+    '''
+    This strategy has a bit more memory and classifies points as HH-HL, LH-LL.
+    Based on that, it generates Support and Resistance signals. 
+    
+    It can also (but doesn't) generate trend change signals right now.
+    '''
     def __init__(self, **kwargs):
         super().__init__(signals= [Resistance, Support], strict=False, **kwargs)
         self.multi_input = True
@@ -239,8 +264,13 @@ class Zigzag(FlowGraphNode):
             await node.next(connection=connection, data = trend_array)
 
         self.consume()
-        
+
 class LongBot(FlowGraphNode, BaseBot, Broker):
+    '''
+    This is a bot which only goes long and quits if stop loss is hit.
+    The signals may be coming from any of the price-action nodes. 
+    It consumes Resistance and Support signals right now.
+    '''
     def __init__(self, **kwargs):
         self.sl = None
         self.resistance = None
@@ -274,6 +304,54 @@ class LongBot(FlowGraphNode, BaseBot, Broker):
                 self.sl = self.support
                 log(f'Update stop loss: {self.sl}', 'info')
         elif signal.name() == EndOfData.name():
+            self.summary()
+            self.get_orderbook()
+        else:
+            log(f"Unknown signal {signal.name()}")
+
+class DynamicResistanceBot(FlowGraphNode, BaseBot, Broker):
+    '''
+    This is a bot which only goes short and quits if stop loss is hit.
+    There are no signals to work on, it is fed data enriched with the EMA
+    values. 
+    If we are in downtrend, and price (high) in the last candle is within a proximity of the 
+    tracked resistance without crossing over, go short.
+    Stop loss is fixed points above for now. Later, it may be the nearest resistance.
+    '''
+    def __init__(self, value=20, proximity=1, **kwargs):
+        self.sl = None
+        self.ema_val = str(value)
+        self.proximity = proximity
+        self.last_close = 0
+        self.ticks_since_last_touch = 0 #In case we want to incorporate rebounce to avoid taking positions in noisy environment
+        super().__init__(**kwargs)
+    
+    async def next(self, connection=None, **kwargs):
+        if not self.ready(connection, **kwargs):
+            log(f'{self}: Not ready yet', 'debug')
+            return
+        df = kwargs.get('data')
+        if self.position and self.sl > df['close'][-1]:
+            self.close_position(df['close'][-1], date=df.index[-1].to_pydatetime())
+            self.sl = 0
+            log(f'SL Hit {df["close"][-1]}. Total Charges (so far): {self.charges}', 'info')
+
+        if df['close'][-1] <= df['EMA'+self.ema_val][-1]:
+            #Still below EMA. Are we in proximity?
+            if df['close'][-1]/df['EMA'+self.ema_val][-1] <= self.proximity:
+                #We are within proximity. Go short if there isn't a position open, else, update SL
+                if not self.position:
+                    self.sell(df['close'][-1], date=df.index[-1].to_pydatetime())
+                    log(f"Go short: {df['close'][-1]} SL: {self.sl}", 'info')
+                else:
+                    self.sl = df['high'][-1]
+        self.last_close = [df['close'][-1], df.index[-1]]
+        self.consume()
+
+    async def handle_signal(self, signal):
+        if signal.name() == EndOfData.name():
+            if self.position:
+                self.close_position(self.last_close[0], date=self.last_close[1].to_pydatetime())
             self.summary()
             self.get_orderbook()
         else:

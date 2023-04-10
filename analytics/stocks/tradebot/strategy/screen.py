@@ -104,12 +104,12 @@ class CustomScreen(BaseScreen):
                     self.column_names.append(column_name)
 
 class EMA_Filter(BaseFilter):
-    def __init__(self, value, greater=True):
+    def __init__(self, value, greater=True, what='close'):
         self.column_names = ['EMA'+str(value)]
         if greater==True:
-            self.filter = lambda x: True if x['close'][-1]>=x['EMA'+str(value)][-1] else False
+            self.filter = lambda x: True if x[what][-1]>=x['EMA'+str(value)][-1] else False
         else:
-            self.filter = lambda x: True if x['close'][-1]<=x['EMA'+str(value)][-1] else False
+            self.filter = lambda x: True if x[what][-1]<=x['EMA'+str(value)][-1] else False
 
 class RSI_Filter(BaseFilter):
     def __init__(self, value=65, greater=True):
@@ -119,7 +119,6 @@ class RSI_Filter(BaseFilter):
             self.filter = lambda x: True if ((not pd.isna(x['RSI'][-1])) and x['RSI'][-1]>=value) else False
         else:
             self.filter = lambda x: True if ((not pd.isna(x['RSI'][-1])) and x['RSI'][-1]<=value) else False
-
 
 class Crossover_Screen(BaseScreen):
     def __init__(self,  crosses, what='close', direction='None', **kwargs):

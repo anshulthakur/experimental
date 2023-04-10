@@ -1,3 +1,6 @@
+'''
+This bot only goes long
+'''
 import asyncio
 
 import sys, os

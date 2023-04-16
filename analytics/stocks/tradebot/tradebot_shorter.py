@@ -46,6 +46,7 @@ async def main():
                           timeframe='1H', 
                           folder=project_dirs.get('intraday'),
                           start_date='2022-01-01 09:15',
+                          market_start_time='09:15:00',
                           offset=25)
     fg.add_node(source)
 
@@ -58,7 +59,13 @@ async def main():
     fg.add_node(node_indicators)
 
     #TraderBot
-    shortbot = DynamicResistanceBot(name='ShortBot', value=20, proximity=1.0, cash=20000000, lot_size=75)
+    shortbot = DynamicResistanceBot(name='ShortBot', 
+                                    value=20, 
+                                    proximity=1.0, 
+                                    cash=20000000, 
+                                    lot_size=75,
+                                    overnight_positions=False,
+                                    last_candle_time='15:15:00')
     fg.add_node(shortbot)
     fg.register_signal_handler([EndOfData], shortbot)
 
@@ -68,7 +75,7 @@ async def main():
     fg.register_signal_handler([Resistance, Support, EndOfData], sink)
     
     #Add frequency scaling
-    resampler = Resampler(interval=1*60*60, name='Resampler') #Running on a 15min scale
+    resampler = Resampler(interval=1, name='Resampler') #Running on a 15min scale
     fg.add_node(resampler)
 
     # connect the nodes together

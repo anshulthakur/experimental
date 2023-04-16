@@ -522,7 +522,7 @@ class FolderSource(SourceNode):
             - Day
                 - Stock.csv
     '''
-    def __init__(self, folder, symbol='NIFTY50', start_date = '2012-01-01 09:15', timeframe='1min', offset=0, **kwargs):
+    def __init__(self, folder, symbol='NIFTY50', start_date = '2012-01-01 09:15', market_start_time='09:15:00', timeframe='1min', offset=0, **kwargs):
         if os.path.isdir(folder):
             self.folder = folder
         else:
@@ -535,6 +535,7 @@ class FolderSource(SourceNode):
         self.df = None
         self.index = None
         self.offset = offset
+        self.market_start_time = datetime.datetime.strptime(market_start_time, "%H:%M:%S")
         super().__init__(signals= [EndOfData], **kwargs)
 
     def sanitize_timeframe(self, timeframe):
@@ -592,9 +593,9 @@ class FolderSource(SourceNode):
         if self.timeframe.lower() == '1min':
             return df
         if self.timeframe.endswith('Min'):
-            df = df.resample(self.timeframe.lower()).apply(logic).dropna()
+            df = df.resample(self.timeframe.lower(), offset='09h15min').apply(logic).dropna()
         else:
-            df = df.resample(self.timeframe).apply(logic).dropna()
+            df = df.resample(self.timeframe, offset='09h15min').apply(logic).dropna()
         return df
     
     async def next(self, connection=None, **kwargs):
@@ -635,8 +636,16 @@ class FolderSource(SourceNode):
                             df_source.set_index('datetime', inplace=True)
                             df_source.reindex()
                             df_source = df_source.sort_index()
+                            #Until initial datetime is less than market hours, drop rows
+                            while True:
+                                if (df_source.index[0].hour <= self.market_start_time.hour) and \
+                                    (df_source.index[0].minute < self.market_start_time.minute):
+                                    df_source.drop(index=[df_source.index[0]], inplace=True)
+                                else:
+                                    break
                             #This is 1 minute data. Resample, if required
                             df_source = self.resample(df_source)
+
                             df_array.append(df_source)
                         #Increment the day to advance the date
                         self.current_date += relativedelta(days=1)

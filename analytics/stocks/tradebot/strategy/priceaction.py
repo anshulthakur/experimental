@@ -316,9 +316,9 @@ class DynamicResistanceBot(FlowGraphNode, BaseBot, Broker):
     values. 
     If we are in downtrend, and price (high) in the last candle is within a proximity of the 
     tracked resistance without crossing over, go short.
-    Stop loss is fixed points above for now. Later, it may be the nearest resistance.
+    Stop loss is fixed points above for now (high of last candle). Later, it may be the nearest resistance.
     '''
-    def __init__(self, value=20, proximity=1, **kwargs):
+    def __init__(self, value=20, proximity=1.0, **kwargs):
         self.sl = None
         self.ema_val = str(value)
         self.proximity = proximity
@@ -331,21 +331,71 @@ class DynamicResistanceBot(FlowGraphNode, BaseBot, Broker):
             log(f'{self}: Not ready yet', 'debug')
             return
         df = kwargs.get('data')
-        if self.position and self.sl > df['close'][-1]:
-            self.close_position(df['close'][-1], date=df.index[-1].to_pydatetime())
-            self.sl = 0
-            log(f'SL Hit {df["close"][-1]}. Total Charges (so far): {self.charges}', 'info')
+        if self.position and self.sl <= df.iloc[-1]['close']:
+            self.close_position(df.iloc[-1]['close'], date=df.index[-1].to_pydatetime())
+            self.sl = None
+            log(f"SL Hit {df.iloc[-1]['close']}. Total Charges (so far): {self.charges}", 'info')
 
-        if df['close'][-1] <= df['EMA'+self.ema_val][-1]:
+        if df.iloc[-1]['close'] <= df.iloc[-1]['EMA'+self.ema_val]:
             #Still below EMA. Are we in proximity?
-            if df['close'][-1]/df['EMA'+self.ema_val][-1] <= self.proximity:
+            if (abs(df.iloc[-1]['close'] - df.iloc[-1]['EMA'+self.ema_val])/df.iloc[-1]['EMA'+self.ema_val])*100 <= self.proximity:
                 #We are within proximity. Go short if there isn't a position open, else, update SL
                 if not self.position:
-                    self.sell(df['close'][-1], date=df.index[-1].to_pydatetime())
-                    log(f"Go short: {df['close'][-1]} SL: {self.sl}", 'info')
+                    self.sell(df.iloc[-1]['close'], date=df.index[-1].to_pydatetime())
+                    self.sl = df.iloc[-1]['high']
+                    log(f"Go short: {df.iloc[-1]['close']} SL: {self.sl}", 'info')
                 else:
-                    self.sl = df['high'][-1]
-        self.last_close = [df['close'][-1], df.index[-1]]
+                    self.sl = df.iloc[-1]['high']
+        self.last_close = [df.iloc[-1]['close'], df.index[-1]]
+        self.consume()
+
+    async def handle_signal(self, signal):
+        if signal.name() == EndOfData.name():
+            if self.position:
+                self.close_position(self.last_close[0], date=self.last_close[1].to_pydatetime())
+            self.summary()
+            self.get_orderbook()
+        else:
+            log(f"Unknown signal {signal.name()}")
+
+class DynamicSupportBot(FlowGraphNode, BaseBot, Broker):
+    '''
+    This is a bot which only goes long and quits if stop loss is hit.
+    There are no signals to work on, it is fed data enriched with the EMA
+    values. 
+    If we are in uptrend, and price (low) in the last candle is within a proximity of the 
+    tracked support without crossing over, go long.
+    Stop loss is fixed points above for now (low of last candle). Later, it may be the nearest support.
+    '''
+    def __init__(self, value=20, proximity=1.0, **kwargs):
+        self.sl = None
+        self.ema_val = str(value)
+        self.proximity = proximity
+        self.last_close = 0
+        self.ticks_since_last_touch = 0 #In case we want to incorporate rebounce to avoid taking positions in noisy environment
+        super().__init__(**kwargs)
+    
+    async def next(self, connection=None, **kwargs):
+        if not self.ready(connection, **kwargs):
+            log(f'{self}: Not ready yet', 'debug')
+            return
+        df = kwargs.get('data')
+        if self.position and self.sl >= df.iloc[-1]['close']:
+            self.close_position(df.iloc[-1]['close'], date=df.index[-1].to_pydatetime())
+            self.sl = None
+            log(f'SL Hit {df.iloc[-1]["close"]}. Total Charges (so far): {self.charges}', 'info')
+
+        if df.iloc[-1]['close'] >= df.iloc[-1]['EMA'+self.ema_val]:
+            #Still above EMA. Are we in proximity?
+            if (abs(df.iloc[-1]['close'] - df.iloc[-1]['EMA'+self.ema_val])/df.iloc[-1]['EMA'+self.ema_val])*100 <= self.proximity:
+                #We are within proximity. Go short if there isn't a position open, else, update SL
+                if not self.position:
+                    self.sell(df.iloc[-1]['close'], date=df.index[-1].to_pydatetime())
+                    self.sl = df.iloc[-1]['low']
+                    log(f"Go long: {df.iloc[-1]['close']} SL: {self.sl}", 'info')
+                else:
+                    self.sl = df.iloc[-1]['low']
+        self.last_close = [df.iloc[-1]['close'], df.index[-1]]
         self.consume()
 
     async def handle_signal(self, signal):

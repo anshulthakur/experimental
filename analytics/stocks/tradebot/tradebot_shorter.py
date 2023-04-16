@@ -6,15 +6,17 @@ import asyncio
 import sys, os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
+
 from lib.logging import log, set_loglevel
+from settings import project_dirs
 
 from threading import Thread
 
 from base import FlowGraph
 from base.scheduler import AsyncScheduler as Scheduler
-from nodes import DataFrameAggregator, Resampler, NseSource
+from nodes import DataFrameAggregator, Resampler, FolderSource, Indicator
 
-from strategy.priceaction import EvolvingSupportResistance, LongBot, Zigzag
+from strategy.priceaction import DynamicResistanceBot
 from tradebot.base.signals import Resistance, Support, EndOfData
 
 import signal, os
@@ -39,16 +41,26 @@ async def main():
     fg = FlowGraph(name='FlowGraph', mode='backtest')
 
     # Add a dataframe source 
-    source = NseSource(name='NSE', symbol='NIFTY 50', timeframe='5min')
+    source = FolderSource(name='NSE', 
+                          symbol='NIFTY', 
+                          timeframe='1H', 
+                          folder=project_dirs.get('intraday'),
+                          start_date='2022-01-01 09:15',
+                          offset=25)
     fg.add_node(source)
 
-    res_sup_node = EvolvingSupportResistance(name="SuppRes", support_basis='low', resistance_basis='high')
-    fg.add_node(res_sup_node)
+    # Add indicator nodes
+    node_indicators = Indicator(name='Indicators', transparent=True, indicators=[{'tagname': 'EMA20', 
+                                                                'type': 'EMA', 
+                                                                'length': 20,
+                                                                'column': 'close'},
+                                                               ])
+    fg.add_node(node_indicators)
 
     #TraderBot
-    longbot = LongBot(name='LongBot', cash=20000000, lot_size=75)
-    fg.add_node(longbot)
-    fg.register_signal_handler([Resistance, Support, EndOfData], longbot)
+    shortbot = DynamicResistanceBot(name='ShortBot', value=20, proximity=1.0, cash=20000000, lot_size=75)
+    fg.add_node(shortbot)
+    fg.register_signal_handler([EndOfData], shortbot)
 
     # Add some sink nodes 
     sink = DataFrameAggregator(name='Sink', filename='/tmp/ResistanceSupport.csv')
@@ -56,14 +68,14 @@ async def main():
     fg.register_signal_handler([Resistance, Support, EndOfData], sink)
     
     #Add frequency scaling
-    resampler = Resampler(interval=5*60, name='Resampler') #Running on a 5min scale
+    resampler = Resampler(interval=1*60*60, name='Resampler') #Running on a 15min scale
     fg.add_node(resampler)
 
     # connect the nodes together
     fg.connect(resampler, source)
-    fg.connect(source, res_sup_node)
-    fg.connect(res_sup_node, sink)
-    fg.connect(res_sup_node, longbot)
+    fg.connect(source, node_indicators)
+    fg.connect(node_indicators, sink)
+    fg.connect(node_indicators, shortbot)
 
     fg.display()
     # Create a scheduler

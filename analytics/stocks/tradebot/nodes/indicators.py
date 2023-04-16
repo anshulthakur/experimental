@@ -45,8 +45,9 @@ class Indicator(FlowGraphNode):
     '''
     The output of this node is just the last value (row) of the indicator
     '''
-    def __init__(self, indicators=[], **kwargs):
+    def __init__(self, indicators=[], transparent=False, **kwargs):
         self.indicators = {}
+        self.transparent = transparent
         for indicator in indicators:
             if indicator['tagname'] in self.indicators:
                 log(f"Indicator with tagname {indicator['tagname']} already exists in Node.", 'error')
@@ -96,7 +97,7 @@ class Indicator(FlowGraphNode):
         make the design a bit convoluted
         '''
         #https://stackoverflow.com/questions/40225683/how-to-simply-add-a-column-level-to-a-pandas-dataframe
-        if len(list(df.columns))==1:
+        if len(list(df.columns))==1 or self.transparent:
             for indicator in self.indicators:
                 df[indicator] = self.indicators[indicator]['method'](df['close'], **self.indicators[indicator]['attributes'])
             for node,connection in self.connections:

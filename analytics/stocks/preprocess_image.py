@@ -11,7 +11,8 @@ transform_rule = {'blue': 'white',
                   'white': 'white',
                   'black': 'black',
                   'red': 'red',
-                  'green': 'green'}
+                  'green': 'green',
+                  'orange': 'white'}
 red_candle = ['red']
 green_candle = ['green']
 # transform_rule = {'blue': 'white',
@@ -24,7 +25,8 @@ colors = {"red": (255, 0, 0),
           "green" : (0,255,0),
           "black" : (0, 0, 0),
           "white" : (255,255,255),
-          "blue"  : (0, 0, 255)
+          "blue"  : (0, 0, 255),
+          "orange": (255,127,0)
           }
 def classify(rgb_tuple):
     #https://stackoverflow.com/questions/36439384/classifying-rgb-values-in-python

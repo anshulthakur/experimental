@@ -7,9 +7,13 @@ import pandas as pd
 import json
 import os
 
+import datetime
+from dateutil.relativedelta import relativedelta
+
 from lib.indices import get_index_members, load_index_members
 
 from lib.tradingview import convert_timeframe_to_quant, get_tvfeed_instance, Interval
+from lib.cache import cached
 
 class SourceNode(FlowGraphNode):
     def __init__(self, **kwargs):
@@ -515,15 +519,84 @@ class FolderSource(SourceNode):
     Read from the folder organized as:
     - YEAR
         - Month
+            - Day
+                - Stock.csv
     '''
-    def __init__(self, folder, **kwargs):
+    def __init__(self, folder, symbol='NIFTY50', start_date = '2012-01-01 09:15', timeframe='1min', offset=0, **kwargs):
         if os.path.isdir(folder):
             self.folder = folder
         else:
             raise Exception(f'Folder {folder} does not exist')
-        
-        super().__init__(**kwargs)
+        self.stock = symbol
+        self.start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d %H:%M")
+        self.current_date = self.start_date
+        self.timeframe = self.sanitize_timeframe(timeframe)
+        self.ended = False
+        self.df = None
+        self.index = None
+        self.offset = offset
+        super().__init__(signals= [EndOfData], **kwargs)
 
+    def sanitize_timeframe(self, timeframe):
+        if isinstance(timeframe, str) and timeframe[-1] not in ['m', 'M', 'h', 'H', 'W', 'D', 'd', 'w']:
+            if timeframe.endswith(tuple(['min', 'Min'])):
+                if timeframe[0:-3].isnumeric():
+                    if int(timeframe[0:-3]) < 60:
+                        return f'{timeframe[0:-3]}Min'
+                    if int(timeframe[0:-3]) < 60*24:
+                        return f'{timeframe[0:-3]//60}H'
+                    if int(timeframe[0:-3]) < 60*24*7:
+                        return f'{timeframe[0:-3]//(60*7)}W'
+                    if int(timeframe[0:-3]) < 60*24*30:
+                        return f'{timeframe[0:-3]//(60*30)}M'
+                return timeframe
+            log(f'Timeframe "{timeframe[-1]}" cannot be interpreted')
+        elif not isinstance(timeframe, str):
+            if isinstance(timeframe, int):
+                if timeframe < 60:
+                    return f'{timeframe}Min'
+                if timeframe < 60*24:
+                    return f'{timeframe//60}H'
+                if timeframe < 60*24*7:
+                    return f'{timeframe//(60*7)}W'
+                if timeframe < 60*24*30:
+                    return f'{timeframe//(60*30)}M'
+            else:
+                log(f'Timeframe "{timeframe[-1]}" must be a string')
+        else:
+            if timeframe[0:-1].isnumeric():
+                if timeframe[-1] == 'm':
+                    if int(timeframe[0:-1]) < 60:
+                        return f'{timeframe[0:-1]}Min'
+                    if int(timeframe[0:-1]) < 60*24:
+                        return f'{timeframe[0:-1]//60}H'
+                    if int(timeframe[0:-1]) < 60*24*7:
+                        return f'{timeframe[0:-1]//(60*7)}W'
+                    if int(timeframe[0:-1]) < 60*24*30:
+                        return f'{timeframe[0:-1]//(60*30)}M'
+                if timeframe[-1] in ['h', 'H']:
+                    if int(timeframe[0:-1]) < 24:
+                        return f'{timeframe[0:-1]}H'
+                    if int(timeframe[0:-1]) < 24*7:
+                        return f'{timeframe[0:-1]//24}D'
+                    if int(timeframe[0:-1]) < 24*30:
+                        return f'{timeframe[0:-1]//(24*7)}W'
+                    if int(timeframe[0:-1]) >= 24*30:
+                        return f'{timeframe[0:-1]//(24*30)}M'
+
+    def resample(self, df):
+        logic = {'open'  : 'first',
+                 'high'  : 'max',
+                 'low'   : 'min',
+                 'close' : 'last'}
+        if self.timeframe.lower() == '1min':
+            return df
+        if self.timeframe.endswith('Min'):
+            df = df.resample(self.timeframe.lower()).apply(logic).dropna()
+        else:
+            df = df.resample(self.timeframe).apply(logic).dropna()
+        return df
+    
     async def next(self, connection=None, **kwargs):
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
@@ -533,37 +606,66 @@ class FolderSource(SourceNode):
         if self.df is None:
             log('Fetch data', 'debug')
             if self.mode in ['backtest', 'buffered']:
-                #Get previous data on this timeframe from DB or tradingview
-                members = self.get_members(name=self.memberfile)
-                self.df = load_index_members(sector=self.memberfile, 
-                                        members=members,
-                                        entries=295,
-                                        interval=convert_timeframe_to_quant(self.timeframe),
-                                        online=not self.offline)
-                self.df.fillna(0, inplace=True)
-                #log(self.df.head(1), 'debug')
+                self.df = cached(self.stock, df=None, timeframe=convert_timeframe_to_quant(self.timeframe))
+                if self.df is None:
+                    #Parse the data from the file sources into a single dataframe
+                    log('Fetch fresh data', 'debug')
+                    parsing = True
+                    df_array = []
+                    while parsing:
+                        path = os.path.join(self.folder, 
+                                            str(self.current_date.year), 
+                                            f'{self.current_date.month:02d}',
+                                            f'{self.current_date.day:02d}')
+                        current_file = os.path.join(path, f'{self.stock}.csv')
+                        #log(f'Checking: {current_file}', 'debug')
+                        if os.path.exists(current_file):
+                            #Parse and append to an array which we will merge finally
+                            #log(f'Reading {current_file}', 'debug')
+                            df_source = pd.read_csv(current_file,
+                                                    header=0,
+                                                dtype={'datetime': str,
+                                                    'name': str,
+                                                    'open': float,
+                                                    'high': float,
+                                                    'low': float,
+                                                    'close': float},
+                                                usecols=[0,1,2,3,4,5])
+                            df_source['datetime'] = pd.to_datetime(df_source['datetime'], format='%Y-%m-%d %H:%M:%S')
+                            df_source.set_index('datetime', inplace=True)
+                            df_source.reindex()
+                            df_source = df_source.sort_index()
+                            #This is 1 minute data. Resample, if required
+                            df_source = self.resample(df_source)
+                            df_array.append(df_source)
+                        #Increment the day to advance the date
+                        self.current_date += relativedelta(days=1)
+                        if self.current_date > datetime.datetime.today():
+                            parsing = False #Stopping criteria
+                    #Now merge the dataframes into a single one
+                    if len(df_array)>0:
+                        self.df = pd.concat(df_array, axis=0)
+                        self.df = self.df[~self.df.index.duplicated(keep='first')]
+                        cached(self.stock, self.df, timeframe=convert_timeframe_to_quant(self.timeframe))
+                else:
+                    self.df['datetime'] = pd.to_datetime(self.df['datetime'], format='%Y-%m-%d %H:%M:%S')
+                    self.df.set_index('datetime', inplace=True)
+                    self.df.reindex()
+                    self.df = self.df.sort_index()
+                #log(self.df.head(10), 'debug')
                 #log(self.df.tail(1), 'debug')
                 #log(self.df.tail(1).isnull().sum().sum(), 'debug')
                 #nan_cols = self.df.tail(1)[self.df.tail(1).columns[self.df.tail(1).isnull().any()]]
                 #log(nan_cols, 'debug')
             else:
-                self.df = self.source.getEquityStockIndices(index='NIFTY TOTAL MARKET')
-                self.df.fillna(0, inplace=True)
-                #log(self.df.head(10), 'debug')
-                #self.df['datetime'] = kwargs.get('data')
-                #self.df.set_index('datetime', inplace=True)
-                #self.df.sort_index(inplace=True)
+                log('Mode currently not supported', logtype='error')
+                await self.emit(EndOfData(timestamp=self.df.index[-1]))
+                self.ended = True
         else:
             if self.mode not in ['backtest', 'buffered']:
-                log('Re-fetch data', 'debug')
-                df = self.source.getEquityStockIndices(index='NIFTY TOTAL MARKET')
-                #df['datetime'] = kwargs.get('data')
-                #df.set_index('datetime', inplace=True)
-                #df.sort_index(inplace=True)
-                #log(df.tail(10), 'debug')
-                self.df = pd.concat([self.df, df], join='outer', sort=True)
-                self.df.drop_duplicates(inplace=True)
-                #self.df = self.df.loc[self.last_ts:].copy()
+                log('Mode currently not supported', logtype='error')
+                await self.emit(EndOfData(timestamp=self.df.index[-1]))
+                self.ended = True
         #log(self.df.tail(1), 'debug')
         #log(len(self.df), 'debug')
         if self.index is None:

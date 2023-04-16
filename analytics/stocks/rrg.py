@@ -31,7 +31,7 @@ from download_index_reports import download_historical_data
 
 #Prepare to load stock data as pandas dataframe from source. In this case, prepare django
 import django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'rest.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'settings')
 os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 django.setup()
 

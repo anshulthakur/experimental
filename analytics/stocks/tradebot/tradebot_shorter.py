@@ -15,8 +15,7 @@ from threading import Thread
 from base import FlowGraph
 from base.scheduler import AsyncScheduler as Scheduler
 from nodes import DataFrameAggregator, Resampler, FolderSource, Indicator
-
-from strategy.priceaction import DynamicResistanceBot
+from bots.examples import DynamicResistanceBot
 from tradebot.base.signals import Resistance, Support, EndOfData
 
 import signal, os

@@ -14,7 +14,8 @@ from base import FlowGraph
 from base.scheduler import AsyncScheduler as Scheduler
 from nodes import DataFrameAggregator, Resampler, NseSource
 
-from strategy.priceaction import EvolvingSupportResistance, LongBot, Zigzag
+from strategy.priceaction import EvolvingSupportResistance, Zigzag
+from bots.examples import LongBot
 from tradebot.base.signals import Resistance, Support, EndOfData
 
 import signal, os

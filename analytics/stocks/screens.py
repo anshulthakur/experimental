@@ -20,7 +20,7 @@ from lib.retrieval import get_stock_listing
 from lib.patterns import detect_fractals, get_volume_signals, get_last_day_patterns, get_signals
 
 from lib.tradingview import TvDatafeed, Interval, convert_timeframe_to_quant
-from lib.divergence import detect_divergence
+from lib.divergence import get_divergence_points
 
 import json
 
@@ -124,7 +124,7 @@ def divergence_scan(symbol=None, exchange = 'NSE', timeframe= convert_timeframe_
         print(f'Error fetching information on {symbol}')
     else:
         try:
-            [pos, neg] = detect_divergence(df, indicator='RSI', 
+            [pos, neg] = get_divergence_points(df, indicator='RSI', 
                                            after=after)
             
             if not pos.empty:

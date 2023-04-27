@@ -3,8 +3,12 @@ import talib as ta
 from talib.abstract import *
 from lib.logging import log
 import pandas as pd
+from lib.divergence import detect_divergence, is_diverging
 
 class IndicatorNode(FlowGraphNode):
+    '''
+    Computes and adds the indicator column to the dataframe containing the OHLC data of a scrip
+    '''
     def __init__(self, indicators=[], **kwargs):
         self.indicators = {}
         for indicator in indicators:
@@ -38,12 +42,12 @@ class IndicatorNode(FlowGraphNode):
         for indicator in self.indicators:
             df[indicator] = self.indicators[indicator]['method'](df[self.indicators[indicator]['column']], **self.indicators[indicator]['attributes'])
         for node,connection in self.connections:
-            await node.next(connection=connection, data = df)
+            await node.next(connection=connection, data = df.copy(deep=True))
         self.consume()
 
 class Indicator(FlowGraphNode):
     '''
-    The output of this node is just the last value (row) of the indicator
+    This is similar to IndicatorNode, but supports multiple scrips in a single run.
     '''
     def __init__(self, indicators=[], transparent=False, **kwargs):
         self.indicators = {}
@@ -101,7 +105,7 @@ class Indicator(FlowGraphNode):
             for indicator in self.indicators:
                 df[indicator] = self.indicators[indicator]['method'](df['close'], **self.indicators[indicator]['attributes'])
             for node,connection in self.connections:
-                await node.next(connection=connection, data = df)
+                await node.next(connection=connection, data = df.copy(deep=True))
         else:
             columns = list(df.columns)
             #log(df.tail(1), 'debug')
@@ -131,5 +135,27 @@ class Indicator(FlowGraphNode):
                         )
             #log(n_df, 'debug')
             for node,connection in self.connections:
-                await node.next(connection=connection, data = n_df)
+                await node.next(connection=connection, data = n_df.copy(deep=True))
+        self.consume()
+
+class Divergence(FlowGraphNode):
+    '''
+    Calculates if the price is diverging from the indicator and adds a divergence column for each one of
+    them.
+    By default, it computes the divergence on the closing prices.
+    '''
+    def __init__(self, indicators=['RSI'], order=1, **kwargs):
+        self.indicators = indicators #Indicators to check divergence with
+        self.order = order
+        super().__init__(**kwargs)
+
+    async def next(self, connection=None, **kwargs):
+        if not self.ready(connection, **kwargs):
+            log(f'{self}: Not ready yet', 'debug')
+            return
+        df = kwargs.get('data')
+        for indicator in self.indicators:
+            df[f'{indicator}_divergence'] = detect_divergence(df, indicator=indicator, after=None, order=self.order)
+        for node,connection in self.connections:
+            await node.next(connection=connection, data = df.copy(deep=True))
         self.consume()

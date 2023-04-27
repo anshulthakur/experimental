@@ -5,6 +5,27 @@ class BaseClass(object):
         super().__init__()
 
 class FlowGraphNode(BaseClass):
+    '''
+    A FlowGraphNode is the basic unit of a flowgraph. It represents the vertex in a directed graph.
+    The basic flow of signals is from one node to all the nodes downstream to it through 
+    its output ports, if applicable.
+
+    Overall, a FlowgraphNode must be connected to some other nodes for it to work. If the
+    node doesn't have any upstream connection (or input ports), it is the root node. This means that it should
+    be the one originating a signal which flows downstream.
+
+    Any other node keeps track of its upstream connections as well as downstream ones. Once it 
+    has received a signal input on all its input ports, the node invokes the processing of its
+    'next' function, where it works on the incoming data. If it has some data to send downstream,
+    it iterates on its output ports and places a copy of its generated data on each port. Finally, 
+    it must clear it's input ports by calling 'consume' method. In case there
+    is no data to send forward, it simply returns.
+
+    A node may also generate signals by invoking 'emit', which may be emitted asynchronously such that all the nodes
+    registering to receive those signals will receive a copy, irrespective of whether they are
+    connected to this node or not. It must first inform the Flowgraph about its capability about the signals 
+    during initialization that it can generate.
+    '''
     def __init__(self, name=None, strict = True, connections=[], signals=[], **kwargs):
         #print(kwargs)
         self.connections = copy.deepcopy(connections)

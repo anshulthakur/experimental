@@ -17,7 +17,8 @@ from base import FlowGraph
 from base.scheduler import AsyncScheduler as Scheduler
 from nodes import Sink, Resampler, NseMultiStockSource, Indicator, DataFrameSink, TradingViewSource, ColumnFilter
 from nodes import MinMaxDetector
-from strategy.priceaction import Zigzag, LongBot
+from strategy.priceaction import Zigzag
+from bots.examples import  LongBot
 
 from tradebot.base.signals import Resistance, Support, EndOfData
 

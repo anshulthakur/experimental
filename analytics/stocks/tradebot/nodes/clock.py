@@ -2,6 +2,19 @@ from tradebot.base import FlowGraphNode
 from lib.logging import log
 
 class TimeResampler(FlowGraphNode):
+    """Resample (downsample) the clock such that data is passed to the 
+    pipeline after resampled delays.
+
+    This node downsamples the rate at which data is passed to subsequent
+    nodes in the pipeline. It is useful when the timeframe on which the
+    pipeline works is slower than the rate at which the clock scheduler
+    is operating. For example, there may be multiple parallel pipelines
+    working at different timeframes in a flowgraph. One chain may be working
+    on 5min timeframe, while another on 15min. In such cases, the pipeline
+    code of the chain running on 15min timeframe must not be invoked before
+    the next cycle of 15min elapses. Meanwhile, the 5min timeframe would have 
+    been invoked 3 times.
+    """
     def __init__(self, interval, **kwargs):
         self.interval = interval
         self.reset_ticks = self.interval_to_ticks(self.interval)

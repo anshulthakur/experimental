@@ -5,6 +5,12 @@ from tradebot.base.signals import *
 import pandas as pd 
 
 class Union(FlowGraphNode):
+    """Merge multiple dataframes of same length columnwise before 
+    passing to the next node.
+
+    It assumes that other than the index, no other columns are 
+    repeated. Performs an outer join.
+    """
     def __init__(self, columnmap={}, **kwargs):
         self.multi_input = True
         self.columnmap = columnmap
@@ -36,6 +42,12 @@ class Union(FlowGraphNode):
         return
 
 class Intersection(FlowGraphNode):
+    """Filter common columns from multiple dataframes of same length
+    columnwise before passing to the next node.
+
+    Performs an inner join on the dataframes and retains only those
+    columns which are common.
+    """
     def __init__(self, **kwargs):
         self.multi_input = True
         super().__init__(**kwargs)
@@ -66,6 +78,10 @@ class Intersection(FlowGraphNode):
         return
 
 class ColumnFilter(FlowGraphNode):
+    """Filter out columns from dataframe.
+
+    Other than the columns mentioned in the map, drop the remainder.
+    """
     def __init__(self, map={}, **kwargs):
         self.multi_input = False
         if len(map)==0:

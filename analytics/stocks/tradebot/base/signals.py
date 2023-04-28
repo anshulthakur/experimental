@@ -45,6 +45,7 @@ class Support(BaseSignal):
         self.index = index
         self.value = value
         self.timestamp = timestamp
+        self.timeframe = kwargs.get('timeframe', None)
 
     def __str__(self):
         return f"{self.name}[{self.timestamp.to_pydatetime()}] Support at {self.value} ({self.index})"

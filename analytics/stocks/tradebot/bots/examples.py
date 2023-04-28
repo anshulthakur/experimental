@@ -170,3 +170,4 @@ class DynamicSupportBot(FlowGraphNode, BaseBot, Broker):
             self.get_orderbook()
         else:
             log(f"Unknown signal {signal.name()}")
+

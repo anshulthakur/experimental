@@ -120,6 +120,20 @@ class RSI_Filter(BaseFilter):
         else:
             self.filter = lambda x: True if ((not pd.isna(x['RSI'][-1])) and x['RSI'][-1]<=value) else False
 
+class DivergenceFilter(BaseFilter):
+    '''
+    Divergence filter filters the stock if it is exhibiting divergence (as per the divergence field)
+
+    @param indicator The column name of the indicator for which indicator is being looked at
+    @param positive Flag indicating whether to filter positive divergence or negative
+    '''
+    def __init__(self, indicator='RSI', positive=True):
+        self.indicator = indicator+'_divergence'
+        if positive==True:
+            self.filter = lambda x: True if ((not pd.isna(x[self.indicator][-1])) and x[self.indicator][-1]>0) else False
+        else:
+            self.filter = lambda x: True if ((not pd.isna(x[self.indicator][-1])) and x[self.indicator][-1]<0) else False
+
 class Crossover_Screen(BaseScreen):
     def __init__(self,  crosses, what='close', direction='None', **kwargs):
         super().__init__(**kwargs)
@@ -218,4 +232,16 @@ class EMA_RSI_Screen(BaseScreen):
         filters.append(EMA_Filter(value=20))
         filters.append(EMA_Filter(value=200))
         filters.append(RSI_Filter(value=65))
+        return filters
+
+class DivergenceScreen(BaseScreen):
+    def __init__(self, indicator='RSI', **kwargs):
+        super().__init__(**kwargs)
+        self.indicator = indicator
+        self.column_names = ['close', self.indicator+'_divergence']
+        self.filters = self.create_filters()
+
+    def create_filters(self):
+        filters = []
+        filters.append(DivergenceFilter(indicator=self.indicator))
         return filters

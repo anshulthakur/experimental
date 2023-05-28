@@ -78,10 +78,6 @@ def compare_stock_info(r_df, s_df, threshold, delta=False, logscale=False):
     # Convert r_df to a Series.
     r_df = r_df.squeeze()
 
-    # If logscale is True, convert s_df to the log scale.
-    if logscale:
-        s_df = np.log10(s_df)
-
     #for index, row in s_df.iterrows():
     #    print(index, row)
 
@@ -218,7 +214,7 @@ def load_references(folder):
     
     return (df_arr, files)
 
-def load_stocks_data(timeframe, n_bars, offline, min_length, match='close'):
+def load_stocks_data(timeframe, n_bars, offline, logscale, min_length, match='close'):
     '''
     Load all the stocks into a single dataframe to enable vector processing of correlation across
     all of them rather than iterating one by one, which is slow.
@@ -270,6 +266,9 @@ def load_stocks_data(timeframe, n_bars, offline, min_length, match='close'):
             s_df = s_df.reindex(columns = [stock])
             s_df = s_df[~s_df.index.duplicated(keep='first')]
             s_df = s_df.tail(min_length)
+            # If logscale is True, convert s_df to the log scale.
+            if logscale:
+                s_df = np.log10(s_df)
             s_df = s_df - s_df.mean()
             s_df.reset_index(inplace = True, drop=True)
             df_arr.append(s_df)
@@ -312,7 +311,9 @@ def load_stocks_data(timeframe, n_bars, offline, min_length, match='close'):
     #     print(d.head(10))
     #     print(d.tail(10))
     #print('Condensing dataframes.', flush=True)
-    df = pd.concat(df_arr, axis=1, join='outer')
+    df = None
+    if len(df_arr)>0:
+        df = pd.concat(df_arr, axis=1, join='outer')
     #print('Loaded stock data for the run', flush=True)
     #print(df.head(10))
     #print(df.tail(10))
@@ -380,10 +381,17 @@ def main(reference, timeframe, logscale=False, match = 'close', offline=False):
         max_corr = 0
         max_corr_idx = None
         
-        s_df = load_stocks_data(timeframe=timeframe, n_bars=n_bars, offline=offline, min_length=len(r_df)+1, match=match)
-        c = compare_stock_info(r_df, s_df, threshold=c_thresh, delta=delta, logscale=logscale)
-
-        print(f'\n {fnames[ii]}: Shortlist: {json.dumps(c, indent=2)}\n')
+        s_df = load_stocks_data(timeframe=timeframe, 
+                                n_bars=n_bars, 
+                                offline=offline, 
+                                logscale=logscale, 
+                                min_length=len(r_df)+1, 
+                                match=match)
+        if s_df is not None:
+            c = compare_stock_info(r_df, s_df, threshold=c_thresh, delta=delta, logscale=logscale)
+            print(f'\n {fnames[ii]}: Shortlist: {json.dumps(c, indent=2)}\n')
+        else:
+            continue
         
 if __name__ == "__main__":
     day = datetime.date.today()

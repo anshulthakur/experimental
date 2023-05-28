@@ -32,6 +32,9 @@ tvfeed_instance = None
 
 max_depth = 5
 
+local_cache = {}
+ignore_list = []
+
 def get_tvfeed_instance(username, password):
     global tvfeed_instance
     if tvfeed_instance is None:
@@ -57,137 +60,73 @@ def calc_rmse(actual, predic):
     #print(predic.mean())
     return mean_squared_error(actual - actual.mean(), predic - predic.mean())
 
-def cached_old(name, df=None, timeframe=Interval.in_daily):
-    import json
-    cache_file = '.cache.json'
-    overwrite = False
-    try:
-        with open(cache_dir+'/'+str(timeframe.value)+'/'+cache_file, 'r') as fd:
-            progress = json.load(fd)
-            try:
-                date = datetime.datetime.strptime(progress['date'], '%d-%m-%Y')
-                if date.day == datetime.datetime.today().day and \
-                    date.month == datetime.datetime.today().month and \
-                    date.year == datetime.datetime.today().year:
-                    pass #Cache hit
-                else:
-                    if df is None:#Cache is outdated. Clear it first
-                        for f in os.listdir(cache_dir):
-                            if f != cache_dir+cache_file:
-                                os.remove(os.path.join(cache_dir, f))
-                    overwrite = True
-            except:
-                #Doesn't look like a proper date time
-                pass
-    except:
-        overwrite=True
-    
-    if overwrite:
-        with open(cache_dir+'/'+str(timeframe.value)+'/'+cache_file, 'w') as fd:
-            fd.write(json.dumps({'date':datetime.datetime.today().strftime('%d-%m-%Y')}))
-    
-    f = cache_dir+'/'+str(timeframe.value)+'/'+name+'.csv'
-    if df is None:
-        if os.path.isfile(f):
-            #Get from cache if it exists
-            df = pd.read_csv(f)
-            df['datetime'] = pd.to_datetime(df['datetime'], format='%Y-%m-%d %H:%M:%S')
-            return df
-        return None
-    else:
-        #Cache the results
-        df.to_csv(f)
-        return None
+def compare_stock_info(r_df, s_df, threshold, delta=False, logscale=False):
+    """
+    Compares stock information between two dataframes.
 
-def emit_plot(a,b):
-    plt.figure(figsize=(16, 8), dpi=150)
-    #print(len(a[0]), len(b[0]))
-    #a[0].reset_index()
-    ax = (a[0]).plot(y=a[1], label='a', color='orange')
-    (b[0]).plot(ax=ax, y=b[1], label='b', color='blue')
-    plt.savefig('./images/compare_lines.png')
+    Args:
+        r_df: A single column dataframe containing the return data.
+        s_df: A dataframe containing the stock data.
+        threshold: The correlation threshold.
+        delta: A boolean value indicating whether to use the daily percentage change.
+        logscale: A boolean value indicating whether to use the log scale.
 
-def compare_stock_info(r_df, s_df, delta, emit=False, logscale=False, match='close'):
-    ref_columns = ['open', 'high', 'low', 'close', 'volume'] 
-    ref_columns.remove(match)
-    s_df = s_df.drop(columns = ref_columns)
-    s_df = s_df.sort_index()
-       
-    s_df.reset_index(inplace = True)
+    Returns:
+        A dictionary, with the column name as key and the correlation values as the value of the key.
+    """
 
-    #print(s_df.head(10))
-    if 'datetime' in s_df.columns:
-        s_df = s_df.drop(columns='datetime')
-    else:
-        s_df = s_df.drop(columns='date')
-    #s_df.rename(columns={'close': 'change', 'datetime':'date'},
-    s_df.rename(columns={match: 'change'},
-                inplace = True)
-    #s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y').dt.date
-    #s_df.set_index('date', inplace = True)
-    #s_df = s_df.sort_index()
-    s_df = s_df.reindex(columns = ['change'])
-    s_df = s_df[~s_df.index.duplicated(keep='first')]
-    #s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
-    #s_df = s_df.iloc[-len(r_df)-2:-1]
-    
+    # Convert r_df to a Series.
+    r_df = r_df.squeeze()
+
+    # If logscale is True, convert s_df to the log scale.
+    if logscale:
+        s_df = np.log10(s_df)
+
+    #for index, row in s_df.iterrows():
+    #    print(index, row)
+
+    # Calculate the correlation of r_df with each column of s_df.
+    #corr_values = r_df.corr(s_df, numeric_only=True)
+    corr_values = s_df.corrwith(r_df)
+    columns = list(s_df.columns)
+
+    # Find the indices of the columns whose correlation values are greater than or equal to the threshold.
+    indices = np.where(corr_values >= threshold)[0]
+
+    #for ii in range(0, len(corr_values)):
+    #    print(columns[ii], corr_values[ii])
+
+    # Return a dictionary with the column names as keys and the correlation values as values.
+    ret = {'max': max(corr_values),
+           'min': min(corr_values),
+           'map': None}
+    if len(indices)>0:
+        ret['map'] = dict(zip(s_df.columns[indices], corr_values[indices]))
+    return ret
+
+
+def compare_stock_info_base(r_df, s_df, delta, logscale=False):
     r_df = r_df - r_df.mean()
-    #r_df = r_df.reset_index()
-    if len(s_df)<len(r_df)+1:
-        #print(f'{len(s_df)},{len(r_df)}Skip')
-        #correlations.append(0)
-        c = -1
-        pass
-    else:
-        #s_df.drop(s_df.iloc[0].name, inplace=True) #First entry is going to be NaN
-        c = 0
-        #print('Window slide length {}'.format(len(s_df) - len(r_df)))
-        for ii in range(0, max(len(s_df) - len(r_df), max_depth)):
-            #print(-(len(r_df)-ii)-1, -ii)
-            if ii==0:
-                temp_df = s_df.iloc[-(len(r_df)+ii):].copy(deep=True).reset_index().drop(columns = 'index')
-                if logscale:
-                    temp_df = np.log10(temp_df)
-                temp_df = temp_df - temp_df.mean()
-            else:
-                temp_df = s_df.iloc[-(len(r_df)+ii):-ii].copy(deep=True).reset_index().drop(columns = 'index')
-                if logscale:
-                    temp_df = np.log10(temp_df)
-                temp_df = temp_df - temp_df.mean()
-            
-            #print(temp_df.tail(10))
-            #print(max(temp_df['change']))
-            #print(min(temp_df['change']))
-            
-            temp_df['change'] = temp_df['change']/(max(temp_df['change'] - min(temp_df['change'])))
-            
-            #print(temp_df.tail(10))
-            if delta:
-                temp_df = temp_df.pct_change(1)
-                temp_df.drop(temp_df.iloc[0].name, inplace=True) #First entry is going to be NaN
-            
-            if ii==0:
-                #print(temp_df.head(10))
-                #print(r_df.head(10))
-                #print(r_df.iloc[:,0])
-                #print(temp_df.iloc[:,0])
-                
-                if emit:
-                    emit_plot([r_df, 'change'], [temp_df, 'change'])
-                #plt.figure(figsize=(16, 8), dpi=150)
-                #plt.plot(list(range(0, len(r_df.iloc[:,0]))), r_df.iloc[:,0] - np.mean(r_df.iloc[:,0]), label='a', color='orange')
-                #plt.plot(list(range(0, len(temp_df.iloc[:,0]))), temp_df.iloc[:,0] -  np.mean(temp_df.iloc[:,0]), label='b', color='green')
-                #plt.savefig('./images/compare_lines_1.png')
-                pass
-            #print(len(r_df), len(temp_df))
-            cval = r_df.iloc[:,0].corr(temp_df.iloc[:,0])
-            
-            #cval = calc_correlation(r_df.iloc[:,0], temp_df.iloc[:,0])
-            #mcval = calc_mape(r_df.iloc[:,0], temp_df.iloc[:,0])
-            #rmse = calc_rmse(r_df.iloc[:,0], temp_df.iloc[:,0])
-            c = max(cval, c)
-            
-            #print(f'{ii} Correlation: {cval}, {mcval}, {rmse}')
+    c = 0
+    for ii in range(0, max(len(s_df) - len(r_df), max_depth)):
+        #print(-(len(r_df)-ii)-1, -ii)
+        if ii==0:
+            temp_df = s_df.iloc[-(len(r_df)+ii):].copy(deep=True).reset_index().drop(columns = 'index')
+            if logscale:
+                temp_df = np.log10(temp_df)
+            temp_df = temp_df - temp_df.mean()
+        else:
+            temp_df = s_df.iloc[-(len(r_df)+ii):-ii].copy(deep=True).reset_index().drop(columns = 'index')
+            if logscale:
+                temp_df = np.log10(temp_df)
+            temp_df = temp_df - temp_df.mean()
+        
+        temp_df['change'] = temp_df['change']/(max(temp_df['change'] - min(temp_df['change'])))
+        if delta:
+            temp_df = temp_df.pct_change(1)
+            temp_df.drop(temp_df.iloc[0].name, inplace=True) #First entry is going to be NaN
+        cval = r_df.iloc[:,0].corr(temp_df.iloc[:,0])
+        c = max(cval, c)
     return c
 
 def get_dataframe(stock, market, timeframe, duration, date=datetime.datetime.now(), offline=False):
@@ -275,8 +214,109 @@ def load_references(folder):
             #print(r_df.tail(10))
             #print(len(r_df))
             df_arr.append(r_df)
-    print('Loaded references')
-    return df_arr
+    print('Loaded references', flush=True)
+    
+    return (df_arr, files)
+
+def load_stocks_data(timeframe, n_bars, offline, min_length, match='close'):
+    '''
+    Load all the stocks into a single dataframe to enable vector processing of correlation across
+    all of them rather than iterating one by one, which is slow.
+    '''
+    indices = []
+    b_indices = []
+    global ignore_list 
+    global local_cache
+    ref_columns = ['open', 'high', 'low', 'close', 'volume'] 
+    ref_columns.remove(match)
+    
+    with open(nse_list, 'r') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            indices.append(row['SYMBOL'].strip())
+    
+    with open(bse_list, 'r') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            if row['Security Id'].strip() not in indices:
+                b_indices.append(row['Security Id'].strip())
+
+    df_arr = []
+    for stock in indices:
+        s_df = None
+        if stock in local_cache:
+            s_df = local_cache[stock].copy(deep=True)
+        else:
+            if stock in ignore_list:
+                continue
+            print('.', end='', flush=True)
+            s_df = get_dataframe(stock=stock, 
+                                market='NSE', 
+                                timeframe=timeframe, 
+                                duration=n_bars, 
+                                offline=offline)
+            if s_df is not None:
+                local_cache[stock] = s_df.copy(deep=True)
+        if s_df is not None and len(s_df)>=min_length:
+            s_df = s_df.drop(columns = ref_columns)
+            s_df = s_df.sort_index()
+            s_df.reset_index(inplace = True)
+            if 'datetime' in s_df.columns:
+                s_df = s_df.drop(columns='datetime')
+            else:
+                s_df = s_df.drop(columns='date')
+            s_df.rename(columns={match: stock},
+                        inplace = True)
+            s_df = s_df.reindex(columns = [stock])
+            s_df = s_df[~s_df.index.duplicated(keep='first')]
+            s_df = s_df.tail(min_length)
+            s_df = s_df - s_df.mean()
+            s_df.reset_index(inplace = True, drop=True)
+            df_arr.append(s_df)
+        elif s_df is None:
+            ignore_list.append(stock)
+    for stock in b_indices:
+        if stock in local_cache:
+            s_df = local_cache[stock].copy(deep=True)
+        else:
+            if stock not in ignore_list:
+                continue
+            print('.', end='', flush=True)
+            s_df = get_dataframe(stock=stock, 
+                                market='BSE', 
+                                timeframe=timeframe, 
+                                duration=n_bars, 
+                                offline=offline)
+            if s_df is not None:
+                local_cache[stock] = s_df.copy(deep=True)
+
+        if s_df is not None and len(s_df)>=min_length:
+            s_df = s_df.drop(columns = ref_columns)
+            s_df = s_df.sort_index()
+            s_df.reset_index(inplace = True)
+            if 'datetime' in s_df.columns:
+                s_df = s_df.drop(columns='datetime')
+            else:
+                s_df = s_df.drop(columns='date')
+            s_df.rename(columns={match: stock},
+                        inplace = True)
+            s_df = s_df.reindex(columns = [stock])
+            s_df = s_df[~s_df.index.duplicated(keep='first')]
+            s_df = s_df.tail(min_length)
+            s_df = s_df - s_df.mean()
+            s_df.reset_index(inplace = True, drop=True)
+            df_arr.append(s_df)
+        elif s_df is None:
+            ignore_list.append(stock)
+    # for d in df_arr:
+    #     print(d.head(10))
+    #     print(d.tail(10))
+    #print('Condensing dataframes.', flush=True)
+    df = pd.concat(df_arr, axis=1, join='outer')
+    #print('Loaded stock data for the run', flush=True)
+    #print(df.head(10))
+    #print(df.tail(10))
+    return df
 
 def main(reference, timeframe, logscale=False, match = 'close', offline=False):
     cutoff_date = datetime.datetime.strptime('01-Aug-2018', "%d-%b-%Y")
@@ -301,17 +341,17 @@ def main(reference, timeframe, logscale=False, match = 'close', offline=False):
                 b_indices.append(row['Security Id'].strip())
     
     # Load the reference candlestick charts from the folder
-    df_arr = load_references(reference)
+    (df_arr, fnames) = load_references(reference)
     #r_df = pd.read_csv(reference)
     correlations = []
     bse_correlations = []
 
     shortlist = {}
     c_thresh = 0.97
-    ignore_list = []
 
     #cutoff_date = r_df.index.values[0]
-    for r_df in df_arr:
+    for ii in range(0, len(df_arr)):
+        r_df = df_arr[ii]
         d = relativedelta(datetime.datetime.today(), cutoff_date)
         if timeframe == Interval.in_monthly:
             #print('Monthly')
@@ -340,61 +380,10 @@ def main(reference, timeframe, logscale=False, match = 'close', offline=False):
         max_corr = 0
         max_corr_idx = None
         
-        for stock in indices:
-            print('.', end='', flush=True)
-            if stock in ignore_list:
-                continue
-            s_df = get_dataframe(stock=stock, 
-                                market='NSE', 
-                                timeframe=timeframe, 
-                                duration=n_bars, 
-                                offline=offline)
-            if s_df is not None and len(s_df)>0:
-                c = compare_stock_info(r_df, s_df, delta, logscale=logscale, match=match)
-                if c >= c_thresh:
-                    if stock in shortlist:
-                        shortlist[stock] += 1
-                    else:
-                        shortlist[stock] = 1
-                    print(f'\nShortlist: {json.dumps(shortlist, indent=2)}\n')
-                if c>max_corr:
-                    max_corr=c
-                    max_corr_idx = [stock]
-                elif c>0 and c==max_corr:
-                    max_corr_idx.append(stock)
-                #print(f'{stock}[{c}] Max: {max_corr_idx}({max_corr})')
-            else:
-                ignore_list.append(stock)
-        for stock in b_indices:
-            print('.', end='', flush=True)
-            if stock not in ignore_list:
-                continue
-            s_df = get_dataframe(stock=stock, 
-                                market='BSE', 
-                                timeframe=timeframe, 
-                                duration=n_bars, 
-                                offline=offline)
-            if s_df is not None and len(s_df)>0:
-                c = compare_stock_info(r_df, s_df, delta, logscale=logscale, match=match)
-                if c >= c_thresh:
-                    if stock in shortlist:
-                        shortlist[stock] += 1
-                    else:
-                        shortlist[stock] = 1
-                    print(f'\nShortlist: {json.dumps(shortlist, indent=2)}\n')
-                if c>max_corr:
-                    max_corr=c
-                    max_corr_idx = [stock]
-                elif c>0 and c==max_corr:
-                    max_corr_idx.append(stock)
-                #print(f'{stock}[{c}] Max: {max_corr_idx}({max_corr})')
-            else:
-                ignore_list.append(stock)
+        s_df = load_stocks_data(timeframe=timeframe, n_bars=n_bars, offline=offline, min_length=len(r_df)+1, match=match)
+        c = compare_stock_info(r_df, s_df, threshold=c_thresh, delta=delta, logscale=logscale)
 
-    #print(f'Maximum correlation:{max_corr}: {max_corr_idx}')
-    #print(f'NSE: {len(indices)}. BSE: {len(b_indices)}')
-
-    print(f'\nShortlist: {json.dumps(shortlist, indent=2)}\n')
+        print(f'\n {fnames[ii]}: Shortlist: {json.dumps(c, indent=2)}\n')
         
 if __name__ == "__main__":
     day = datetime.date.today()

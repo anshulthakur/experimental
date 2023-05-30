@@ -278,7 +278,7 @@ def load_stocks_data(timeframe, n_bars, offline, logscale, min_length, match='cl
         if stock in local_cache:
             s_df = local_cache[stock].copy(deep=True)
         else:
-            if stock not in ignore_list:
+            if stock in ignore_list:
                 continue
             print('.', end='', flush=True)
             s_df = get_dataframe(stock=stock, 
@@ -302,21 +302,20 @@ def load_stocks_data(timeframe, n_bars, offline, logscale, min_length, match='cl
             s_df = s_df.reindex(columns = [stock])
             s_df = s_df[~s_df.index.duplicated(keep='first')]
             s_df = s_df.tail(min_length)
+            # If logscale is True, convert s_df to the log scale.
+            if logscale:
+                s_df = np.log10(s_df)
             s_df = s_df - s_df.mean()
             s_df.reset_index(inplace = True, drop=True)
             df_arr.append(s_df)
         elif s_df is None:
             ignore_list.append(stock)
-    # for d in df_arr:
-    #     print(d.head(10))
-    #     print(d.tail(10))
     #print('Condensing dataframes.', flush=True)
     df = None
     if len(df_arr)>0:
         df = pd.concat(df_arr, axis=1, join='outer')
     #print('Loaded stock data for the run', flush=True)
-    #print(df.head(10))
-    #print(df.tail(10))
+    #print(f'Ignore list: {ignore_list}')
     return df
 
 def main(reference, timeframe, logscale=False, match = 'close', offline=False):
@@ -328,59 +327,43 @@ def main(reference, timeframe, logscale=False, match = 'close', offline=False):
     except:
         print('Error creating folder')
     
-    indices = []
-    b_indices = []
-    with open(nse_list, 'r') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            indices.append(row['SYMBOL'].strip())
-    
-    with open(bse_list, 'r') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            if row['Security Id'].strip() not in indices:
-                b_indices.append(row['Security Id'].strip())
-    
     # Load the reference candlestick charts from the folder
     (df_arr, fnames) = load_references(reference)
-    #r_df = pd.read_csv(reference)
-    correlations = []
-    bse_correlations = []
+    c_thresh = 0.96
 
-    shortlist = {}
-    c_thresh = 0.97
+    max_df_len = 0
+    for a in df_arr:
+        max_df_len = max(max_df_len, len(a))
 
     #cutoff_date = r_df.index.values[0]
+
+    d = relativedelta(datetime.datetime.today(), cutoff_date)
+    if timeframe == Interval.in_monthly:
+        #print('Monthly')
+        n_bars = max((d.years*12) + d.months+1, max_df_len)+10
+    elif timeframe == Interval.in_3_months:
+        #print('3 Monthly')
+        n_bars = max((d.years*4) + d.months+1, max_df_len)+10
+    elif timeframe == Interval.in_weekly:
+        #print('Weekly')
+        n_bars = max((d.years*52) + (d.months*5) + d.weeks+1, max_df_len)+10
+    elif timeframe == Interval.in_4_hour:
+        #print('4 Hourly')
+        n_bars = max(500, max_df_len)+10
+    elif timeframe == Interval.in_2_hour:
+        #print('2 Hourly')
+        n_bars = max(500, max_df_len)+10
+    elif timeframe == Interval.in_1_hour:
+        #print('Hourly')
+        n_bars = max(500, max_df_len)+10
+    else:
+        #print('Daily')
+        n_bars = max(500, max_df_len)+10
+    
+    #print(f'Get {n_bars} candles')
+    
     for ii in range(0, len(df_arr)):
         r_df = df_arr[ii]
-        d = relativedelta(datetime.datetime.today(), cutoff_date)
-        if timeframe == Interval.in_monthly:
-            #print('Monthly')
-            n_bars = max((d.years*12) + d.months+1, len(r_df))+10
-        elif timeframe == Interval.in_3_months:
-            #print('3 Monthly')
-            n_bars = max((d.years*4) + d.months+1, len(r_df))+10
-        elif timeframe == Interval.in_weekly:
-            #print('Weekly')
-            n_bars = max((d.years*52) + (d.months*5) + d.weeks+1, len(r_df))+10
-        elif timeframe == Interval.in_4_hour:
-            #print('4 Hourly')
-            n_bars = max(500, len(r_df))+10
-        elif timeframe == Interval.in_2_hour:
-            #print('2 Hourly')
-            n_bars = max(500, len(r_df))+10
-        elif timeframe == Interval.in_1_hour:
-            #print('Hourly')
-            n_bars = max(500, len(r_df))+10
-        else:
-            #print('Daily')
-            n_bars = max(500, len(r_df))+10
-        
-        #print(f'Get {n_bars} candles')
-        
-        max_corr = 0
-        max_corr_idx = None
-        
         s_df = load_stocks_data(timeframe=timeframe, 
                                 n_bars=n_bars, 
                                 offline=offline, 

@@ -384,7 +384,8 @@ def main(reference, timeframe, delta, stock=None, logscale=False,
         print(f'Maximum correlation:{max_corr}: {max_corr_idx}')
         print(f'NSE: {len(indices)}. BSE: {len(b_indices)}')
 
-        print(f'Shortlist: {json.dumps(shortlist, indent=2)}')
+        #print(f'Shortlist: {json.dumps(shortlist, indent=2)}')
+        print(f'\nShortlist: {sorted( ((v,k) for k,v in shortlist.items()), reverse=True)}')
 if __name__ == "__main__":
     day = datetime.date.today()
     import argparse

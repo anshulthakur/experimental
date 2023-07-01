@@ -95,7 +95,7 @@ def compare_stock_info(r_df, s_df, threshold, delta=False, logscale=False):
     # Return a dictionary with the column names as keys and the correlation values as values.
     ret = {'max': max(corr_values),
            'min': min(corr_values),
-           'map': None}
+           'map': {}}
     if len(indices)>0:
         ret['map'] = dict(zip(s_df.columns[indices], corr_values[indices]))
     return ret
@@ -163,6 +163,7 @@ def get_dataframe(stock, market, timeframe, duration, date=datetime.datetime.now
                     cached(name=symbol, df=s_df, timeframe=timeframe)
             except:
                 s_df = None
+                print(symbol)
     else:
         try:
             market_obj = Market.objects.get(name=market)
@@ -372,7 +373,8 @@ def main(reference, timeframe, logscale=False, match = 'close', offline=False):
                                 match=match)
         if s_df is not None:
             c = compare_stock_info(r_df, s_df, threshold=c_thresh, delta=delta, logscale=logscale)
-            print(f'\n {fnames[ii]}: Shortlist: {json.dumps(c, indent=2)}\n')
+            #print(f'\n {fnames[ii]}: Shortlist: {json.dumps(c, indent=2)}\n')
+            print(f'\n {fnames[ii]}: Shortlist: {sorted( ((v,k) for k,v in c["map"].items()), reverse=True)}')
         else:
             continue
         

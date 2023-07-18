@@ -108,7 +108,7 @@ def main(filename, ohlc_type='candlestick', find_tops=False):
                     #Reached the end of file
                     break 
                 candle_width = candle['body_start_right'][1] - candle['body_start_left'][1]
-                if candle_width>3 and (candle['body_end_left'][0] - candle['body_start_left'][0] >= 3): #Arbitrary for now(it could be a doji)
+                if candle_width>=3 and (candle['body_end_left'][0] - candle['body_start_left'][0] >= 3): #Arbitrary for now(it could be a doji)
                     if classify(numpydata[row+floor((candle['body_end_left'][0] - candle['body_start_left'][0])/2)][col+floor(candle_width/2)]) in candle_color_options['green']:
                         #Green Candle body
                         candle['color'] = 'green'
@@ -131,7 +131,7 @@ def main(filename, ohlc_type='candlestick', find_tops=False):
                     min_close = min(min_close, candle['close'])
                     max_close = max(max_close, candle['close'])
                     candles.append(candle)
-                elif candle_width>3 and (candle['body_end_left'][0] - candle['body_start_left'][0] < 3): #Doji
+                elif candle_width>=3 and (candle['body_end_left'][0] - candle['body_start_left'][0] < 3): #Doji
                     candle['color'] = 'black'
                     if candle['color'] in ['green', 'black']:
                         candle['close'] = rows - candle['body_start_left'][0]

@@ -1,6 +1,6 @@
 import os
 import sys
-import settings
+import init
 import numpy as np
 import pandas as pd
 

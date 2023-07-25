@@ -6,7 +6,7 @@ Created on 12-Apr-2022
 import os
 import sys
 import matplotlib
-import settings
+import init
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd

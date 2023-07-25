@@ -1,6 +1,6 @@
 import os
 import sys
-import settings
+import init
 import csv
 from datetime import datetime, timedelta
 

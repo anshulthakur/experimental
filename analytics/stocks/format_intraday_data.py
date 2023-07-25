@@ -1,6 +1,6 @@
 import os
 import sys
-import settings
+import init
 
 import numpy as np
 import pandas as pd
@@ -36,7 +36,7 @@ def format_intraday(filename):
             for s_df in df_list:
                 day = s_df.index[0].date().day
                 #print(day)
-                directory = os.path.join(settings.project_dirs.get('intraday'), 
+                directory = os.path.join(init.project_dirs.get('intraday'), 
                                 str(pd.to_datetime(s_df.index[0]).year), 
                                 f'{pd.to_datetime(s_df.index[0]).month:02d}',
                                 f'{day:02d}')
@@ -51,7 +51,7 @@ def format_intraday(filename):
     pass
 
 if __name__ == "__main__":
-    #create_intraday_folders(base_folder=settings.project_dirs.get('intraday'))
+    #create_intraday_folders(base_folder=init.project_dirs.get('intraday'))
     filelist = get_filelist(raw_dir, recursive=True)
     for f in filelist:
         format_intraday(f)

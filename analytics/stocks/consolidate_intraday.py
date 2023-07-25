@@ -2,7 +2,7 @@
 
 import os
 import sys
-import settings
+import init
 import pandas as pd
 import numpy as np
 import glob

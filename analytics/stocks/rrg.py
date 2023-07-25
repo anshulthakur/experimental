@@ -6,7 +6,7 @@ Created on 02-May-2022
 
 import os
 import sys
-import settings
+import init
 import matplotlib
 import numpy as np
 import matplotlib.pyplot as plt
@@ -254,7 +254,7 @@ pd.options.display.float_format = '{:0.2f}'.format
 
 import os
 import sys
-import settings
+import init
 import csv
 
 from lib.retrieval import get_stock_listing

@@ -3,7 +3,7 @@ On a given time scale, determine whether the security is in uptrend, or downtren
 '''
 import os
 import sys
-import settings
+import init
 import numpy as np
 import pandas as pd
 

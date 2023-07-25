@@ -10,8 +10,8 @@ import datetime
 from stocks.models import Stock, Market
 from lib.tradingview import TvDatafeed, Interval, convert_timeframe_to_quant, get_tvfeed_instance
 from lib.retrieval import get_stock_listing
-import settings
-from settings import project_dirs
+import init
+from init import project_dirs
 from lib.cache import cached
 from lib.logging import log
 

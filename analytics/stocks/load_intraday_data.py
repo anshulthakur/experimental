@@ -7,7 +7,7 @@ Created on 13-Mar-2022
 
 import os
 import sys
-import settings
+import init
 import csv
 from datetime import datetime
 

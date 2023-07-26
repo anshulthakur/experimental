@@ -2,15 +2,13 @@ import os
 from django.conf import settings
 from django.apps import apps
 
-import .settings as setting
+import settings as setting
 
 
 conf = {}
 for mod in dir(setting):
     if mod.isupper():
-        conf[mod] = getattr(mod, setting)
-
-print(conf)
+        conf[mod] = getattr(setting, mod)
 
 project_dirs = {
     'reports': os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reports/'),

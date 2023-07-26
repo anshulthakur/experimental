@@ -16,7 +16,7 @@ attrs
 autobahn
 Automat
 backcall
-backports.zoneinfo
+backports.zoneinfo;python_version<"3.9"
 Backtesting
 beautifulsoup4
 black

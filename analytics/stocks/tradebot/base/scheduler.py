@@ -2,6 +2,7 @@ from lib.logging import log
 import datetime 
 import time
 import asyncio
+from .signals import Shutdown
 
 class AsyncScheduler(object):
     def __init__(self, interval, mode='stream'):
@@ -48,8 +49,11 @@ class AsyncScheduler(object):
         elif self.mode == 'buffered' and mode == 'stream':
             self.mode = mode
         
-    def stop(self):
+    async def stop(self):
+        for flowgraph in self.flowgraphs:
+            await flowgraph.sighandler.emit(Shutdown())
         self.running = False
+        return
     
     async def run(self):
         self.running = True

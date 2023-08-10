@@ -20,7 +20,7 @@ from nodes import MinMaxDetector
 from strategy.priceaction import Zigzag
 from bots.examples import  LongBot
 
-from tradebot.base.signals import Resistance, Support, EndOfData
+from tradebot.base.signals import Resistance, Support, EndOfData, Shutdown
 
 import signal, os
 
@@ -59,7 +59,7 @@ async def main():
     #TraderBot
     longbot = LongBot(name='LongBot', cash=20000000, lot_size=100)
     fg.add_node(longbot)
-    fg.register_signal_handler([Resistance, Support, EndOfData], longbot)
+    fg.register_signal_handler([Resistance, Support, EndOfData, Shutdown], longbot)
 
     # Add some sink nodes 
     sink = Sink(name='Sink')

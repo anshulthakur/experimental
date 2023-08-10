@@ -463,9 +463,10 @@ class MultiStockSource(SourceNode):
                 members = self.get_members(name=self.memberfile)
                 self.df = load_index_members(sector=self.memberfile, 
                                         members=members,
-                                        entries=295,
+                                        entries=300,
                                         interval=convert_timeframe_to_quant(self.timeframe),
-                                        online=not self.offline)
+                                        online=not self.offline,
+                                        date = datetime.date.today())
                 self.df.fillna(0, inplace=True)
                 #log(self.df.head(1), 'debug')
                 #log(self.df.tail(1), 'debug')
@@ -486,7 +487,7 @@ class MultiStockSource(SourceNode):
                 #df['datetime'] = kwargs.get('data')
                 #df.set_index('datetime', inplace=True)
                 #df.sort_index(inplace=True)
-                #log(df.tail(10), 'debug')
+                #log(df.tail(1), 'debug')
                 self.df = pd.concat([self.df, df], join='outer', sort=True)
                 self.df.drop_duplicates(inplace=True)
                 #self.df = self.df.loc[self.last_ts:].copy()
@@ -696,4 +697,5 @@ class FolderSource(SourceNode):
             if not self.ended:
                 await self.emit(EndOfData(timestamp=self.df.index[-1]))
                 self.ended = True
+            log('Source Returning', 'debug')
             return

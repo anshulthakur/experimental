@@ -1,7 +1,7 @@
 from tradebot.base import FlowGraphNode
 from lib.logging import log
 import numpy as np
-from tradebot.base.signals import Resistance, Support, EndOfData
+from tradebot.base.signals import Resistance, Support, EndOfData, Shutdown
 
 from tradebot.base.trading import BaseBot, Broker
 import datetime
@@ -35,6 +35,7 @@ class LongBot(FlowGraphNode, BaseBot, Broker):
                 self.buy(df['close'][-1], date=df.index[-1].to_pydatetime())
                 log(f"Go long: {df['close'][-1]} SL: {self.sl}", 'info')
         self.consume()
+        return
 
     async def handle_signal(self, signal):
         if signal.name() == Resistance.name():
@@ -47,8 +48,16 @@ class LongBot(FlowGraphNode, BaseBot, Broker):
         elif signal.name() == EndOfData.name():
             self.summary()
             self.get_orderbook()
+            self.save_orderbook()
+            self.save_tradebook()
+        elif signal.name() == Shutdown.name():
+            self.summary()
+            self.save_orderbook()
+            self.save_tradebook()
         else:
             log(f"Unknown signal {signal.name()}")
+        log('Bot Returning', 'debug')
+        return
 
 class DynamicResistanceBot(FlowGraphNode, BaseBot, Broker):
     '''
@@ -111,6 +120,12 @@ class DynamicResistanceBot(FlowGraphNode, BaseBot, Broker):
                 self.close_position(self.last_close[0], date=self.last_close[1].to_pydatetime())
             self.summary()
             self.get_orderbook()
+            self.save_orderbook()
+            self.save_tradebook()
+        elif signal.name() == Shutdown.name():
+            self.summary()
+            self.save_orderbook()
+            self.save_tradebook()
         else:
             log(f"Unknown signal {signal.name()}")
 
@@ -168,6 +183,12 @@ class DynamicSupportBot(FlowGraphNode, BaseBot, Broker):
                 self.close_position(self.last_close[0], date=self.last_close[1].to_pydatetime())
             self.summary()
             self.get_orderbook()
+            self.save_orderbook()
+            self.save_tradebook()
+        elif signal.name() == Shutdown.name():
+            self.summary()
+            self.save_orderbook()
+            self.save_tradebook()
         else:
             log(f"Unknown signal {signal.name()}")
 

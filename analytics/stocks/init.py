@@ -1,9 +1,10 @@
 import os
+#os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 from django.conf import settings
 from django.apps import apps
 
 import settings as setting
-
+from libinit import is_initialized, initialize
 
 conf = {}
 for mod in dir(setting):
@@ -16,5 +17,8 @@ project_dirs = {
     'intraday': os.path.join(os.path.dirname(os.path.abspath(__file__)), 'intraday/'),
 }
 
-settings.configure(**conf)
-apps.populate(settings.INSTALLED_APPS)
+if not is_initialized():
+    print("Initializing")
+    settings.configure(**conf)
+    apps.populate(settings.INSTALLED_APPS)
+    initialize()

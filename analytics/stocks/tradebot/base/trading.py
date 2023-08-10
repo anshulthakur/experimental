@@ -3,7 +3,7 @@ from .graph import BaseClass
 import datetime
 
 class Position(BaseClass):
-    def __init__(self, buy=None, sell=None, quantity=1):
+    def __init__(self, timestamp=None, buy=None, sell=None, quantity=1, charges=None):
         if buy is not None and sell is not None:
             log(f'Cannot have both buy and sell in a single order', 'error')
             raise Exception('Cannot have both buy and sell in a single order')
@@ -12,17 +12,33 @@ class Position(BaseClass):
         self.sell = sell
         self.profit = 0
         self.quantity = quantity
+        self.open_time = timestamp
+        self.close_time = None
+        self.charges = charges
     
     def is_long(self):
         return True if (self.buy is not None and self.sell is None) else False
 
-    def close(self, price):
+    def close(self, price, timestamp=None, charges=None):
+        self.close_time = None
         if self.is_long():
             self.sell = price
         else:
             self.buy = price
         self.profit = (self.sell - self.buy)*self.quantity
+        self.open = False
+        self.charges += charges
         log(f'Closed position. Profit = {self.profit}', 'info')
+    
+    def get_trade_entry(self):
+        trade = {'Open_time': self.open_time,
+                 'Open_price': self.buy if self.is_long() else self.sell,
+                 'Order_type': 'Long' if self.is_long() else 'Short',
+                 'Close_time': self.close_time,
+                 'Close_price': self.sell if self.is_long() else self.buy,
+                 'Profit': (self.sell - self.buy)*self.quantity if self.open is False else None,
+                 'Charges': self.charges}
+        return trade
 
 class Broker(BaseClass):
     def __init__(self, **kwargs):
@@ -78,6 +94,7 @@ class BaseBot(BaseClass):
     def __init__(self, cash=0, lot_size=1, **kwargs):
         #print(kwargs)
         self.orderbook = []
+        self.tradebook = []
         self.position = None
         self.charges = 0
         self.cash = cash
@@ -92,8 +109,9 @@ class BaseBot(BaseClass):
                 pass
             else:
                 log(f'Close shorts', 'info')
-                self.position.close(price)
                 charges = self.get_charges(segment='options', quantity=self.lot_size, buy=True, price=price)
+                self.position.close(price, timestamp=date, charges=charges)
+                self.tradebook.append(self.position.get_trade_entry())
                 self.cash = self.cash + (price*self.lot_size) - charges
                 self.charges += charges
                 self.orderbook.append({'timestamp': date, 
@@ -107,7 +125,7 @@ class BaseBot(BaseClass):
         else:
             charges = self.get_charges(segment='options', quantity=self.lot_size, buy=True, price=price)
             if self.cash > ((price*self.lot_size) + charges):
-                self.position = Position(buy=price, quantity=self.lot_size)
+                self.position = Position(buy=price, quantity=self.lot_size, timestamp=date, charges=charges)
                 self.cash = self.cash - (price*self.lot_size) - charges
                 self.charges += charges
                 self.orderbook.append({'timestamp': date, 
@@ -127,8 +145,9 @@ class BaseBot(BaseClass):
                 pass
             else:
                 log(f'Close longs', 'info')
-                self.position.close(price)
                 charges = self.get_charges(segment='options', quantity=self.lot_size, buy=False, price=price)
+                self.position.close(price, timestamp=date, charges=charges)
+                self.tradebook.append(self.position.get_trade_entry())
                 self.cash = self.cash + (price*self.lot_size) - charges
                 self.charges += charges
                 self.orderbook.append({'timestamp': date, 
@@ -142,7 +161,7 @@ class BaseBot(BaseClass):
         else:
             charges = self.get_charges(segment='options', quantity=self.lot_size, buy=False, price=price)
             if self.cash > ((price*self.lot_size) + charges):
-                self.position = Position(sell=price, quantity=self.lot_size)
+                self.position = Position(sell=price, quantity=self.lot_size, timestamp=date, charges=charges)
                 self.cash = self.cash - (price*self.lot_size) - charges
                 self.charges += charges
                 self.orderbook.append({'timestamp': date, 
@@ -158,10 +177,11 @@ class BaseBot(BaseClass):
     def close_position(self, price, date=datetime.datetime.now()):
         if self.position is not None:
             if self.position.is_long():
-                self.position.close(price)
                 charges = self.get_charges(segment='options', 
                                             quantity=self.lot_size, 
                                             buy=False, price=price)
+                self.position.close(price, timestamp=date, charges=charges)
+                self.tradebook.append(self.position.get_trade_entry())
                 self.cash = self.cash + (price*self.lot_size) - charges
                 self.charges += charges
                 self.orderbook.append({'timestamp': date, 
@@ -172,8 +192,9 @@ class BaseBot(BaseClass):
                 #log(f'{self.orderbook[-1]}', 'info')
                 log(f'Cash: {self.cash} Charges: {self.charges}')
             else:
-                self.position.close(price)
                 charges = self.get_charges(segment='options', quantity=self.lot_size, buy=True, price=price)
+                self.position.close(price, timestamp=date, charges=charges)
+                self.tradebook.append(self.position.get_trade_entry())
                 self.cash = self.cash + (price*self.lot_size) - charges
                 self.charges += charges
                 self.orderbook.append({'timestamp': date, 
@@ -195,3 +216,19 @@ class BaseBot(BaseClass):
         print(f'Orderbook')
         for order in self.orderbook:
             print(order)
+
+    def save_orderbook(self, name=None):
+        if name is None:
+            name = 'orderbook.csv'
+        with open(name, 'w') as fd:
+            fd.write('Time,Order,Quantity,Price,Charges\n')
+            for order in self.orderbook:
+                fd.write(f'{order["timestamp"]},{order["operation"]},{order["price"]},{order["quantity"]},{order["charges"]}\n')
+    
+    def save_tradebook(self, name=None):
+        if name is None:
+            name = 'tradebook.csv'
+        with open(name, 'w') as fd:
+            fd.write('Open Time, Open Price, Close Time, Close Price, Order Type, Charges, Profit\n')
+            for trade in self.tradebook:
+                fd.write(f'{trade["Open_time"]}, {trade["Open_price"]}, {trade["Close_time"]}, {trade["Close_price"]}, {trade["Order_type"]}, {trade["Charges"]}, {trade["Profit"]}\n')

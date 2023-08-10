@@ -147,9 +147,9 @@ class DataFrameAggregator(SinkNode):
             log("Received end of data", 'debug')
             pass
         else:
-            log(f"Unknown signal {signal.name()}")
+            log(f"Unknown signal {signal.name()}", 'debug')
+        log('Sink Returning', 'debug')
         return
-
 
 class Recorder(FlowGraphNode):
     def __init__(self, **kwargs):

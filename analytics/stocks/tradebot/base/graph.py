@@ -1,4 +1,5 @@
 from lib.logging import log
+from .signals import Shutdown
 import copy
 class BaseClass(object):
     def __init__(self, **kwargs):
@@ -140,6 +141,7 @@ class FlowGraph(BaseClass):
         self.roots = []
         self.signals = {}
         self.mode = mode
+        self.sighandler = FlowGraphNode(name='SigHandler', signals=[Shutdown])
         if self.mode not in ['stream', 'buffered', 'backtest']:
             log(f'Unrecognized mode "{self.mode}".', 'error')
             raise Exception(f'Unrecognized mode "{self.mode}".')
@@ -205,6 +207,8 @@ class FlowGraph(BaseClass):
                 if signal.name() in self.signals:
                     for s in self.signals[signal.name()]:
                         s.register(signal, node.handle_signal)
+                elif signal.name() == Shutdown.name():
+                    self.sighandler.register(signal, node.handle_signal)
         else:
             raise ValueError("Node is not in flowgraph")
 

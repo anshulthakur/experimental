@@ -6,7 +6,7 @@ import asyncio
 import sys, os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
-
+import init
 from lib.logging import log, set_loglevel
 from settings import project_dirs
 
@@ -16,7 +16,7 @@ from base import FlowGraph
 from base.scheduler import AsyncScheduler as Scheduler
 from nodes import DataFrameAggregator, Resampler, FolderSource, Indicator
 from bots.examples import DynamicResistanceBot
-from tradebot.base.signals import Resistance, Support, EndOfData
+from tradebot.base.signals import Resistance, Support, EndOfData, Shutdown
 
 import signal, os
 
@@ -66,7 +66,7 @@ async def main():
                                     overnight_positions=False,
                                     last_candle_time='15:15:00')
     fg.add_node(shortbot)
-    fg.register_signal_handler([EndOfData], shortbot)
+    fg.register_signal_handler([EndOfData, Shutdown], shortbot)
 
     # Add some sink nodes 
     sink = DataFrameAggregator(name='Sink', filename='/tmp/ResistanceSupport.csv')

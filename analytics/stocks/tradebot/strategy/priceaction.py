@@ -92,6 +92,7 @@ class EvolvingSupportResistance(FlowGraphNode):
         for node,connection in self.connections:
             await node.next(connection=connection, data = s_df.copy())
         self.consume()
+        return
 
 class Zigzag(FlowGraphNode):
     '''

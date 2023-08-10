@@ -4,14 +4,13 @@ import sys, os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 
-import django
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'settings')
-os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
-django.setup()
+# import django
+# os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'settings')
+# os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
+# django.setup()
+import init
 
 from lib.logging import log, set_loglevel
-
-from threading import Thread
 
 from base import FlowGraph
 from base.scheduler import AsyncScheduler as Scheduler
@@ -28,11 +27,19 @@ def signal_handler(signum, frame):
     global scheduler
     scheduler.stop()
 
+async def sig_handle():
+    global scheduler
+    print(f'Signal handler invoked')
+    await scheduler.stop()
+    exit(0)
+
 async def main():
     global scheduler
     set_loglevel('debug')
     # Set the signal handler and a 5-second alarm
-    signal.signal(signal.SIGINT, signal_handler)
+    #signal.signal(signal.SIGINT, signal_handler)
+    loop = asyncio.get_event_loop()
+    loop.add_signal_handler(signal.SIGINT, lambda: asyncio.ensure_future(sig_handle()))
 
     # Create a flowgraph
     fg = FlowGraph(name='FlowGraph', mode='backtest')
@@ -141,7 +148,7 @@ async def main():
 
     # start the scheduler
     await scheduler.run()
-    scheduler.stop()
+    await scheduler.stop()
     #await asyncio.sleep(scheduler.interval)
 
     #thread.join()

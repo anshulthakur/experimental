@@ -57,6 +57,7 @@ class TimeResampler(FlowGraphNode):
         self.elapsed_ticks += 1
         if self.elapsed_ticks == self.reset_ticks:
             self.elapsed_ticks = 0
+        return
 
 class Resampler(TimeResampler):
     pass

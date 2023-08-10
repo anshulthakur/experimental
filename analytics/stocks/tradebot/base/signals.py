@@ -21,6 +21,17 @@ class EndOfData(BaseSignal):
     def __str__(self):
         return f"{self.name}[{self.timestamp.to_pydatetime()}] End of data"
 
+class Shutdown(BaseSignal):
+    @classmethod
+    def name(cls):
+        return 'Shutdown'
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+    
+    def __str__(self):
+        return f"{self.name} Shutting down"
+
 class Resistance(BaseSignal):
     @classmethod
     def name(cls):

@@ -25,8 +25,8 @@ colors = {"red": (255, 0, 0),
           "green" : (0,255,0),
           "black" : (0, 0, 0),
           "white" : (255,255,255),
-          "blue"  : (0, 0, 255),
-          "orange": (255,127,0)
+          #"blue"  : (0, 0, 255),
+          #"orange": (255,127,0)
           }
 def classify(rgb_tuple):
     #https://stackoverflow.com/questions/36439384/classifying-rgb-values-in-python
@@ -60,7 +60,7 @@ def smoothen_neighbourhoods(im):
     im2 = Image.new(im.mode, im.size, 0)
 
     # Iterate over each pixel in the image
-    neighborhood_size = 2
+    neighborhood_size = 1
     for x in range(neighborhood_size, im.width - neighborhood_size):
         for y in range(neighborhood_size, im.height - neighborhood_size):
             # Get the pixel and its neighbors

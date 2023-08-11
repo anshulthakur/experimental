@@ -15,12 +15,13 @@ class Position(BaseClass):
         self.open_time = timestamp
         self.close_time = None
         self.charges = charges
+        self.is_long_order = True if (self.buy is not None and self.sell is None) else False
     
     def is_long(self):
-        return True if (self.buy is not None and self.sell is None) else False
+        return self.is_long_order 
 
     def close(self, price, timestamp=None, charges=None):
-        self.close_time = None
+        self.close_time = timestamp
         if self.is_long():
             self.sell = price
         else:
@@ -223,7 +224,7 @@ class BaseBot(BaseClass):
         with open(name, 'w') as fd:
             fd.write('Time,Order,Quantity,Price,Charges\n')
             for order in self.orderbook:
-                fd.write(f'{order["timestamp"]},{order["operation"]},{order["price"]},{order["quantity"]},{order["charges"]}\n')
+                fd.write(f'{order["timestamp"]},{order["operation"]},{order["quantity"]},{order["price"]},{order["charges"]}\n')
     
     def save_tradebook(self, name=None):
         if name is None:

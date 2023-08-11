@@ -684,7 +684,7 @@ class FolderSource(SourceNode):
             df = self.df.iloc[0:self.index+1].copy()
             if len(df)>0:
                 self.last_ts = df.index[-1]
-                #log(f'{df.tail(1)}', 'debug')
+                #log(f'Source: {df.tail(1)}', 'debug')
                 for node,connection in self.connections:
                     await node.next(connection=connection, data = df.copy(deep=True))
                 self.consume()
@@ -697,5 +697,5 @@ class FolderSource(SourceNode):
             if not self.ended:
                 await self.emit(EndOfData(timestamp=self.df.index[-1]))
                 self.ended = True
-            log('Source Returning', 'debug')
+            #log('Source Returning', 'debug')
             return

@@ -17,7 +17,7 @@ from base.scheduler import AsyncScheduler as Scheduler
 from nodes import Sink, Resampler, NseMultiStockSource, Indicator, DataFrameSink, TradingViewSource, ColumnFilter, MultiStockSource
 from strategy.screen import EMA_RSI_Screen, Proximity_Screen, Crossover_Screen, EMA_Filter, RSI_Filter
 
-from tradebot.base.signals import EndOfData
+from tradebot.base.signals import EndOfData, Shutdown
 
 import signal, os
 
@@ -27,19 +27,11 @@ def signal_handler(signum, frame):
     global scheduler
     scheduler.stop()
 
-async def sig_handle():
-    global scheduler
-    print(f'Signal handler invoked')
-    await scheduler.stop()
-    exit(0)
-
 async def main():
     global scheduler
     set_loglevel('debug')
     # Set the signal handler and a 5-second alarm
-    #signal.signal(signal.SIGINT, signal_handler)
-    loop = asyncio.get_event_loop()
-    loop.add_signal_handler(signal.SIGINT, lambda: asyncio.ensure_future(sig_handle()))
+    signal.signal(signal.SIGINT, signal_handler)
 
     # Create a flowgraph
     fg = FlowGraph(name='FlowGraph', mode='backtest')
@@ -92,27 +84,27 @@ async def main():
     # Add some sink nodes 
     sink = Sink(name='Sink')
     fg.add_node(sink)
-    fg.register_signal_handler([EndOfData], sink)
+    fg.register_signal_handler([EndOfData,Shutdown], sink)
 
     proxy_sink = Sink(name='Proximity-Upside')
     fg.add_node(proxy_sink)
-    fg.register_signal_handler([EndOfData], proxy_sink)
+    fg.register_signal_handler([EndOfData,Shutdown], proxy_sink)
 
     proxy_sink_2 = Sink(name='Proximity-Downside')
     fg.add_node(proxy_sink_2)
-    fg.register_signal_handler([EndOfData], proxy_sink_2)
+    fg.register_signal_handler([EndOfData,Shutdown], proxy_sink_2)
 
     cross_sink = Sink(name='Upside-Crossovers')
     fg.add_node(cross_sink)
-    fg.register_signal_handler([EndOfData], cross_sink)
+    fg.register_signal_handler([EndOfData,Shutdown], cross_sink)
 
     cross_sink_2 = Sink(name='Downside-Crossovers')
     fg.add_node(cross_sink_2)
-    fg.register_signal_handler([EndOfData], cross_sink_2)
+    fg.register_signal_handler([EndOfData,Shutdown], cross_sink_2)
 
     df_sink = DataFrameSink(name='DF-Sink')
     fg.add_node(df_sink)
-    fg.register_signal_handler([EndOfData], df_sink)
+    fg.register_signal_handler([EndOfData,Shutdown], df_sink)
 
     #Add frequency scaling
     resampler = Resampler(interval=1, name='Resampler') #Running on a 1min 30s scale (rate of update of NSE website data)
@@ -148,7 +140,7 @@ async def main():
 
     # start the scheduler
     await scheduler.run()
-    await scheduler.stop()
+    scheduler.stop()
     #await asyncio.sleep(scheduler.interval)
 
     #thread.join()

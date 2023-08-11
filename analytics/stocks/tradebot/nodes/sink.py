@@ -62,6 +62,9 @@ class Sink(SinkNode):
         if signal.name() == EndOfData.name():
             log("Received end of data", 'debug')
             pass
+        elif signal.name() == Shutdown.name():
+            log("Received shutdown", 'debug')
+            pass
         else:
             log(f"Unknown signal {signal.name()}")
         return
@@ -89,6 +92,9 @@ class DataFrameSink(SinkNode):
     async def handle_signal(self, signal):
         if signal.name() == EndOfData.name():
             log("Received end of data", 'debug')
+            pass
+        elif signal.name() == Shutdown.name():
+            log("Received shutdown", 'debug')
             pass
         else:
             log(f"Unknown signal {signal.name()}")
@@ -136,7 +142,7 @@ class DataFrameAggregator(SinkNode):
                 self.df = pd.concat([self.df, self.inputs[conn]], join='outer', sort=True) 
                 self.df.drop_duplicates(inplace=True)
             #log(f'{conn}', 'debug')
-            log(f'{self.df.tail(1)}', 'debug')
+            #log(f'{self.df.tail(1)}', 'debug')
         self.consume()
         return
     
@@ -148,7 +154,7 @@ class DataFrameAggregator(SinkNode):
             pass
         else:
             log(f"Unknown signal {signal.name()}", 'debug')
-        log('Sink Returning', 'debug')
+        #log('Sink Returning', 'debug')
         return
 
 class Recorder(FlowGraphNode):

@@ -29,20 +29,13 @@ def signal_handler(signum, frame):
     global scheduler
     scheduler.stop()
 
-async def sig_handle():
-    global scheduler
-    print(f'Signal handler invoked')
-    await scheduler.stop()
-    exit(0)
-
 async def main():
     global scheduler
     set_loglevel('debug')
-    loop = asyncio.get_event_loop()
-    loop.add_signal_handler(signal.SIGINT, lambda: asyncio.ensure_future(sig_handle()))
+
     
     # Set the signal handler and a 5-second alarm
-    #signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
 
     # create and start the new thread
     #thread = Broker(queue=queue)
@@ -95,7 +88,7 @@ async def main():
 
     # start the scheduler
     await scheduler.run()
-    await scheduler.stop()
+    scheduler.stop()
     #await asyncio.sleep(scheduler.interval)
 
     #thread.join()

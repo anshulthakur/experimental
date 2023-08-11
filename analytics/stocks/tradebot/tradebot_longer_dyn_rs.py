@@ -15,7 +15,7 @@ from threading import Thread
 from base import FlowGraph
 from base.scheduler import AsyncScheduler as Scheduler
 from nodes import DataFrameAggregator, Resampler, FolderSource, Indicator
-from bots.examples import DynamicResistanceBot
+from bots.examples import DynamicSupportBot
 from tradebot.base.signals import Resistance, Support, EndOfData, Shutdown
 
 import signal, os
@@ -58,15 +58,15 @@ async def main():
     fg.add_node(node_indicators)
 
     #TraderBot
-    shortbot = DynamicResistanceBot(name='ShortBot', 
+    longbot = DynamicSupportBot(name='LongBot', 
                                     value=20, 
                                     proximity=1.0, 
                                     cash=20000000, 
                                     lot_size=75,
                                     overnight_positions=False,
                                     last_candle_time='15:15:00')
-    fg.add_node(shortbot)
-    fg.register_signal_handler([EndOfData, Shutdown], shortbot)
+    fg.add_node(longbot)
+    fg.register_signal_handler([EndOfData, Shutdown], longbot)
 
     # Add some sink nodes 
     sink = DataFrameAggregator(name='Sink', filename='/tmp/ResistanceSupport.csv')
@@ -81,7 +81,7 @@ async def main():
     fg.connect(resampler, source)
     fg.connect(source, node_indicators)
     fg.connect(node_indicators, sink)
-    fg.connect(node_indicators, shortbot)
+    fg.connect(node_indicators, longbot)
 
     fg.display()
     # Create a scheduler

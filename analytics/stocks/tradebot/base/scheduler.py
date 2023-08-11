@@ -49,9 +49,7 @@ class AsyncScheduler(object):
         elif self.mode == 'buffered' and mode == 'stream':
             self.mode = mode
         
-    async def stop(self):
-        for flowgraph in self.flowgraphs:
-            await flowgraph.sighandler.emit(Shutdown())
+    def stop(self):
         self.running = False
         return
     
@@ -66,4 +64,7 @@ class AsyncScheduler(object):
                 #log(f'Sleep for {next_runtime.total_seconds()}s', 'debug')
                 if self.mode not in ['buffered', 'backtest']: #Wait if we are live, else we should already be having data
                     await asyncio.sleep(next_runtime.total_seconds())
+        log('Shutting down')
+        for flowgraph in self.flowgraphs:
+            await flowgraph.sighandler.emit(Shutdown())
 

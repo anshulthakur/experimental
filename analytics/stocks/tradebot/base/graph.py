@@ -207,7 +207,7 @@ class FlowGraph(BaseClass):
                 if signal.name() in self.signals:
                     for s in self.signals[signal.name()]:
                         s.register(signal, node.handle_signal)
-                elif signal.name() == Shutdown.name():
+                if signal.name() == Shutdown.name():
                     self.sighandler.register(signal, node.handle_signal)
         else:
             raise ValueError("Node is not in flowgraph")

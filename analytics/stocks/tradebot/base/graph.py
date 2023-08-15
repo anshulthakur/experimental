@@ -5,6 +5,53 @@ class BaseClass(object):
     def __init__(self, **kwargs):
         super().__init__()
 
+    def sanitize_timeframe(self, timeframe):
+        if isinstance(timeframe, str) and timeframe[-1] not in ['m', 'M', 'h', 'H', 'W', 'D', 'd', 'w']:
+            if timeframe.endswith(tuple(['min', 'Min'])):
+                if timeframe[0:-3].isnumeric():
+                    if int(timeframe[0:-3]) < 60:
+                        return f'{timeframe[0:-3]}Min'
+                    if int(timeframe[0:-3]) < 60*24:
+                        return f'{timeframe[0:-3]//60}H'
+                    if int(timeframe[0:-3]) < 60*24*7:
+                        return f'{timeframe[0:-3]//(60*7)}W'
+                    if int(timeframe[0:-3]) < 60*24*30:
+                        return f'{timeframe[0:-3]//(60*30)}M'
+                return timeframe
+            log(f'Timeframe "{timeframe[-1]}" cannot be interpreted')
+        elif not isinstance(timeframe, str):
+            if isinstance(timeframe, int):
+                if timeframe < 60:
+                    return f'{timeframe}Min'
+                if timeframe < 60*24:
+                    return f'{timeframe//60}H'
+                if timeframe < 60*24*7:
+                    return f'{timeframe//(60*7)}W'
+                if timeframe < 60*24*30:
+                    return f'{timeframe//(60*30)}M'
+            else:
+                log(f'Timeframe "{timeframe[-1]}" must be a string')
+        else:
+            if timeframe[0:-1].isnumeric():
+                if timeframe[-1] == 'm':
+                    if int(timeframe[0:-1]) < 60:
+                        return f'{timeframe[0:-1]}Min'
+                    if int(timeframe[0:-1]) < 60*24:
+                        return f'{timeframe[0:-1]//60}H'
+                    if int(timeframe[0:-1]) < 60*24*7:
+                        return f'{timeframe[0:-1]//(60*7)}W'
+                    if int(timeframe[0:-1]) < 60*24*30:
+                        return f'{timeframe[0:-1]//(60*30)}M'
+                if timeframe[-1] in ['h', 'H']:
+                    if int(timeframe[0:-1]) < 24:
+                        return f'{timeframe[0:-1]}H'
+                    if int(timeframe[0:-1]) < 24*7:
+                        return f'{timeframe[0:-1]//24}D'
+                    if int(timeframe[0:-1]) < 24*30:
+                        return f'{timeframe[0:-1]//(24*7)}W'
+                    if int(timeframe[0:-1]) >= 24*30:
+                        return f'{timeframe[0:-1]//(24*30)}M'
+
 class FlowGraphNode(BaseClass):
     '''
     A FlowGraphNode is the basic unit of a flowgraph. It represents the vertex in a directed graph.
@@ -27,7 +74,7 @@ class FlowGraphNode(BaseClass):
     connected to this node or not. It must first inform the Flowgraph about its capability about the signals 
     during initialization that it can generate.
     '''
-    def __init__(self, name=None, strict = True, connections=[], signals=[], **kwargs):
+    def __init__(self, name=None, strict = True, connections=[], signals=[], publications=[], **kwargs):
         #print(kwargs)
         self.connections = copy.deepcopy(connections)
         self._flowgraph = None
@@ -37,6 +84,9 @@ class FlowGraphNode(BaseClass):
         self.callbacks = {}
         for signal in self.signals:
             self.callbacks[signal.name()] = []
+        self.streams = {}
+        for publication in publications:
+            self.streams[publication] = []
         self.multi_input = False #By default, single input
         self.inputs = {}
         if name is None:
@@ -86,9 +136,26 @@ class FlowGraphNode(BaseClass):
             raise Exception(f"{self} does not support signal {signal.name()}")
         self.callbacks[signal.name()].append(callback)
 
+    def register_subscriber(self, event, callback):
+        if event.timeframe in self.streams:
+            self.streams[event.timeframe].append((event, callback))
+
+    async def notify(self, df):
+        for stream in self.streams:
+            for (event, callback) in stream:
+                if event.trigger(df):
+                    await callback(copy.deepcopy(event))
+    
     async def handle_signal(self, signal):
         log(f"Received signal {signal.name()}.", 'debug')
         return
+
+    def subscribe(self, event):
+        event.subscriber = self.name
+        self.flowgraph.subscribe(event=event, callback=self.handle_event_notification)
+
+    async def handle_event_notification(self, event):
+        pass
 
     def display_connections(self, offset=0):
         disp = ''
@@ -140,6 +207,7 @@ class FlowGraph(BaseClass):
         self.nodes = []
         self.roots = []
         self.signals = {}
+        self.events = {}
         self.mode = mode
         self.sighandler = FlowGraphNode(name='SigHandler', signals=[Shutdown])
         if self.mode not in ['stream', 'buffered', 'backtest']:
@@ -200,6 +268,22 @@ class FlowGraph(BaseClass):
         for node in self.roots:
             node.display_connections()
         print('\n')
+
+    def subscribe(self, event, callback):
+        #Make an entry in the flowgraph events dictionary regarding the subscription
+        if event.timeframe not in self.events:
+            self.events[event.timeframe] = {'subscribers': [], 
+                                            'events': {}
+                                            }
+        if event.name not in self.events[event.timeframe]:
+            self.events[event.timeframe]['events'][event.name] = (event, callback)
+        else:
+            log(f'Event with name {event.name} already exists.')
+            raise
+        #For nodes that already exist as publishers, subscribe to their publications
+        for publisher in self.events[event.timeframe]:
+            publisher.register_subscriber(event, callback)
+        pass
 
     def register_signal_handler(self, signals, node):
         if node in self.nodes:

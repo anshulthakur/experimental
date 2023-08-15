@@ -214,7 +214,6 @@ virtualenv
 wcwidth
 webdriver-manager
 webencodings
-websocket
 websocket-client
 websockets
 wget

@@ -1,5 +1,6 @@
 
-from .graph import BaseClass
+from .base import BaseClass
+
 class BaseSignal(BaseClass):
     @classmethod
     def name(cls):
@@ -17,6 +18,7 @@ class EndOfData(BaseSignal):
         return 'EndOfData'
     def __init__(self, timestamp, **kwargs):
         self.timestamp = timestamp
+        self.timeframe = kwargs.get('timeframe', None)
         super().__init__(**kwargs)
     
     def __str__(self):
@@ -78,7 +80,8 @@ class Alert(BaseClass):
     def trigger(self, df):
         if self.key in list(df.columns): 
             if eval(f'{df[self.key][-1]}{self.condition}{self.level}') is True:
-                self.df = df[self.key][-1]
+                #self.df = df.loc[df.index[-1]]
+                self.df = df.tail(1)
                 self.active = False if self.recurring is False else True
                 return True
         return False

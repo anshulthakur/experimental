@@ -1,9 +1,22 @@
 from lib.logging import log
-from .graph import BaseClass
+from .base import BaseClass
 import datetime
 
 class Position(BaseClass):
-    def __init__(self, timestamp=None, buy=None, sell=None, quantity=1, charges=None):
+    def get_delta(self, timeframe):
+        delta = None
+        if timeframe[-1] == 'n':
+            delta = datetime.timedelta(minutes=int(timeframe[:-3]))
+        elif timeframe[-1] == 'H':
+            delta = datetime.timedelta(hours=int(timeframe[:-1]))
+        elif timeframe[-1] == 'D':
+            delta = datetime.timedelta(days=int(timeframe[:-1]))
+        elif timeframe[-1] == 'W':
+            delta = datetime.timedelta(weeks=int(timeframe[:-1]))
+
+        return delta
+    
+    def __init__(self, timestamp=None, buy=None, sell=None, quantity=1, charges=None, timeframe='1Min'):
         if buy is not None and sell is not None:
             log(f'Cannot have both buy and sell in a single order', 'error')
             raise Exception('Cannot have both buy and sell in a single order')
@@ -12,7 +25,8 @@ class Position(BaseClass):
         self.sell = sell
         self.profit = 0
         self.quantity = quantity
-        self.open_time = timestamp
+        delta = self.get_delta(timeframe=timeframe)
+        self.open_time = timestamp + delta if delta is not None else timestamp
         self.close_time = None
         self.charges = charges
         self.is_long_order = True if (self.buy is not None and self.sell is None) else False
@@ -20,8 +34,9 @@ class Position(BaseClass):
     def is_long(self):
         return self.is_long_order 
 
-    def close(self, price, timestamp=None, charges=None):
-        self.close_time = timestamp
+    def close(self, price, timestamp=None, charges=None, timeframe='1Min'):
+        delta = self.get_delta(timeframe=timeframe)
+        self.close_time = timestamp + delta if delta is not None else timestamp
         if self.is_long():
             self.sell = price
         else:
@@ -92,7 +107,19 @@ class Broker(BaseClass):
 
 
 class BaseBot(BaseClass):
-    def __init__(self, cash=0, lot_size=1, **kwargs):
+    def get_delta(self, timeframe):
+        delta = None
+        if timeframe[-1] == 'n':
+            delta = datetime.timedelta(minutes=int(timeframe[:-3]))
+        elif timeframe[-1] == 'H':
+            delta = datetime.timedelta(hours=int(timeframe[:-1]))
+        elif timeframe[-1] == 'D':
+            delta = datetime.timedelta(days=int(timeframe[:-1]))
+        elif timeframe[-1] == 'W':
+            delta = datetime.timedelta(weeks=int(timeframe[:-1]))
+
+        return delta
+    def __init__(self, timeframe='1m', cash=0, lot_size=1, **kwargs):
         #print(kwargs)
         self.orderbook = []
         self.tradebook = []
@@ -101,9 +128,11 @@ class BaseBot(BaseClass):
         self.cash = cash
         self.initial_cash = cash
         self.lot_size = lot_size
+        self.registered_events = {}
         super().__init__()
 
-    def buy(self, price, date=datetime.datetime.now()):
+    def buy(self, price, date=datetime.datetime.now(), timeframe='1Min'):
+        delta = self.get_delta(timeframe=timeframe)
         if self.position is not None:
             if self.position.is_long():
                 log(f'Already long', 'warning')
@@ -111,11 +140,11 @@ class BaseBot(BaseClass):
             else:
                 log(f'Close shorts', 'info')
                 charges = self.get_charges(segment='options', quantity=self.lot_size, buy=True, price=price)
-                self.position.close(price, timestamp=date, charges=charges)
+                self.position.close(price, timestamp=date, charges=charges, timeframe=timeframe)
                 self.tradebook.append(self.position.get_trade_entry())
                 self.cash = self.cash + (price*self.lot_size) - charges
                 self.charges += charges
-                self.orderbook.append({'timestamp': date, 
+                self.orderbook.append({'timestamp': date + delta if delta is not None else date, 
                                        'operation': 'buy', 
                                        'price': price, 
                                        'quantity': self.lot_size, 
@@ -126,10 +155,10 @@ class BaseBot(BaseClass):
         else:
             charges = self.get_charges(segment='options', quantity=self.lot_size, buy=True, price=price)
             if self.cash > ((price*self.lot_size) + charges):
-                self.position = Position(buy=price, quantity=self.lot_size, timestamp=date, charges=charges)
+                self.position = Position(buy=price, quantity=self.lot_size, timestamp=date, charges=charges, timeframe=timeframe)
                 self.cash = self.cash - (price*self.lot_size) - charges
                 self.charges += charges
-                self.orderbook.append({'timestamp': date, 
+                self.orderbook.append({'timestamp': date + delta if delta is not None else date, 
                                        'operation': 'buy', 
                                        'price': price, 
                                        'quantity': self.lot_size, 
@@ -139,7 +168,8 @@ class BaseBot(BaseClass):
             else:
                 log(f'Not enough cash. Have: {self.cash}. Required: {((price*self.lot_size) + charges)}', 'warning')
 
-    def sell(self, price, date=datetime.datetime.now()):
+    def sell(self, price, date=datetime.datetime.now(), timeframe='1Min'):
+        delta = self.get_delta(timeframe=timeframe)
         if self.position is not None:
             if not self.position.is_long():
                 log(f'Already short', 'warning')
@@ -147,11 +177,11 @@ class BaseBot(BaseClass):
             else:
                 log(f'Close longs', 'info')
                 charges = self.get_charges(segment='options', quantity=self.lot_size, buy=False, price=price)
-                self.position.close(price, timestamp=date, charges=charges)
+                self.position.close(price, timestamp=date, charges=charges, timeframe=timeframe)
                 self.tradebook.append(self.position.get_trade_entry())
                 self.cash = self.cash + (price*self.lot_size) - charges
                 self.charges += charges
-                self.orderbook.append({'timestamp': date, 
+                self.orderbook.append({'timestamp': date + delta if delta is not None else date, 
                                        'operation': 'sell', 
                                        'price': price, 
                                        'quantity': self.lot_size, 
@@ -162,10 +192,10 @@ class BaseBot(BaseClass):
         else:
             charges = self.get_charges(segment='options', quantity=self.lot_size, buy=False, price=price)
             if self.cash > ((price*self.lot_size) + charges):
-                self.position = Position(sell=price, quantity=self.lot_size, timestamp=date, charges=charges)
+                self.position = Position(sell=price, quantity=self.lot_size, timestamp=date, charges=charges, timeframe=timeframe)
                 self.cash = self.cash - (price*self.lot_size) - charges
                 self.charges += charges
-                self.orderbook.append({'timestamp': date, 
+                self.orderbook.append({'timestamp': date + delta if delta is not None else date, 
                                        'operation': 'sell', 
                                        'price': price, 
                                        'quantity': self.lot_size, 
@@ -175,17 +205,18 @@ class BaseBot(BaseClass):
             else:
                 log(f'Not enough cash', 'warning')
 
-    def close_position(self, price, date=datetime.datetime.now()):
+    def close_position(self, price, date=datetime.datetime.now(), timeframe='1Min'):
+        delta = self.get_delta(timeframe=timeframe)
         if self.position is not None:
             if self.position.is_long():
                 charges = self.get_charges(segment='options', 
                                             quantity=self.lot_size, 
                                             buy=False, price=price)
-                self.position.close(price, timestamp=date, charges=charges)
+                self.position.close(price, timestamp=date, charges=charges, timeframe=timeframe)
                 self.tradebook.append(self.position.get_trade_entry())
                 self.cash = self.cash + (price*self.lot_size) - charges
                 self.charges += charges
-                self.orderbook.append({'timestamp': date, 
+                self.orderbook.append({'timestamp': date + delta if delta is not None else date, 
                                        'operation': 'sell', 
                                        'price': price, 
                                        'quantity': self.lot_size, 
@@ -194,11 +225,11 @@ class BaseBot(BaseClass):
                 log(f'Cash: {self.cash} Charges: {self.charges}')
             else:
                 charges = self.get_charges(segment='options', quantity=self.lot_size, buy=True, price=price)
-                self.position.close(price, timestamp=date, charges=charges)
+                self.position.close(price, timestamp=date, charges=charges, timeframe=timeframe)
                 self.tradebook.append(self.position.get_trade_entry())
                 self.cash = self.cash + (price*self.lot_size) - charges
                 self.charges += charges
-                self.orderbook.append({'timestamp': date, 
+                self.orderbook.append({'timestamp': date + delta if delta is not None else date, 
                                        'operation': 'buy', 
                                        'price': price, 
                                        'quantity': self.lot_size, 

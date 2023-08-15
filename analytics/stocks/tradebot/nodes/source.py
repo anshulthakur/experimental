@@ -175,65 +175,6 @@ class NseMultiStockSource(SourceNode):
     Fetch the latest price for TOTAL MARKET INDEX members in a single API call,
     append it to the previous df and pass the df
     '''
-    def sanitize_timeframe(self, timeframe):
-        if isinstance(timeframe, str) and timeframe[-1] not in ['m', 'M', 'h', 'H', 'W', 'D', 'd', 'w']:
-            if timeframe.endswith(tuple(['min', 'Min'])):
-                if timeframe[0:-3].isnumeric():
-                    if int(timeframe[0:-3]) < 60:
-                        return f'{timeframe[0:-3]}Min'
-                    if int(timeframe[0:-3]) < 60*24:
-                        return f'{timeframe[0:-1]//60}H'
-                    if int(timeframe[0:-3]) < 60*24*7:
-                        return f'{timeframe[0:-1]//(60*7)}W'
-                    if int(timeframe[0:-3]) < 60*24*30:
-                        return f'{timeframe[0:-1]//(60*30)}M'
-                return timeframe
-            log(f'Timeframe "{timeframe[-1]}" cannot be interpreted', 'debug')
-        elif not isinstance(timeframe, str):
-            if isinstance(timeframe, int):
-                if timeframe < 60:
-                    return f'{timeframe}Min'
-                if timeframe < 60*24:
-                    return f'{timeframe//60}H'
-                if timeframe < 60*24*7:
-                    return f'{timeframe//(60*7)}W'
-                if timeframe < 60*24*30:
-                    return f'{timeframe//(60*30)}M'
-            else:
-                log(f'Timeframe "{timeframe[-1]}" must be a string', 'debug')
-        else:
-            if timeframe[0:-1].isnumeric():
-                if timeframe[-1] == 'm':
-                    if int(timeframe[0:-1]) < 60:
-                        return f'{timeframe[0:-1]}Min'
-                    if int(timeframe[0:-1]) < 60*24:
-                        return f'{timeframe[0:-1]//60}H'
-                    if int(timeframe[0:-1]) < 60*24*7:
-                        return f'{timeframe[0:-1]//(60*7)}W'
-                    if int(timeframe[0:-1]) < 60*24*30:
-                        return f'{timeframe[0:-1]//(60*30)}M'
-                if timeframe[-1] in ['h', 'H']:
-                    if int(timeframe[0:-1]) < 24:
-                        return f'{timeframe[0:-1]}H'
-                    if int(timeframe[0:-1]) < 24*7:
-                        return f'{timeframe[0:-1]//24}D'
-                    if int(timeframe[0:-1]) < 24*30:
-                        return f'{timeframe[0:-1]//(24*7)}W'
-                    if int(timeframe[0:-1]) >= 24*30:
-                        return f'{timeframe[0:-1]//(24*30)}M'
-                if timeframe[-1] in ['d', 'D']:
-                    if int(timeframe[0:-1]) < 7:
-                        return f'{timeframe[0:-1]}D'
-                    if int(timeframe[0:-1]) < 30:
-                        return f'{timeframe[0:-1]//7}W'
-                    if int(timeframe[0:-1]) >= 30:
-                        return f'{timeframe[0:-1]//30}M'
-                if timeframe[-1] in ['w', 'W']:
-                    if int(timeframe[0:-1]) < 5:
-                        return f'{timeframe[0:-1]}W'
-                    if int(timeframe[0:-1]) >= 5:
-                        return f'{timeframe[0:-1]//5}M'
-
     def __init__(self, timeframe='1D', is_index=True, offline=False, offset = 0, **kwargs):
         super().__init__(signals= [EndOfData], **kwargs)
         self.offline = offline
@@ -321,64 +262,6 @@ class MultiStockSource(SourceNode):
     Fetch the latest price for a list of scripts in a single API call,
     append it to the previous df and pass the df
     '''
-    def sanitize_timeframe(self, timeframe):
-        if isinstance(timeframe, str) and timeframe[-1] not in ['m', 'M', 'h', 'H', 'W', 'D', 'd', 'w']:
-            if timeframe.endswith(tuple(['min', 'Min'])):
-                if timeframe[0:-3].isnumeric():
-                    if int(timeframe[0:-3]) < 60:
-                        return f'{timeframe[0:-3]}Min'
-                    if int(timeframe[0:-3]) < 60*24:
-                        return f'{timeframe[0:-1]//60}H'
-                    if int(timeframe[0:-3]) < 60*24*7:
-                        return f'{timeframe[0:-1]//(60*7)}W'
-                    if int(timeframe[0:-3]) < 60*24*30:
-                        return f'{timeframe[0:-1]//(60*30)}M'
-                return timeframe
-            log(f'Timeframe "{timeframe[-1]}" cannot be interpreted', 'debug')
-        elif not isinstance(timeframe, str):
-            if isinstance(timeframe, int):
-                if timeframe < 60:
-                    return f'{timeframe}Min'
-                if timeframe < 60*24:
-                    return f'{timeframe//60}H'
-                if timeframe < 60*24*7:
-                    return f'{timeframe//(60*7)}W'
-                if timeframe < 60*24*30:
-                    return f'{timeframe//(60*30)}M'
-            else:
-                log(f'Timeframe "{timeframe[-1]}" must be a string', 'debug')
-        else:
-            if timeframe[0:-1].isnumeric():
-                if timeframe[-1] == 'm':
-                    if int(timeframe[0:-1]) < 60:
-                        return f'{timeframe[0:-1]}Min'
-                    if int(timeframe[0:-1]) < 60*24:
-                        return f'{timeframe[0:-1]//60}H'
-                    if int(timeframe[0:-1]) < 60*24*7:
-                        return f'{timeframe[0:-1]//(60*7)}W'
-                    if int(timeframe[0:-1]) < 60*24*30:
-                        return f'{timeframe[0:-1]//(60*30)}M'
-                if timeframe[-1] in ['h', 'H']:
-                    if int(timeframe[0:-1]) < 24:
-                        return f'{timeframe[0:-1]}H'
-                    if int(timeframe[0:-1]) < 24*7:
-                        return f'{timeframe[0:-1]//24}D'
-                    if int(timeframe[0:-1]) < 24*30:
-                        return f'{timeframe[0:-1]//(24*7)}W'
-                    if int(timeframe[0:-1]) >= 24*30:
-                        return f'{timeframe[0:-1]//(24*30)}M'
-                if timeframe[-1] in ['d', 'D']:
-                    if int(timeframe[0:-1]) < 7:
-                        return f'{timeframe[0:-1]}D'
-                    if int(timeframe[0:-1]) < 30:
-                        return f'{timeframe[0:-1]//7}W'
-                    if int(timeframe[0:-1]) >= 30:
-                        return f'{timeframe[0:-1]//30}M'
-                if timeframe[-1] in ['w', 'W']:
-                    if int(timeframe[0:-1]) < 5:
-                        return f'{timeframe[0:-1]}W'
-                    if int(timeframe[0:-1]) >= 5:
-                        return f'{timeframe[0:-1]//5}M'
 
     def __init__(self, member_file=None, timeframe='1D', offline=False, offset = 0, **kwargs):
         super().__init__(signals= [EndOfData], **kwargs)
@@ -481,6 +364,7 @@ class FolderSource(SourceNode):
                 - Stock.csv
     '''
     def __init__(self, folder, symbol='NIFTY50', start_date = '2012-01-01 09:15', market_start_time='09:15:00', timeframe='1min', offset=0, **kwargs):
+        super().__init__(signals= [EndOfData], publications=[self.sanitize_timeframe(timeframe)], **kwargs)
         if os.path.isdir(folder):
             self.folder = folder
         else:
@@ -488,13 +372,13 @@ class FolderSource(SourceNode):
         self.stock = symbol
         self.start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d %H:%M")
         self.current_date = self.start_date
-        self.timeframe = self.sanitize_timeframe(timeframe)
         self.ended = False
         self.df = None
         self.index = None
         self.offset = offset
         self.market_start_time = datetime.datetime.strptime(market_start_time, "%H:%M:%S")
-        super().__init__(signals= [EndOfData], publications=[self.timeframe], **kwargs)
+        self.timeframe = self.sanitize_timeframe(timeframe)
+        
 
     def resample(self, df):
         logic = {'open'  : 'first',
@@ -579,12 +463,12 @@ class FolderSource(SourceNode):
                 #log(nan_cols, 'debug')
             else:
                 log('Mode currently not supported', logtype='error')
-                await self.emit(EndOfData(timestamp=self.df.index[-1]))
+                await self.emit(EndOfData(timestamp=self.df.index[-1], timeframe=self.timeframe))
                 self.ended = True
         else:
             if self.mode not in ['backtest', 'buffered']:
                 log('Mode currently not supported', logtype='error')
-                await self.emit(EndOfData(timestamp=self.df.index[-1]))
+                await self.emit(EndOfData(timestamp=self.df.index[-1], timeframe=self.timeframe))
                 self.ended = True
         #log(self.df.tail(1), 'debug')
         #log(len(self.df), 'debug')
@@ -594,7 +478,7 @@ class FolderSource(SourceNode):
             df = self.df.iloc[0:self.index+1].copy()
             if len(df)>0:
                 self.last_ts = df.index[-1]
-                #log(f'Source: {df.tail(1)}', 'debug')
+                #log(f'{self.name}: Source: {df.tail(1)}', 'debug')
                 for node,connection in self.connections:
                     await node.next(connection=connection, data = df.copy(deep=True))
                 await self.notify(df)
@@ -606,7 +490,7 @@ class FolderSource(SourceNode):
             self.index +=1
         else:
             if not self.ended:
-                await self.emit(EndOfData(timestamp=self.df.index[-1]))
+                await self.emit(EndOfData(timestamp=self.df.index[-1], timeframe=self.timeframe))
                 self.ended = True
             #log('Source Returning', 'debug')
             return

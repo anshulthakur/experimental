@@ -1,5 +1,6 @@
 
-class BaseSignal(object):
+from .graph import BaseClass
+class BaseSignal(BaseClass):
     @classmethod
     def name(cls):
         raise Exception('Cannot invoke BaseSignal')
@@ -60,3 +61,25 @@ class Support(BaseSignal):
 
     def __str__(self):
         return f"{self.name}[{self.timestamp.to_pydatetime()}] Support at {self.value} ({self.index})"
+
+
+class Alert(BaseClass):
+    def __init__(self, name, level, key='close', condition='<=', recurring=False, timeframe='1m'):
+        self.name = name
+        self.level = float(level)
+        self.key = key
+        self.condition = condition
+        self.recurring = recurring
+        self.timeframe = self.sanitize_timeframe(timeframe)
+        self.active = True
+        self.subscriber = None
+        self.df = None #Will contain the dataframe row of trigger
+    
+    def trigger(self, df):
+        if self.key in list(df.columns): 
+            if eval(f'{df[self.key][-1]}{self.condition}{self.level}') is True:
+                self.df = df[self.key][-1]
+                self.active = False if self.recurring is False else True
+                return True
+        return False
+    

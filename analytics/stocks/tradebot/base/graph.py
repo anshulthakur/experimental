@@ -2,6 +2,7 @@ from lib.logging import log
 from .base import BaseClass
 from .signals import Shutdown
 import copy
+import time
 
 class FlowGraphNode(BaseClass):
     '''
@@ -46,6 +47,9 @@ class FlowGraphNode(BaseClass):
         self.input_types = None
         self.strict = strict
         self.timeframe = self.sanitize_timeframe(timeframe) if timeframe is not None else None
+        #On multi-timeframe analysis, a smaller time frame may trigger an event while we're still awaiting the processing to complete on a larger TF.
+        #We avoid this by flagging busy sections and making the other processing to wait until we're out.
+        self.busy = False 
         super().__init__(**kwargs)
 
     def get_connection_name(self, node, tag=None):
@@ -158,6 +162,11 @@ class FlowGraphNode(BaseClass):
                 #Not all inputs are received yet
                 return False
         return True
+    
+    def wait_until_busy(self):
+        sleep_duration = 1/100000.0
+        while self.busy:
+            time.sleep(sleep_duration)
 
     def consume(self):
         for connections in self.inputs:
@@ -263,6 +272,7 @@ class FlowGraph(BaseClass):
         if event.name not in self.events[event.timeframe]:
             self.events[event.timeframe][event.name] = (event, callback)
         else:
+            print(self.events[event.timeframe][event.name])
             raise Exception(f'Event with name {event.name} already exists.')
         #For nodes that already exist as publishers, subscribe to their publications
         for publisher in self.events[event.timeframe]['publishers']:
@@ -272,10 +282,11 @@ class FlowGraph(BaseClass):
     def unsubscribe(self, event):
         if event.timeframe not in self.events:
             return
-        for publisher in self.events[event.timeframe]['publishers']:
-            publisher.unregister_subscriber(event)
         if event.name in self.events[event.timeframe]:
             del(self.events[event.timeframe][event.name])
+            #log(f'{self.events[event.timeframe]}')
+        for publisher in self.events[event.timeframe]['publishers']:
+            publisher.unregister_subscriber(event)
 
     def register_signal_handler(self, signals, node):
         if node in self.nodes:

@@ -55,6 +55,7 @@ class Position(BaseClass):
                  'Profit': (self.sell - self.buy)*self.quantity if self.open is False else None,
                  'Charges': self.charges}
         return trade
+    
 
 class Broker(BaseClass):
     def __init__(self, **kwargs):
@@ -119,6 +120,7 @@ class BaseBot(BaseClass):
             delta = datetime.timedelta(weeks=int(timeframe[:-1]))
 
         return delta
+
     def __init__(self, timeframe='1m', cash=0, lot_size=1, **kwargs):
         #print(kwargs)
         self.orderbook = []

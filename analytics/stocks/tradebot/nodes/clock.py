@@ -119,5 +119,6 @@ class DataResampler(FlowGraphNode):
             #log(f'{self}: {df.tail(10)}', 'debug')
             for node,connection in self.connections:
                 await node.next(connection=connection, data = df.copy(deep=True))
+            await self.notify(df)
             self.consume()
         return

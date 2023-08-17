@@ -32,6 +32,7 @@ class LongBot(FlowGraphNode, BaseBot, Broker):
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
             return
+        self.busy = True
         df = kwargs.get('data')
         if self.position and self.close_orderbook(df):
             self.close_position(df.iloc[-1]['close'], date=df.index[-1].to_pydatetime())
@@ -49,9 +50,11 @@ class LongBot(FlowGraphNode, BaseBot, Broker):
                 self.buy(df['close'][-1], date=df.index[-1].to_pydatetime())
                 log(f"Go long: {df['close'][-1]} SL: {self.sl}", 'info')
         self.consume()
+        self.busy = False
         return
 
     async def handle_signal(self, signal):
+        self.wait_until_busy()
         if signal.name() == Resistance.name():
             self.resistance = signal.value
         elif signal.name() == Support.name():
@@ -94,8 +97,9 @@ class DynamicResistanceBot(FlowGraphNode, BaseBot, Broker):
         super().__init__(**kwargs)
     
     def close_orderbook(self, df):
+        delta = self.get_delta(timeframe=self.timeframe)
         if not self.overnight_positions:
-            last_candle = df.index[-1].to_pydatetime()
+            last_candle = df.index[-1].to_pydatetime()+delta if delta is not None else df.index[-1].to_pydatetime()
             #log(f'{last_candle.hour}=={self.last_candle_time.hour}, {last_candle.minute}== {self.last_candle_time.minute}')
             if (last_candle.hour == self.last_candle_time.hour) and (last_candle.minute >= self.last_candle_time.minute):
                 return True
@@ -111,31 +115,34 @@ class DynamicResistanceBot(FlowGraphNode, BaseBot, Broker):
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
             return
+        self.busy = True
         df = kwargs.get('data')
-        if self.position and self.close_orderbook(df):
+        if self.position is not None and self.close_orderbook(df):
             self.close_position(df.iloc[-1]['close'], date=df.index[-1].to_pydatetime())
             self.sl = None
             log(f"Trade closed {df.iloc[-1]['close']}. Total Charges (so far): {self.charges}", 'info')
 
-        elif self.taking_fresh_orders(candle_time=df.index[-1].to_pydatetime()) and self.position and self.sl <= df.iloc[-1]['close']:
+        elif self.taking_fresh_orders(candle_time=df.index[-1].to_pydatetime()) and self.position is not None and self.sl <= df.iloc[-1]['close']:
             self.close_position(df.iloc[-1]['close'], date=df.index[-1].to_pydatetime())
             self.sl = None
             log(f"SL Hit {df.iloc[-1]['close']}. Total Charges (so far): {self.charges}", 'info')
 
-        elif self.taking_fresh_orders(candle_time=df.index[-1].to_pydatetime()) and df.iloc[-1]['close'] <= df.iloc[-1]['EMA'+self.ema_val]:
+        elif df.iloc[-1]['close'] <= df.iloc[-1]['EMA'+self.ema_val]:
             #Still below EMA. Are we in proximity?
             if (abs(df.iloc[-1]['close'] - df.iloc[-1]['EMA'+self.ema_val])/df.iloc[-1]['EMA'+self.ema_val])*100 <= self.proximity:
                 #We are within proximity. Go short if there isn't a position open, else, update SL
-                if not self.position:
+                if not self.position and self.taking_fresh_orders(candle_time=df.index[-1].to_pydatetime()):
                     self.sell(df.iloc[-1]['close'], date=df.index[-1].to_pydatetime())
                     self.sl = df.iloc[-1]['high']
                     log(f"Go short: {df.iloc[-1]['close']} SL: {self.sl}", 'info')
-                else:
+                elif self.position is not None:
                     self.sl = df.iloc[-1]['high']
         self.last_close = [df.iloc[-1]['close'], df.index[-1]]
         self.consume()
+        self.busy = False
 
     async def handle_signal(self, signal):
+        self.wait_until_busy()
         if signal.name() == EndOfData.name():
             if self.position:
                 self.close_position(self.last_close[0], date=self.last_close[1].to_pydatetime())
@@ -160,7 +167,7 @@ class DynamicSupportBot(FlowGraphNode, BaseBot, Broker):
     tracked support without crossing over, go long.
     Stop loss is fixed points above for now (low of last candle). Later, it may be the nearest support.
     '''
-    def __init__(self, value=20, proximity=1.0, overnight_positions=False, last_candle_time='15:15:00', **kwargs):
+    def __init__(self, value=20, proximity=1.0, overnight_positions=False, last_candle_time='15:15:00', stop_loss_tf = '1Min', **kwargs):
         self.sl = None
         self.ema_val = str(value)
         self.proximity = proximity
@@ -168,13 +175,14 @@ class DynamicSupportBot(FlowGraphNode, BaseBot, Broker):
         self.ticks_since_last_touch = 0 #In case we want to incorporate rebounce to avoid taking positions in noisy environment
         self.overnight_positions = overnight_positions
         self.last_candle_time = datetime.datetime.strptime(last_candle_time, "%H:%M:%S")
+        self.tf_val = stop_loss_tf
         super().__init__(**kwargs)
     
     def close_orderbook(self, df):
         if not self.overnight_positions:
             last_candle = df.index[-1].to_pydatetime()
             #log(f'{last_candle.hour}=={self.last_candle_time.hour}, {last_candle.minute}== {self.last_candle_time.minute}')
-            if (last_candle.hour == self.last_candle_time.hour) and (last_candle.minute >= self.last_candle_time.minute):
+            if (last_candle.hour >= self.last_candle_time.hour) and (last_candle.minute >= self.last_candle_time.minute):
                 return True
         return False
     
@@ -188,17 +196,18 @@ class DynamicSupportBot(FlowGraphNode, BaseBot, Broker):
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
             return
+        self.busy =True
         df = kwargs.get('data')
-        #log(f'{df.tail(1)}')
+        log(f'{df.tail(1)}')
         if self.position and self.close_orderbook(df):
             self.close_position(df.iloc[-1]['close'], date=df.index[-1].to_pydatetime(), timeframe=self.timeframe)
             self.sl = None
-            log(f"Trade closed {df.iloc[-1]['close']}. Total Charges (so far): {self.charges}", 'info')
+            log(f"End-of-day Trade closed {df.iloc[-1]['close']}. Total Charges (so far): {self.charges}", 'info')
             for event in self.registered_events:
                 self.unsubscribe(self.registered_events[event])
             self.registered_events = {}
 
-        elif self.taking_fresh_orders(candle_time=df.index[-1].to_pydatetime()) and self.position and self.sl >= df.iloc[-1]['close']:
+        elif self.position and self.sl >= df.iloc[-1]['close']:
             self.close_position(df.iloc[-1]['close'], date=df.index[-1].to_pydatetime(), timeframe=self.timeframe)
             self.sl = None
             log(f'SL Hit {df.iloc[-1]["close"]}. Total Charges (so far): {self.charges}', 'info')
@@ -206,44 +215,49 @@ class DynamicSupportBot(FlowGraphNode, BaseBot, Broker):
                 self.unsubscribe(self.registered_events[event])
             self.registered_events = {}
 
-        elif self.taking_fresh_orders(candle_time=df.index[-1].to_pydatetime()) and df.iloc[-1]['close'] >= df.iloc[-1]['EMA'+self.ema_val]:
+        elif df.iloc[-1]['close'] >= df.iloc[-1]['EMA'+self.ema_val]:
             #Still above EMA. Are we in proximity?
             if (abs(df.iloc[-1]['close'] - df.iloc[-1]['EMA'+self.ema_val])/df.iloc[-1]['EMA'+self.ema_val])*100 <= self.proximity:
                 #We are within proximity. Go long if there isn't a position open, else, update SL
-                if not self.position:
+                if self.position is None and self.taking_fresh_orders(candle_time=df.index[-1].to_pydatetime()) :
                     self.buy(df.iloc[-1]['close'], date=df.index[-1].to_pydatetime(), timeframe=self.timeframe)
                     self.sl = df.iloc[-1]['low']
                     log(f"Go long: {df.iloc[-1]['close']} SL: {self.sl}", 'info')
-                    event = Alert(name='StopLoss', key='close', condition='<=', level=self.sl, recurring=False, timeframe=self.sanitize_timeframe('1Min'))
+                    event = Alert(name='StopLoss', key='close', condition='<=', level=self.sl, recurring=False, timeframe=self.sanitize_timeframe(self.tf_val))
                     self.subscribe(event)
                     self.registered_events[event.name] = event
-                else:
+                elif self.position is not None:
+                    #log(f'{self.position}')
                     self.sl = df.iloc[-1]['low']
                     #Delete previous alert and set a new one
                     for event in self.registered_events:
                         self.unsubscribe(self.registered_events[event])
                     self.registered_events = {}
-                    event = Alert(name='StopLoss', key='close', condition='<=', level=self.sl, recurring=False, timeframe=self.sanitize_timeframe('1Min'))
+                    log('Update stoploss')
+                    event = Alert(name='StopLoss', key='close', condition='<=', level=self.sl, recurring=False, timeframe=self.sanitize_timeframe(self.tf_val))
                     self.subscribe(event)
                     self.registered_events[event.name] = event
 
         self.last_close = [df.iloc[-1]['close'], df.index[-1]]
         self.consume()
+        self.busy = False
     
     async def handle_event_notification(self, event):
         log(f'Event {event.name} received.', 'debug')
         log(f'{event.df}', 'debug')
+        self.wait_until_busy()
         if self.position:
             self.close_position(event.df.iloc[-1]['close'], date=event.df.index[-1].to_pydatetime(), timeframe=event.timeframe)
             self.sl = None
-            log(f"SL Hit {event.df.iloc[-1]['close']}. Total Charges (so far): {self.charges}", 'info')
+            #log(f"(Event) SL Hit {event.df.iloc[-1]['close']}. Total Charges (so far): {self.charges}", 'info')
             for event in self.registered_events:
                 self.unsubscribe(self.registered_events[event])
             self.registered_events = {}
         return
 
     async def handle_signal(self, signal):
-        if signal.name() == EndOfData.name() and signal.timeframe == self.timeframe:
+        self.wait_until_busy()
+        if signal.name() == EndOfData.name():
             if self.position:
                 self.close_position(self.last_close[0], date=self.last_close[1].to_pydatetime(), timeframe=self.timeframe)
             self.summary()

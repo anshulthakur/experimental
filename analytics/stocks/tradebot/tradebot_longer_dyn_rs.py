@@ -39,7 +39,7 @@ async def main():
     # Create a flowgraph
     fg = FlowGraph(name='FlowGraph', mode='backtest')
 
-    tf_value=30
+    tf_value=15
     tf_unit = 'm'
     timeframe = f'{tf_value}{tf_unit}'
 
@@ -61,6 +61,9 @@ async def main():
     data_resampler = DataResampler(name='Data Resampler' ,interval=tf_value)
     fg.add_node(data_resampler)
 
+    data_resampler2 = DataResampler(name='Data Resampler 1' ,interval=3, publications=['3Min'])
+    fg.add_node(data_resampler2)
+
     # Add indicator nodes
     node_indicators = Indicator(name='Indicators', transparent=True, indicators=[{'tagname': 'EMA20', 
                                                                 'type': 'EMA', 
@@ -77,7 +80,8 @@ async def main():
                                 lot_size=75,
                                 overnight_positions=False,
                                 last_candle_time='15:15:00',
-                                timeframe=timeframe)
+                                timeframe=timeframe,
+                                stop_loss_tf='3Min')
     fg.add_node(longbot)
     fg.register_signal_handler([EndOfData, Shutdown], longbot)
 
@@ -96,7 +100,8 @@ async def main():
     fg.connect(node_indicators, sink)
     fg.connect(node_indicators, longbot)
 
-    fg.connect(source, null_sink)
+    fg.connect(source, data_resampler2)
+    fg.connect(data_resampler2, null_sink)
 
     fg.display()
     # Create a scheduler

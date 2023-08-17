@@ -86,3 +86,6 @@ class Alert(BaseClass):
                 return True
         return False
     
+    def __str__(self) -> str:
+        return f'{self.name} ({self.timeframe})'
+    

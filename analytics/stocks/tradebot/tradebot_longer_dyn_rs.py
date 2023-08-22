@@ -16,7 +16,7 @@ from base import FlowGraph
 from base.scheduler import AsyncScheduler as Scheduler
 from nodes import DataFrameAggregator, Resampler, FolderSource, Indicator, DataResampler
 from bots.examples import DynamicSupportBot
-from tradebot.base.signals import Resistance, Support, EndOfData, Shutdown
+from tradebot.base.signals import Resistance, Support, EndOfData, Shutdown, EndOfDay
 
 import signal, os
 
@@ -40,8 +40,10 @@ async def main():
     fg = FlowGraph(name='FlowGraph', mode='backtest')
 
     tf_value=15
+    sl_tf_value = 5
     tf_unit = 'm'
     timeframe = f'{tf_value}{tf_unit}'
+    sl_timeframe = f'{sl_tf_value}{tf_unit}'
 
     #Add frequency scaling
     resampler = Resampler(interval=1, name='Main Resampler') #Running on a 15min scale
@@ -54,36 +56,37 @@ async def main():
                           folder=project_dirs.get('intraday'),
                           start_date='2022-01-01 09:15',
                           market_start_time='09:15:00',
+                          market_end_time='15:15:00',
                           offset=0)
     fg.add_node(source)
 
     #Add data resampling
-    data_resampler = DataResampler(name='Data Resampler' ,interval=tf_value)
+    data_resampler = DataResampler(name='Data Resampler',interval=tf_value, offset=15)
     fg.add_node(data_resampler)
 
-    data_resampler2 = DataResampler(name='Data Resampler 1' ,interval=3, publications=['3Min'])
+    data_resampler2 = DataResampler(name='Data Resampler 1' ,interval=sl_tf_value, publications=[sl_timeframe], offset=15)
     fg.add_node(data_resampler2)
 
     # Add indicator nodes
-    node_indicators = Indicator(name='Indicators', transparent=True, indicators=[{'tagname': 'EMA20', 
+    node_indicators = Indicator(name='Indicators', transparent=True, indicators=[{'tagname': 'EMA30', 
                                                                 'type': 'EMA', 
-                                                                'length': 20,
+                                                                'length': 30,
                                                                 'column': 'close'},
                                                                ])
     fg.add_node(node_indicators)
 
     #TraderBot
     longbot = DynamicSupportBot(name='LongBot', 
-                                value=20, 
+                                value=30, 
                                 proximity=1.0, 
                                 cash=20000000, 
                                 lot_size=75,
                                 overnight_positions=False,
                                 last_candle_time='15:15:00',
                                 timeframe=timeframe,
-                                stop_loss_tf='3Min')
+                                stop_loss_tf=sl_timeframe)
     fg.add_node(longbot)
-    fg.register_signal_handler([EndOfData, Shutdown], longbot)
+    fg.register_signal_handler([EndOfData, Shutdown, EndOfDay], longbot)
 
     # Add some sink nodes 
     sink = DataFrameAggregator(name='Sink', filename='/tmp/ResistanceSupport.csv')

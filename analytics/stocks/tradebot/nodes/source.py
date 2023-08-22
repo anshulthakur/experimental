@@ -2,7 +2,7 @@ from tradebot.base import FlowGraphNode
 from lib.logging import log
 
 from lib.nse import NseIndia
-from tradebot.base.signals import EndOfData
+from tradebot.base.signals import EndOfData, EndOfDay
 import pandas as pd
 import json
 import os
@@ -363,8 +363,8 @@ class FolderSource(SourceNode):
             - Day
                 - Stock.csv
     '''
-    def __init__(self, folder, symbol='NIFTY50', start_date = '2012-01-01 09:15', market_start_time='09:15:00', timeframe='1min', offset=0, **kwargs):
-        super().__init__(signals= [EndOfData], publications=[self.sanitize_timeframe(timeframe)], **kwargs)
+    def __init__(self, folder, symbol='NIFTY50', start_date = '2012-01-01 09:15', market_start_time='09:15:00', market_end_time='15:15:00', timeframe='1min', offset=0, **kwargs):
+        super().__init__(signals= [EndOfData, EndOfDay], publications=[self.sanitize_timeframe(timeframe)], **kwargs)
         if os.path.isdir(folder):
             self.folder = folder
         else:
@@ -377,7 +377,11 @@ class FolderSource(SourceNode):
         self.index = None
         self.offset = offset
         self.market_start_time = datetime.datetime.strptime(market_start_time, "%H:%M:%S")
+        self.market_end_time = datetime.datetime.strptime(market_end_time, "%H:%M:%S")
         self.timeframe = self.sanitize_timeframe(timeframe)
+        self.current_day = 0
+        self.end_sent = False
+        self.df_offset_str = '09h15min'
         
 
     def resample(self, df):
@@ -388,9 +392,9 @@ class FolderSource(SourceNode):
         if self.timeframe.lower() == '1min':
             return df
         if self.timeframe.endswith('Min'):
-            df = df.resample(self.timeframe.lower(), offset='09h15min').apply(logic).dropna()
+            df = df.resample(self.timeframe.lower(), offset=self.df_offset_str).apply(logic).dropna()
         else:
-            df = df.resample(self.timeframe, offset='09h15min').apply(logic).dropna()
+            df = df.resample(self.timeframe, offset=self.df_offset_str).apply(logic).dropna()
         return df
     
     async def next(self, connection=None, **kwargs):
@@ -474,6 +478,7 @@ class FolderSource(SourceNode):
         #log(len(self.df), 'debug')
         if self.index is None:
             self.index = self.offset
+            self.df_offset_str = f'{self.df.index[0].hour}h{self.df.index[0].minute}min'
         if self.index < len(self.df):
             df = self.df.iloc[0:self.index+1].copy()
             if len(df)>0:
@@ -482,6 +487,15 @@ class FolderSource(SourceNode):
                 for node,connection in self.connections:
                     await node.next(connection=connection, data = df.copy(deep=True))
                 await self.notify(df)
+                if self.current_day != self.last_ts.day:
+                    #Send EndOfDay notification only once, not beyond it on the same day. Here, day has changed now
+                    self.current_day = self.last_ts.day
+                    self.end_sent = False
+                if (self.last_ts.hour >= self.market_end_time.hour) and \
+                        (self.last_ts.minute >= self.market_end_time.minute) and \
+                        (self.end_sent is False):
+                    await self.emit(EndOfDay(timestamp=self.last_ts, timeframe=self.timeframe, df=df))
+                    self.end_sent = True
                 self.consume()
             else:
                 log('No data to pass', 'debug')

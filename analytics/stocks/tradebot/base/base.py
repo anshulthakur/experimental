@@ -4,6 +4,22 @@ class BaseClass(object):
     def __init__(self, **kwargs):
         super().__init__()
 
+    def compare_timeframe(self, tf1, tf2):
+        t1 = self.sanitize_timeframe(tf1)
+        t2 = self.sanitize_timeframe(tf2)
+        if t1.endswith('n'):
+            if t2.endswith('n'): #Both in minutes
+                if int(t1[0:-3])>int(t2[0:-3]):
+                    return -1
+                elif int(t1[0:-3])==int(t2[0:-3]):
+                    return 0
+                else:
+                    return 1
+            else: #t2 is > min, hence greater
+                return 1
+        elif t2.endswith('n'): #t2 in min and t1 not
+            return -1
+
     def sanitize_timeframe(self, timeframe):
         if isinstance(timeframe, str) and timeframe[-1] not in ['m', 'M', 'h', 'H', 'W', 'D', 'd', 'w']:
             if timeframe.endswith(tuple(['min', 'Min'])):
@@ -11,13 +27,13 @@ class BaseClass(object):
                     if int(timeframe[0:-3]) < 60:
                         return f'{timeframe[0:-3]}Min'
                     if int(timeframe[0:-3]) < 60*24:
-                        return f'{timeframe[0:-3]//60}H'
+                        return f'{int(timeframe[0:-3])//60}H'
                     if int(timeframe[0:-3]) < 60*24*7:
-                        return f'{timeframe[0:-3]//(60*7)}D'
+                        return f'{int(timeframe[0:-3])//(60*7)}D'
                     if int(timeframe[0:-3]) < 60*24*30:
-                        return f'{timeframe[0:-3]//(60*30)}W'
+                        return f'{int(timeframe[0:-3])//(60*30)}W'
                     if int(timeframe[0:-3]) >= 60*24*30:
-                        return f'{timeframe[0:-3]//(60*30)}M'
+                        return f'{int(timeframe[0:-3])//(60*30)}M'
                 return timeframe
             log(f'Timeframe "{timeframe[-1]}" cannot be interpreted')
         elif not isinstance(timeframe, str):
@@ -40,19 +56,26 @@ class BaseClass(object):
                     if int(timeframe[0:-1]) < 60:
                         return f'{timeframe[0:-1]}Min'
                     if int(timeframe[0:-1]) < 60*24:
-                        return f'{timeframe[0:-1]//60}H'
+                        return f'{int(timeframe[0:-1])//60}H'
                     if int(timeframe[0:-1]) < 60*24*7:
-                        return f'{timeframe[0:-1]//(60*7)}D'
+                        return f'{int(timeframe[0:-1])//(60*7)}D'
                     if int(timeframe[0:-1]) < 60*24*30:
-                        return f'{timeframe[0:-1]//(60*30)}W'
+                        return f'{int(timeframe[0:-1])//(60*30)}W'
                     if int(timeframe[0:-1]) >= 60*24*30:
-                        return f'{timeframe[0:-1]//(60*30)}M'
+                        return f'{int(timeframe[0:-1])//(60*30)}M'
                 if timeframe[-1] in ['h', 'H']:
                     if int(timeframe[0:-1]) < 24:
                         return f'{timeframe[0:-1]}H'
                     if int(timeframe[0:-1]) < 24*7:
-                        return f'{timeframe[0:-1]//24}D'
+                        return f'{int(timeframe[0:-1])//24}D'
                     if int(timeframe[0:-1]) < 24*30:
-                        return f'{timeframe[0:-1]//(24*7)}W'
+                        return f'{int(timeframe[0:-1])//(24*7)}W'
                     if int(timeframe[0:-1]) >= 24*30:
-                        return f'{timeframe[0:-1]//(24*30)}M'
+                        return f'{int(timeframe[0:-1])//(24*30)}M'
+                if timeframe[-1] in ['d', 'D']:
+                    if int(timeframe[0:-1]) < 7:
+                        return f'{timeframe[0:-1]}D'
+                    if int(timeframe[0:-1]) <= 30:
+                        return f'{int(timeframe[0:-1])//7}W'
+                    if int(timeframe[0:-1]) > 30:
+                        return f'{int(timeframe[0:-1])//(30)}M'

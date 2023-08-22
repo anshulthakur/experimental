@@ -64,10 +64,12 @@ class Resampler(TimeResampler):
     pass
 
 class DataResampler(FlowGraphNode):
-    def __init__(self, interval=1, **kwargs):
+    def __init__(self, interval=1, offset = 15, **kwargs):
         self.interval = self.sanitize_timeframe(timeframe=interval)
         self.reset_ticks = self.to_ticks(interval)
         self.elapsed_ticks = 0
+        self.df_offset_str = '09h15min'
+        self.offset = int(offset)
         super().__init__(**kwargs)
 
     def resample(self, df):
@@ -78,9 +80,9 @@ class DataResampler(FlowGraphNode):
         if self.interval.lower() == '1min':
             return df
         if self.interval.endswith('Min'):
-            df = df.resample(self.interval.lower(), offset='09h15min').apply(logic).dropna()
+            df = df.resample(self.interval.lower(), offset=self.df_offset_str).apply(logic).dropna()
         else:
-            df = df.resample(self.interval, offset='09h15min').apply(logic).dropna()
+            df = df.resample(self.interval, offset=self.df_offset_str).apply(logic).dropna()
         return df
     
     def to_ticks(self, interval):
@@ -110,11 +112,46 @@ class DataResampler(FlowGraphNode):
             log(f'{self}: Not ready yet', 'debug')
             return
         df = kwargs.get('data', None)
+        '''
+        Resampling purely on the basis of samples passed has an issue when we are trying to do multi-timeframe analysis.
+        Suppose the candles start at 9:16 (though the market starts at 9:15) and we are sampling with an offset of 9:15.
+        Then, an unsampled stream may look like:
+        9:16, 
+        9:16, 9:17, 
+        9:16, 9:17, 9:18, 
+        9:16, 9:17, 9:18, 9:19, 
+        9:16, 9:17, 9:18, 9:19, 9:20, 
+        9:16, 9:17, 9:18, 9:19, 9:20, 9:21 ...
+
+        A 3-sampler would look like:
+        .
+        ..
+        9:15, 9:18
+        9:15, 9:18
+        9:15, 9:18
+        9:15, 9:18, 9:21
+
+        The 9:18 sample should not have been there in the 3rd sample. This is because we expect that a candle data will be made
+        available only after it is fully over (unless we ignore the last candle altogether)
+
+        Any downstream node making a decision on the basis of the higher TF candle would 'jump in' fast, set the wrong stop-loss
+        and possibly get stopped out at unintentional place.
+
+        At least in a backtest, that is, because time runs faster in a backtest and doesn't take the order time from the system,
+        but guesses it as the time we received the candlestick data (end of candle). So, the tradebook would look like:
+        Order placed at 9:21, Order closed at 9:19 (stop hit).
+
+        To avoid this, we use the mod of timeframe, while accounting for the offset of market start time (15 min as default). This
+        too, however, works only for sub-hour sampling.
+        '''
+        # if self.df_offset_str is None:
+        #     self.df_offset_str = f'{df.index[0].hour}h{df.index[0].minute}min'
         #log(f'{self}: {df.tail(10)}', 'debug')
-        self.elapsed_ticks += 1
-        if self.elapsed_ticks == self.reset_ticks:
-            self.elapsed_ticks = 0
-        if self.elapsed_ticks==0:
+        #self.elapsed_ticks += 1
+        #if self.elapsed_ticks == self.reset_ticks:
+        #    self.elapsed_ticks = 0
+        #if self.elapsed_ticks==0:
+        if (df.index[-1].minute+1-self.offset)%self.reset_ticks==0:#Remove the initial offset of 15 minutes (9:15)
             df = self.resample(df)
             #log(f'{self}: {df.tail(10)}', 'debug')
             for node,connection in self.connections:

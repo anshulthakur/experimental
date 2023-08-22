@@ -38,7 +38,7 @@ class FlowGraphNode(BaseClass):
             self.callbacks[signal.name()] = []
         self.streams = {}
         for publication in publications:
-            self.streams[publication] = []
+            self.streams[self.sanitize_timeframe(publication)] = []
         self.multi_input = False #By default, single input
         self.inputs = {}
         if name is None:

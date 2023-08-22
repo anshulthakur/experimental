@@ -24,6 +24,19 @@ class EndOfData(BaseSignal):
     def __str__(self):
         return f"{self.name}[{self.timestamp.to_pydatetime()}] End of data"
 
+class EndOfDay(BaseSignal):
+    @classmethod
+    def name(cls):
+        return 'EndOfDay'
+    def __init__(self, timestamp, df, **kwargs):
+        self.timestamp = timestamp
+        self.timeframe = kwargs.get('timeframe', None)
+        self.df = df.tail(1)
+        super().__init__(**kwargs)
+    
+    def __str__(self):
+        return f"{self.name}[{self.timestamp.to_pydatetime()}] End of data"
+
 class Shutdown(BaseSignal):
     @classmethod
     def name(cls):

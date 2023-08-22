@@ -14,9 +14,9 @@ from threading import Thread
 
 from base import FlowGraph
 from base.scheduler import AsyncScheduler as Scheduler
-from nodes import DataFrameAggregator, Resampler, FolderSource, Indicator
+from nodes import DataFrameAggregator, Resampler, FolderSource, Indicator, DataResampler
 from bots.examples import DynamicResistanceBot
-from tradebot.base.signals import Resistance, Support, EndOfData, Shutdown
+from tradebot.base.signals import Resistance, Support, EndOfData, Shutdown, EndOfDay
 
 import signal, os
 
@@ -39,15 +39,32 @@ async def main():
     # Create a flowgraph
     fg = FlowGraph(name='FlowGraph', mode='backtest')
 
+    tf_value=60
+    sl_tf_value = 5
+    tf_unit = 'm'
+    timeframe = f'{tf_value}{tf_unit}'
+    sl_timeframe = f'{sl_tf_value}{tf_unit}'
+
+    #Add frequency scaling
+    resampler = Resampler(interval=1, name='Main Resampler') #Running on a 15min scale
+    fg.add_node(resampler)
+
     # Add a dataframe source 
-    source = FolderSource(name='NSE', 
+    source = FolderSource(name='NIFTY', 
                           symbol='NIFTY', 
-                          timeframe='30m', 
+                          timeframe='1Min', 
                           folder=project_dirs.get('intraday'),
                           start_date='2022-01-01 09:15',
                           market_start_time='09:15:00',
-                          offset=25)
+                          offset=0)
     fg.add_node(source)
+
+    #Add data resampling
+    data_resampler = DataResampler(name='Data Resampler', interval=tf_value)
+    fg.add_node(data_resampler)
+
+    data_resampler2 = DataResampler(name='Data Resampler 1', interval=sl_tf_value, publications=[sl_timeframe])
+    fg.add_node(data_resampler2)
 
     # Add indicator nodes
     node_indicators = Indicator(name='Indicators', transparent=True, indicators=[{'tagname': 'EMA20', 
@@ -64,24 +81,29 @@ async def main():
                                     cash=20000000, 
                                     lot_size=75,
                                     overnight_positions=False,
-                                    last_candle_time='15:15:00')
+                                    last_candle_time='15:15:00',
+                                    timeframe=timeframe,
+                                    stop_loss_tf=sl_timeframe)
     fg.add_node(shortbot)
-    fg.register_signal_handler([EndOfData, Shutdown], shortbot)
+    fg.register_signal_handler([EndOfData, Shutdown, EndOfDay], shortbot)
 
     # Add some sink nodes 
     sink = DataFrameAggregator(name='Sink', filename='/tmp/ResistanceSupport.csv')
     fg.add_node(sink)
     fg.register_signal_handler([Resistance, Support, EndOfData], sink)
     
-    #Add frequency scaling
-    resampler = Resampler(interval=1, name='Resampler') #Running on a 15min scale
-    fg.add_node(resampler)
+    null_sink = DataFrameAggregator(name='NullSink', )
+    fg.add_node(null_sink)
 
     # connect the nodes together
     fg.connect(resampler, source)
-    fg.connect(source, node_indicators)
+    fg.connect(source, data_resampler)
+    fg.connect(data_resampler, node_indicators)
     fg.connect(node_indicators, sink)
     fg.connect(node_indicators, shortbot)
+
+    fg.connect(source, data_resampler2)
+    fg.connect(data_resampler2, null_sink)
 
     fg.display()
     # Create a scheduler

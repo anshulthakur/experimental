@@ -79,9 +79,20 @@ class Support(BaseSignal):
 
 
 class Alert(BaseClass):
-    def __init__(self, name, level, key='close', condition='<=', recurring=False, timeframe='1m'):
+    def __init__(self, name, level, scrip=None, key='close', condition='<=', recurring=False, timeframe='1m', filters = []):
         self.name = name
-        self.level = float(level)
+        self.level_key = None
+        self.scrip = None
+        self.filters = filters if filters is not None else []
+        try:
+            self.level = float(level)
+        except:
+            self.level = None
+            if level is None:
+                raise Exception('Level field cannot be None')
+            if scrip is None:
+                raise Exception('Scrip field cannot be None')
+            self.scrip = scrip
         self.key = key
         self.condition = condition
         self.recurring = recurring
@@ -91,12 +102,51 @@ class Alert(BaseClass):
         self.df = None #Will contain the dataframe row of trigger
     
     def trigger(self, df):
-        if self.key in list(df.columns): 
-            if eval(f'{df[self.key][-1]}{self.condition}{self.level}') is True:
-                #self.df = df.loc[df.index[-1]]
-                self.df = df.tail(1)
-                self.active = False if self.recurring is False else True
-                return True
+        stocks = []
+        try:
+            stocks = list(df.columns.levels[0])
+            columns = list(df.columns.levels[1])
+            output = {s: None for s in stocks}
+        except:
+            columns = list(df.columns)
+        if len(stocks)>0:
+            #Multi-level dataframe
+            if self.scrip not in stocks:
+                #Don't process if stock not in dataframe
+                return False
+            for filter in self.filters:
+                if filter.filter(df[self.scrip]) is False: #Filter criteria not matched yet
+                    return False
+            if self.level is not None:
+                if eval(f'{df[self.scrip][self.key][-1]}{self.condition}{self.level}') is True:
+                    #self.df = df.loc[df.index[-1]]
+                    self.df = df[self.scrip].tail(1)
+                    self.active = False if self.recurring is False else True
+                    return True
+            elif self.level_key in columns:
+                if eval(f'{df[self.scrip][self.key][-1]}{self.condition}{df[self.scrip][self.level_key][-1]}') is True:
+                    #self.df = df.loc[df.index[-1]]
+                    self.df = df[self.scrip].tail(1)
+                    self.active = False if self.recurring is False else True
+                    return True
+        else:
+            #Single-level dataframe
+            if self.key in list(df.columns):
+                for filter in self.filters:
+                    if filter.filter(df) is False: #Filter criteria not matched yet
+                        return False 
+                if self.level is not None:
+                    if eval(f'{df[self.key][-1]}{self.condition}{self.level}') is True:
+                        #self.df = df.loc[df.index[-1]]
+                        self.df = df.tail(1)
+                        self.active = False if self.recurring is False else True
+                        return True
+                elif self.level_key in list(df.columns):
+                    if eval(f'{df[self.key][-1]}{self.condition}{df[self.level_key][-1]}') is True:
+                        #self.df = df.loc[df.index[-1]]
+                        self.df = df.tail(1)
+                        self.active = False if self.recurring is False else True
+                        return True
         return False
     
     def __str__(self) -> str:

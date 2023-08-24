@@ -50,7 +50,6 @@ class Sink(SinkNode):
             elif type(df).__name__ == 'dict':
                 log(json.dumps(df, indent=2, cls=NpEncoder), 'debug')
             elif type(df).__name__ == 'list':
-                pass
                 for l in df:
                     log(l, 'debug')
             else:

@@ -21,24 +21,6 @@ from stocks.models import Listing, Stock
 #Create a composite dataframe of closing prices for all securities
 #and compute correlation across all of them (and cluster them together)
 
-'''
-def get_stock_listing(stock):
-    print(stock.sid)
-    listing = Listing.objects.filter(stock=stock)
-    df = read_frame(listing, fieldnames=['close', 'date'], index_col='date')
-    for column in df.columns:
-        if column != 'stock':
-           df[column] = pd.to_numeric(df[column])
-    df = df.sort_index()
-    df = df.reindex(columns = ['close'])
-    df.rename(columns={"close":stock.sid.replace(' ', '_')}, inplace=True)
-    #Optionally, filter out by date range
-    start_date = '2020-01-01'
-    end_date = '2020-12-31'
-    df = df.loc[start_date:end_date]
-    return df
-'''
-
 def get_stock_listing(stock):
     import datetime
     first_date = datetime.date(2020, 1, 1)

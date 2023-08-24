@@ -44,3 +44,30 @@ class MinMaxDetector(FlowGraphNode):
                 log(f"{self}: {data}", 'debug')
                 await node.next(connection=connection, data = data)
         self.consume()
+
+class PriceAlerts(FlowGraphNode):
+    def load_alerts(self):
+        pass
+
+    def __init__(self, file=None, **kwargs):
+        super().__init__(publications=[self.sanitize_timeframe(kwargs.get('timeframe', '1Min'))], **kwargs)
+        self.file = file #File from which alerts must be loaded
+        if self.file is not None:
+            self.load_alerts()
+
+    async def next(self, connection=None, **kwargs):
+        if not self.ready(connection, **kwargs):
+            log(f'{self}: Not ready yet', 'debug')
+            return
+        df = kwargs.get('data')
+        await self.notify(df)
+        for node,connection in self.connections:
+            await node.next(connection=connection, data = df.copy(deep=True))
+        self.consume()
+
+    async def handle_event_notification(self, event):
+        log(f'Event {event.name} received.', 'debug')
+        log(f'{event.df}', 'debug')
+        if not event.recurring:
+            self.unsubscribe(event)
+        return

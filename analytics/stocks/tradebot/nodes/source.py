@@ -263,7 +263,7 @@ class MultiStockSource(SourceNode):
     append it to the previous df and pass the df
     '''
 
-    def __init__(self, member_file=None, timeframe='1D', offline=False, offset = 0, **kwargs):
+    def __init__(self, member_file=None, timeframe='1D', offline=False, offset = 0, min_entries= 200, **kwargs):
         super().__init__(signals= [EndOfData], **kwargs)
         self.memberfile = member_file
         if self.memberfile is None:
@@ -279,6 +279,7 @@ class MultiStockSource(SourceNode):
         self.index = None
         self.ended = False
         self.offset = offset
+        self.min_entries = min_entries
         #super().__init__(**kwargs)
 
     def get_members(self, name):
@@ -286,6 +287,8 @@ class MultiStockSource(SourceNode):
         with open(f'runtime/lists/{name}', 'r', newline='') as fd:
             reader = json.load(fd)
             for market in reader:
+                if market.lower() not in ['nse', 'bse']:
+                    continue
                 for member in reader[market]:
                     members.append(f"{market.upper().strip()}:{member.upper().strip()}")
         return members
@@ -303,13 +306,14 @@ class MultiStockSource(SourceNode):
                 members = self.get_members(name=self.memberfile)
                 self.df = load_index_members(sector=self.memberfile, 
                                         members=members,
-                                        entries=300,
+                                        entries=max(self.offset, self.min_entries),
                                         interval=convert_timeframe_to_quant(self.timeframe),
                                         online=not self.offline,
                                         date = datetime.date.today())
                 self.df.fillna(0, inplace=True)
-                #log(self.df.head(1), 'debug')
-                #log(self.df.tail(1), 'debug')
+                #log(self.df.head(10), 'debug')
+                #log(self.df.tail(10), 'debug')
+                log(f'Length: {len(self.df)}')
                 #log(self.df.tail(1).isnull().sum().sum(), 'debug')
                 #nan_cols = self.df.tail(1)[self.df.tail(1).columns[self.df.tail(1).isnull().any()]]
                 #log(nan_cols, 'debug')
@@ -339,7 +343,7 @@ class MultiStockSource(SourceNode):
             df = self.df.iloc[0:self.index+1].copy()
             if len(df)>0:
                 self.last_ts = df.index[-1]
-                #log(f'{df.tail(1)}', 'debug')
+                #log(f'{self.name}:{df.tail(1)}', 'debug')
                 for node,connection in self.connections:
                     await node.next(connection=connection, data = df.copy(deep=True))
                 self.consume()

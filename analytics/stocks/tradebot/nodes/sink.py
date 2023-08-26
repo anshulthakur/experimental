@@ -83,7 +83,7 @@ class DataFrameSink(SinkNode):
         for conn in self.inputs:
             df = self.inputs[conn]
             #log(f'{conn}', 'debug')
-            log(f'{df.tail(1)}', 'debug')
+            #log(f'{self.name}:{df.tail(1)}', 'debug')
             pass
         self.consume()
         return

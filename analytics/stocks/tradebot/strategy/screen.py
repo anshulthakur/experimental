@@ -1,14 +1,6 @@
-from tradebot.base import FlowGraphNode
+from tradebot.base import FlowGraphNode, BaseFilter
 from lib.logging import log
 import pandas as pd
-
-class BaseFilter(object):
-    def __init__(self, filter=None):
-        self.filter = filter
-        self.column_names = []
-
-    def filter(self):        
-        return self.filter
 
 class BaseScreen(FlowGraphNode):
     epsilon = 0.00001

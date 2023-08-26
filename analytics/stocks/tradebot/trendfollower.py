@@ -41,7 +41,7 @@ async def main():
 
     # Add a dataframe source 
     source = TradingViewSource(name='Stock', symbol='KABRAEXTRU', exchange='NSE', timeframe='1d')
-    #source = NseMultiStockSource(name='Source', exchange='NSE', timeframe='15m', offline=False, offset=200)
+    #source = NseMultiStockSource(name='Source', exchange='NSE', timeframe='15m', offline=False, offset=200, min_entries=400,)
     fg.add_node(source)
 
     #Drop columns except close

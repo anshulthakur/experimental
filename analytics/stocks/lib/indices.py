@@ -192,6 +192,8 @@ def load_index_members(sector, members, date=datetime.datetime.now(), interval=I
                     #df[stock] = s_df[stock]
         except Stock.DoesNotExist:
             log(f'{stock} values do not exist', 'error')
+        except Market.DoesNotExist:
+            log(f'{market} does not exist as Market', 'error')
     df = pd.concat(s_list, axis='columns')
     df = df[~df.index.duplicated(keep='first')]
     df.sort_index(inplace=True)

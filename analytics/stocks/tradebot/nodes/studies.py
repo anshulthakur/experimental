@@ -1,7 +1,9 @@
-from tradebot.base import FlowGraphNode
+from tradebot.base import FlowGraphNode, TimeFilter
 from lib.logging import log
 import pandas as pd
 from lib.pivots import getHHIndex, getHLIndex, getLHIndex, getLLIndex
+import json
+from base.signals import Alert
 
 class MinMaxDetector(FlowGraphNode):
     def __init__(self, lookaround=1, **kwargs):
@@ -47,6 +49,29 @@ class MinMaxDetector(FlowGraphNode):
 
 class PriceAlerts(FlowGraphNode):
     def load_alerts(self):
+        log(f'Load alerts from {self.file}')
+        with open(self.file, 'r') as fd:
+            watchlist = json.load(fd)
+            log(f'Look for alerts in {self.timeframe} timeframe')
+            if self.timeframe not in watchlist:
+                #log(f'No alerts for {self.timeframe} timeframe')
+                return
+            alerts = watchlist[self.timeframe]
+            for alert in alerts:
+                #log(f'Alert {alert}: {alerts[alert]}')
+                event = Alert(name=alert, 
+                              scrip=alerts[alert]['scrip'],
+                              key='close',
+                              condition=alerts[alert]['condition'],
+                              level=alerts[alert]['level'],
+                              margin=alerts[alert].get('margin', 0.0001),
+                              recurring=alerts[alert].get('recurring', False),
+                              timeframe=self.timeframe)
+                if 'after' in alerts[alert]:
+                    filter = TimeFilter(value=alerts[alert]['after'], condition='>=')
+                    #log('Add timefilter', 'debug')
+                    event.add_filters([filter])
+                self.subscribe(event=event)
         pass
 
     def __init__(self, file=None, **kwargs):
@@ -60,6 +85,7 @@ class PriceAlerts(FlowGraphNode):
             log(f'{self}: Not ready yet', 'debug')
             return
         df = kwargs.get('data')
+        #log(f'{df.tail(1)}', 'debug')
         await self.notify(df)
         for node,connection in self.connections:
             await node.next(connection=connection, data = df.copy(deep=True))
@@ -67,7 +93,7 @@ class PriceAlerts(FlowGraphNode):
 
     async def handle_event_notification(self, event):
         log(f'Event {event.name} received.', 'debug')
-        log(f'{event.df}', 'debug')
+        log(f'{self.name}:{event.df}', 'debug')
         if not event.recurring:
             self.unsubscribe(event)
         return

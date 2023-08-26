@@ -1,4 +1,48 @@
 from lib.logging import log
+from datetime import datetime
+
+class BaseFilter(object):
+    def __init__(self, filter=None):
+        self.filter = filter
+        self.column_names = []
+
+    def filter(self):        
+        return self.filter
+
+class TimeFilter(BaseFilter):
+    def __init__(self, value, condition):
+        self.level = datetime.strptime(value.strip(), "%Y-%m-%d %H:%M:%S")
+        self.condition = condition
+        self.filter = self.create_filter()
+
+    def create_filter(self):
+        def lt(x):
+            return True if x.index[-1].to_pydatetime() < self.level else False 
+
+        def leq(x):
+            return True if x.index[-1].to_pydatetime() <= self.level else False 
+
+        def gt(x):
+            return True if x.index[-1].to_pydatetime() > self.level else False 
+            
+        def geq(x):
+            return True if x.index[-1].to_pydatetime() >= self.level else False 
+        
+        def eq(x):
+            return True if x.index[-1].to_pydatetime() == self.level else False 
+
+        filter_map = {'<=': leq,
+                      '>=': geq,
+                      '<': lt,
+                      '>': gt,
+                      '=': eq,}
+        return filter_map.get(self.condition.lower().strip(), None)
+
+    def filter(self):        
+        return self.filter
+    
+    def __str__(self):
+        return f'datetimeIndex{self.condition}{self.level}'
 
 class BaseClass(object):
     def __init__(self, **kwargs):

@@ -50,6 +50,7 @@ class FlowGraphNode(BaseClass):
         #On multi-timeframe analysis, a smaller time frame may trigger an event while we're still awaiting the processing to complete on a larger TF.
         #We avoid this by flagging busy sections and making the other processing to wait until we're out.
         self.busy = False 
+        self.pending_subscriptions = []
         super().__init__(**kwargs)
 
     def get_connection_name(self, node, tag=None):
@@ -95,7 +96,7 @@ class FlowGraphNode(BaseClass):
     def register_subscriber(self, event, callback):
         if event.timeframe in self.streams:
             self.streams[event.timeframe].append((event, callback))
-            #log(f'{self.name} Added subscriber for event {event.name}', 'debug')
+            log(f'{self.name} Added subscriber for event {event.name}', 'debug')
 
     def unregister_subscriber(self, event):
         if event.timeframe in self.streams:
@@ -103,10 +104,13 @@ class FlowGraphNode(BaseClass):
                 if self.streams[event.timeframe][ii][0].name == event.name:
                     self.streams[event.timeframe].pop(ii)
                     #log(f'{self.name} Unsubscribed node for event {event.name}', 'debug')
+                    break
 
     async def notify(self, df):
         for stream in self.streams:
             for (event, callback) in self.streams[stream]:
+                # if event.active:
+                #     log(f'Test {event}', 'debug')
                 if event.active and event.trigger(df):
                     await callback(copy.deepcopy(event))
                     if not event.recurring:
@@ -118,7 +122,10 @@ class FlowGraphNode(BaseClass):
 
     def subscribe(self, event):
         event.subscriber = self.name
-        self.flowgraph.subscribe(event=event, callback=self.handle_event_notification)
+        if self.flowgraph is not None:
+            self.flowgraph.subscribe(event=event, callback=self.handle_event_notification)
+        else:
+            self.pending_subscriptions.append(event)
 
     def unsubscribe(self, event):
         self.flowgraph.unsubscribe(event=event)
@@ -210,6 +217,9 @@ class FlowGraph(BaseClass):
     def add_node(self, node):
         if hasattr(node, 'flowgraph'):
             node.flowgraph = self
+            for subscription in node.pending_subscriptions:
+                node.flowgraph.subscribe(subscription, node.handle_event_notification)
+            node.pending_subscriptions = []
         else:
             log(f"Node doesn't have flowgraph attribute. {type(node)}", 'error')
             raise Exception('Class of node must be FlowGraphNode or inherited from it')
@@ -232,7 +242,7 @@ class FlowGraph(BaseClass):
                 self.events[stream]['publishers'].append(node)
                 for event in self.events[stream]:
                     if event != 'publishers':
-                        node.register_subscriber(event = self.events[stream][0], callback=self.events[stream][1])
+                        node.register_subscriber(event = self.events[stream][event][0], callback=self.events[stream][event][1])
 
         log(f'Added {node} to flowgraph {self}', 'debug')
 

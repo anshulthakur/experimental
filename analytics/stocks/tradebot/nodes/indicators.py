@@ -10,13 +10,16 @@ class IndicatorNode(FlowGraphNode):
     Computes and adds the indicator column to the dataframe containing the OHLC data of a scrip
     '''
     def __init__(self, indicators=[], **kwargs):
+        super().__init__(**kwargs)
+        self.multi_input = True
+        self.wait_for_all = False
         self.indicators = {}
         for indicator in indicators:
             if indicator['tagname'] in self.indicators:
                 log(f"Indicator with tagname {indicator['tagname']} already exists in Node.", 'error')
                 raise Exception(f"Indicator with tagname {indicator['tagname']} already exists in Node.")
             self.add_indicator(indicator)
-        super().__init__(**kwargs)
+        
     
     def add_indicator(self, indicator={}):
         if indicator['tagname'] in self.indicators:
@@ -37,12 +40,12 @@ class IndicatorNode(FlowGraphNode):
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
             return
-        df = kwargs.get('data')
+        df = kwargs.pop('data')
         log(f'{self}: {df.tail(1)}', 'debug')
         for indicator in self.indicators:
             df[indicator] = self.indicators[indicator]['method'](df[self.indicators[indicator]['column']], **self.indicators[indicator]['attributes'])
         for node,connection in self.connections:
-            await node.next(connection=connection, data = df.copy(deep=True))
+            await node.next(connection=connection, data = df.copy(deep=True), **kwargs)
         self.consume()
 
 class Indicator(FlowGraphNode):
@@ -50,14 +53,16 @@ class Indicator(FlowGraphNode):
     This is similar to IndicatorNode, but supports multiple scrips in a single run.
     '''
     def __init__(self, indicators=[], transparent=False, **kwargs):
+        super().__init__(**kwargs)
         self.indicators = {}
         self.transparent = transparent
+        self.multi_input = True
+        self.wait_for_all = False
         for indicator in indicators:
             if indicator['tagname'] in self.indicators:
                 log(f"Indicator with tagname {indicator['tagname']} already exists in Node.", 'error')
                 raise Exception(f"Indicator with tagname {indicator['tagname']} already exists in Node.")
             self.add_indicator(indicator)
-        super().__init__(**kwargs)
     
     def add_indicator(self, indicator={}):
         if indicator['tagname'] in self.indicators:
@@ -78,7 +83,7 @@ class Indicator(FlowGraphNode):
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
             return
-        df = kwargs.get('data')
+        df = kwargs.pop('data')
         #log(f'{self}: \n{df.tail(1)}', 'debug')
         '''
         Here, we add a multi-level index in order to support multiple indicators in a single node.
@@ -105,9 +110,13 @@ class Indicator(FlowGraphNode):
             for indicator in self.indicators:
                 df[indicator] = self.indicators[indicator]['method'](df['close'], **self.indicators[indicator]['attributes'])
             for node,connection in self.connections:
-                await node.next(connection=connection, data = df.copy(deep=True))
+                await node.next(connection=connection, data = df.copy(deep=True), **kwargs)
         else:
             columns = list(df.columns)
+            # duplicates = [number for number in columns if columns.count(number) > 1]
+            # unique_duplicates = list(set(duplicates))
+            # log(f'{unique_duplicates}') # Returns: [2, 3, 5]
+
             #log(df.tail(1), 'debug')
             '''
             #Variant 1: Simple for small number of columns, but pandas cries performance for large number of columns
@@ -135,7 +144,7 @@ class Indicator(FlowGraphNode):
                         )
             #log(n_df, 'debug')
             for node,connection in self.connections:
-                await node.next(connection=connection, data = n_df.copy(deep=True))
+                await node.next(connection=connection, data = n_df.copy(deep=True), **kwargs)
         self.consume()
 
 class Divergence(FlowGraphNode):
@@ -153,9 +162,9 @@ class Divergence(FlowGraphNode):
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
             return
-        df = kwargs.get('data')
+        df = kwargs.pop('data')
         for indicator in self.indicators:
             df[f'{indicator}_divergence'] = detect_divergence(df, indicator=indicator, after=None, order=self.order)
         for node,connection in self.connections:
-            await node.next(connection=connection, data = df.copy(deep=True))
+            await node.next(connection=connection, data = df.copy(deep=True), **kwargs)
         self.consume()

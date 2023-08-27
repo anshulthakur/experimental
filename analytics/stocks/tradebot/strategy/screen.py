@@ -6,6 +6,8 @@ class BaseScreen(FlowGraphNode):
     epsilon = 0.00001
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.multi_input = True
+        self.wait_for_all = False
         self.column_names = []
         self.filters = self.create_filters()
         
@@ -39,7 +41,8 @@ class BaseScreen(FlowGraphNode):
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
             return
-        df = kwargs.get('data')
+        df = kwargs.pop('data')
+
         stocks = []
         #log(f"{self.name}", 'debug')
         #log(f"{df.tail(1)}", 'debug')
@@ -82,7 +85,7 @@ class BaseScreen(FlowGraphNode):
             for stock in output:
                 output[stock] = df[stock].iloc[-1].to_dict()
             for node,connection in self.connections:
-                await node.next(connection=connection, data = output)
+                await node.next(connection=connection, data = output, **kwargs)
         self.consume()
 
 class CustomScreen(BaseScreen):
@@ -104,7 +107,7 @@ class EMA_Filter(BaseFilter):
             self.filter = lambda x: True if x[what][-1]<=x['EMA'+str(value)][-1] else False
 
 class RSI_Filter(BaseFilter):
-    def __init__(self, value=65, greater=True):
+    def __init__(self, value=65, greater=True, **kwargs):
         self.column_names = ['RSI']
         if greater==True:
             #self.filter = lambda x: True if ((not pd.isna(x['RSI'][-1])) and x['RSI'][-1]>=value) else False

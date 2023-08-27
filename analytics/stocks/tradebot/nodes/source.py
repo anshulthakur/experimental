@@ -284,13 +284,16 @@ class MultiStockSource(SourceNode):
 
     def get_members(self, name):
         members = []
+        stocks = []
         with open(f'runtime/lists/{name}', 'r', newline='') as fd:
             reader = json.load(fd)
             for market in reader:
                 if market.lower() not in ['nse', 'bse']:
                     continue
                 for member in reader[market]:
-                    members.append(f"{market.upper().strip()}:{member.upper().strip()}")
+                    if member not in stocks: #Don't have repeated names if they are listed on BSE and NSE
+                        stocks.append(member)
+                        members.append(f"{market.upper().strip()}:{member.upper().strip()}")
         return members
 
     async def next(self, connection=None, **kwargs):
@@ -313,7 +316,7 @@ class MultiStockSource(SourceNode):
                 self.df.fillna(0, inplace=True)
                 #log(self.df.head(10), 'debug')
                 #log(self.df.tail(10), 'debug')
-                log(f'Length: {len(self.df)}')
+                #log(f'Length: {len(self.df)}')
                 #log(self.df.tail(1).isnull().sum().sum(), 'debug')
                 #nan_cols = self.df.tail(1)[self.df.tail(1).columns[self.df.tail(1).isnull().any()]]
                 #log(nan_cols, 'debug')
@@ -345,7 +348,7 @@ class MultiStockSource(SourceNode):
                 self.last_ts = df.index[-1]
                 #log(f'{self.name}:{df.tail(1)}', 'debug')
                 for node,connection in self.connections:
-                    await node.next(connection=connection, data = df.copy(deep=True))
+                    await node.next(connection=connection, data = df.copy(deep=True), metadata={'timeframe': self.timeframe})
                 self.consume()
             else:
                 log('No data to pass', 'debug')

@@ -49,7 +49,7 @@ class TimeResampler(FlowGraphNode):
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
             return
-        tick = kwargs.get('data', None)
+        tick = kwargs.pop('data', None)
         #log(f'{self}: {tick}', 'debug')
         self.elapsed_ticks += 1
         if self.elapsed_ticks == self.reset_ticks:
@@ -111,7 +111,9 @@ class DataResampler(FlowGraphNode):
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
             return
-        df = kwargs.get('data', None)
+        df = kwargs.pop('data', None)
+        metadata = kwargs.pop('metadata', {})
+        metadata.update({'timeframe': self.interval})
         '''
         Resampling purely on the basis of samples passed has an issue when we are trying to do multi-timeframe analysis.
         Suppose the candles start at 9:16 (though the market starts at 9:15) and we are sampling with an offset of 9:15.
@@ -155,7 +157,7 @@ class DataResampler(FlowGraphNode):
             df = self.resample(df)
             #log(f'{self}: {df.tail(10)}', 'debug')
             for node,connection in self.connections:
-                await node.next(connection=connection, data = df.copy(deep=True))
+                await node.next(connection=connection, data = df.copy(deep=True), metadata=metadata, **kwargs)
             await self.notify(df)
             self.consume()
         return

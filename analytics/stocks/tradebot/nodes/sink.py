@@ -34,25 +34,29 @@ class SinkNode(FlowGraphNode):
 
 class Sink(SinkNode):
     def __init__(self, **kwargs):
-        self.multi_input = True
         super().__init__(strict = False, **kwargs)
+        self.multi_input = True
     
     async def next(self, connection=None, **kwargs):
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
             return
         log(f'{self}:', 'debug')
+        metadata = kwargs.get('metadata', None)
         for conn in self.inputs:
             df = self.inputs[conn]
             if type(df).__name__ == 'DataFrame':
-                #log(f'{conn}', 'debug')
+                log(f'{conn}:(Metadata){metadata}', 'debug')
                 log(f'{df.tail(1)}', 'debug')
             elif type(df).__name__ == 'dict':
+                log(f'{conn}:(Metadata){metadata}', 'debug')
                 log(json.dumps(df, indent=2, cls=NpEncoder), 'debug')
             elif type(df).__name__ == 'list':
+                log(f'{conn}:(Metadata){metadata}', 'debug')
                 for l in df:
                     log(l, 'debug')
             else:
+                log(f'{conn}:(Metadata){metadata}', 'debug')
                 log(f'{df}', 'debug')
         self.consume()
         return
@@ -72,18 +76,20 @@ class Sink(SinkNode):
 class DataFrameSink(SinkNode):
     def __init__(self, **kwargs):
         #Will save dataframe to a file
-        self.multi_input = True
         super().__init__(**kwargs)
+        self.multi_input = True
+        self.wait_for_all = False
     
     async def next(self, connection=None, **kwargs):
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
             return
         #log(f'{self}:', 'debug')
+        metadata = kwargs.get('metadata', None)
         for conn in self.inputs:
             df = self.inputs[conn]
-            #log(f'{conn}', 'debug')
-            #log(f'{self.name}:{df.tail(1)}', 'debug')
+            log(f'{conn}:(Metadata){metadata}', 'debug')
+            log(f'{df.tail(1)}', 'debug')
             pass
         self.consume()
         return
@@ -111,10 +117,11 @@ class FileSink(SinkNode):
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
             return
+        metadata = kwargs.get('metadata', None)
         log(f'{self}:', 'debug')
         for conn in self.inputs:
             df = self.inputs[conn]
-            #log(f'{conn}', 'debug')
+            log(f'{conn}:(Metadata){metadata}', 'debug')
             log(f'{df.tail(1)}', 'debug')
         self.consume()
         return

@@ -2,9 +2,9 @@ from lib.logging import log
 from datetime import datetime
 
 class BaseFilter(object):
-    def __init__(self, filter=None):
+    def __init__(self, filter=None, column_names=[]):
         self.filter = filter
-        self.column_names = []
+        self.column_names = column_names
 
     def filter(self):        
         return self.filter
@@ -123,3 +123,10 @@ class BaseClass(object):
                         return f'{int(timeframe[0:-1])//7}W'
                     if int(timeframe[0:-1]) > 30:
                         return f'{int(timeframe[0:-1])//(30)}M'
+                if timeframe[-1] in ['w', 'W']:
+                    if int(timeframe[0:-1]) <= 5:
+                        return f'{int(timeframe[0:-1])}W'
+                    if int(timeframe[0:-1]) > 5:
+                        return f'{int(timeframe[0:-1])//(5)}M'
+                if timeframe[-1] in ['M']:
+                    return f'{timeframe}'

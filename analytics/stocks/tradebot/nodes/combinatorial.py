@@ -21,6 +21,7 @@ class Union(FlowGraphNode):
             log(f'{self}: Not ready yet', 'debug')
             return
         log(f'{self}:', 'debug')
+        df = kwargs.pop('data', None)
         if self.input_types == 'DataFrame':
             df = None
             for conn in self.inputs:
@@ -37,7 +38,7 @@ class Union(FlowGraphNode):
                 #log(f'{conn}', 'debug')
                 log(f'{df}', 'debug')
         for node,connection in self.connections:
-            await node.next(connection=connection, data = df.copy())
+            await node.next(connection=connection, data = df.copy(), **kwargs)
         self.consume()
         return
 
@@ -57,6 +58,7 @@ class Intersection(FlowGraphNode):
             log(f'{self}: Not ready yet', 'debug')
             return
         log(f'{self}:', 'debug')
+        df = kwargs.pop('data', None)
         if self.input_types == 'DataFrame':
             df = None
             for conn in self.inputs:
@@ -73,7 +75,7 @@ class Intersection(FlowGraphNode):
                 #log(f'{conn}', 'debug')
                 log(f'{df}', 'debug')
         for node,connection in self.connections:
-            await node.next(connection=connection, data = df.copy())
+            await node.next(connection=connection, data = df.copy(), **kwargs)
         self.consume()
         return
 
@@ -94,6 +96,7 @@ class ColumnFilter(FlowGraphNode):
             log(f'{self}: Not ready yet', 'debug')
             return
         #log(f'{self}:', 'debug')
+        df = kwargs.pop('data', None)
         if self.input_types == 'DataFrame':
             for conn in self.inputs:
                 df = self.inputs[conn]
@@ -110,6 +113,6 @@ class ColumnFilter(FlowGraphNode):
                 #log(f'{conn}', 'debug')
                 #log(f'{df.tail(1)}', 'debug')
         for node,connection in self.connections:
-            await node.next(connection=connection, data = df.copy())
+            await node.next(connection=connection, data = df.copy(), **kwargs)
         self.consume()
         return

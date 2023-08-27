@@ -33,7 +33,7 @@ class LongBot(FlowGraphNode, BaseBot, Broker):
             log(f'{self}: Not ready yet', 'debug')
             return
         self.busy = True
-        df = kwargs.get('data')
+        df = kwargs.pop('data')
         if self.position and self.close_orderbook(df):
             self.close_position(df.iloc[-1]['close'], date=df.index[-1].to_pydatetime())
             self.sl = None
@@ -117,7 +117,7 @@ class DynamicResistanceBot(FlowGraphNode, BaseBot, Broker):
             log(f'{self}: Not ready yet', 'debug')
             return
         self.busy = True
-        df = kwargs.get('data')
+        df = kwargs.pop('data')
         if self.position is not None and self.close_orderbook(df):
             self.close_position(df.iloc[-1]['close'], date=df.index[-1].to_pydatetime(), timeframe=self.timeframe)
             self.sl = None
@@ -247,7 +247,7 @@ class DynamicSupportBot(FlowGraphNode, BaseBot, Broker):
             log(f'{self}: Not ready yet', 'debug')
             return
         self.busy =True
-        df = kwargs.get('data')
+        df = kwargs.pop('data')
         #log(f'{df.tail(1)}')
         if self.position and self.close_orderbook(df):
             self.close_position(df.iloc[-1]['close'], date=df.index[-1].to_pydatetime(), timeframe=self.timeframe)

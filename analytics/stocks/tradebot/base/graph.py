@@ -46,6 +46,7 @@ class FlowGraphNode(BaseClass):
         self.mode = None
         self.input_types = None
         self.strict = strict
+        self.wait_for_all = False #Useful when the node is stateless and can support multiple input connections.
         self.timeframe = self.sanitize_timeframe(timeframe) if timeframe is not None else None
         #On multi-timeframe analysis, a smaller time frame may trigger an event while we're still awaiting the processing to complete on a larger TF.
         #We avoid this by flagging busy sections and making the other processing to wait until we're out.
@@ -164,10 +165,11 @@ class FlowGraphNode(BaseClass):
                 self.inputs[connection] = kwargs.get('data')
         else:
             raise Exception('Non-root node must have connection name explicitly passed')
-        for connections in self.inputs:
-            if self.inputs[connections] is None:
-                #Not all inputs are received yet
-                return False
+        if self.wait_for_all is True:
+            for connections in self.inputs:
+                if self.inputs[connections] is None:
+                    #Not all inputs are received yet
+                    return False
         return True
     
     def wait_until_busy(self):

@@ -40,7 +40,8 @@ async def main():
     fg = FlowGraph(name='FlowGraph', mode='backtest')
 
     # Add a dataframe source 
-    source = MultiStockSource(name='Source', timeframe='1d', offline=True, offset=200, min_entries=400, member_file='watchlist.json')
+    watchlist_file = 'prospect.json'
+    source = MultiStockSource(name='Source', timeframe='1d', offline=True, offset=200, min_entries=400, member_file=watchlist_file)
     fg.add_node(source)
 
     #Add a column filter node
@@ -57,7 +58,7 @@ async def main():
     fg.add_node(node_indicators)
 
     # Add the alerting node
-    watcher = PriceAlerts(name='Alerts', file='./runtime/lists/watchlist.json', timeframe='1D')
+    watcher = PriceAlerts(name='Alerts', file=f'./runtime/lists/{watchlist_file}', timeframe='1D')
     fg.add_node(watcher)
 
     # Add some sink nodes

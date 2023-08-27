@@ -15,7 +15,7 @@ from lib.logging import log, set_loglevel
 from base import FlowGraph
 from base.scheduler import AsyncScheduler as Scheduler
 from nodes import Sink, Resampler, NseMultiStockSource, Indicator, DataFrameSink, TradingViewSource, ColumnFilter, MultiStockSource
-from strategy.screen import EMA_RSI_Screen, Proximity_Screen, Crossover_Screen, EMA_Filter, RSI_Filter
+from strategy.screen import EMA_RSI_Screen, Proximity_Screen, Crossover_Screen, EMA_Filter, RSI_Filter, CustomScreen
 
 from tradebot.base.signals import EndOfData, Shutdown
 
@@ -40,8 +40,11 @@ async def main():
     #source = TradingViewSource(name='Stock', symbol='KABRAEXTRU', exchange='NSE', timeframe='1d')
     #source = NseMultiStockSource(name='Source', exchange='NSE', timeframe='1d', offline=True, offset=200)
     #source = MultiStockSource(name='Source', timeframe='1d', offline=True, offset=200, member_file='portfolio.json')
-    source = MultiStockSource(name='Source', timeframe='1d', offline=True, offset=200, min_entries=400, member_file='nselist.json')
+    source = MultiStockSource(name='Source', timeframe='1d', offline=True, offset=200, min_entries=400, member_file='universe.json')
     fg.add_node(source)
+
+    source_w = MultiStockSource(name='Weekly_Source', timeframe='1W', offline=True, offset=20, min_entries=40, member_file='universe.json')
+    fg.add_node(source_w)
 
     #Add a column filter node
     #filterNode = ColumnFilter(name='Formatter', map = {'close': 'close'})
@@ -63,9 +66,23 @@ async def main():
                                                                ])
     fg.add_node(node_indicators)
 
+    node_indicators_2 = Indicator(name='Indicators2', indicators=[{'tagname': 'EMA20', 
+                                                                'type': 'EMA', 
+                                                                'length': 20,
+                                                                'column': 'close'},
+                                                               {'tagname': 'RSI', 
+                                                                'type': 'RSI', 
+                                                                'length': 14,
+                                                                'column': 'close'}
+                                                               ])
+    fg.add_node(node_indicators_2)
+
     # Add screener node
     screener = EMA_RSI_Screen(name="EMA-RSI-Screen")
     fg.add_node(screener)
+
+    rsi_screen = CustomScreen(name="DeepRSI", filters=[RSI_Filter(value=35, greater=False)])
+    fg.add_node(rsi_screen)
 
     # Add proximity node
     proximity_up = Proximity_Screen(name="Upside-Proximity-Scanner", what='close', near='EMA20', by=0.01, direction='up', filters=[EMA_Filter(value=200)])
@@ -102,6 +119,10 @@ async def main():
     fg.add_node(cross_sink_2)
     fg.register_signal_handler([EndOfData,Shutdown], cross_sink_2)
 
+    deeprsi_sink = Sink(name='Deep-RSI')
+    fg.add_node(deeprsi_sink)
+    fg.register_signal_handler([EndOfData,Shutdown], deeprsi_sink)
+
     df_sink = DataFrameSink(name='DF-Sink')
     fg.add_node(df_sink)
     fg.register_signal_handler([EndOfData,Shutdown], df_sink)
@@ -115,8 +136,11 @@ async def main():
     #fg.connect(source, filterNode)
     #fg.connect(filterNode, node_indicators)
     fg.connect(source, node_indicators)
+    fg.connect(source_w, node_indicators_2)
     fg.connect(node_indicators, screener)
+    fg.connect(node_indicators_2, rsi_screen)
     fg.connect(screener, sink)
+    fg.connect(rsi_screen, deeprsi_sink)
 
     fg.connect(node_indicators, proximity_up)
     fg.connect(node_indicators, proximity_down)

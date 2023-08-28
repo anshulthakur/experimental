@@ -50,6 +50,10 @@ async def main():
 
     # Add indicator nodes
     node_indicators = Indicator(name='Indicators', indicators=[
+                                                                {'tagname': 'EMA20', 
+                                                                'type': 'EMA', 
+                                                                'length': 20,
+                                                                'column': 'close'},
                                                                {'tagname': 'EMA200', 
                                                                 'type': 'EMA', 
                                                                 'length': 200,
@@ -62,7 +66,7 @@ async def main():
     fg.add_node(watcher)
 
     # Add some sink nodes
-    df_sink = DataFrameSink(name='DF-Sink')
+    df_sink = DataFrameSink(name='DF-Sink', print_logs = False)
     fg.add_node(df_sink)
     fg.register_signal_handler([EndOfData,Shutdown], df_sink)
 

@@ -97,6 +97,26 @@ INDICES = {"NIFTY 50":"Nifty_50",
 
 def load_index_members(sector, members, date=datetime.datetime.now(), interval=Interval.in_weekly, 
                         entries=50, online=True, start_date=None, end_date=None, market='NSE'):
+    
+    def resample(df, interval):
+        df_offset_str = '09h15min'
+        logic = {'open'  : 'first',
+                 'high'  : 'max',
+                 'low'   : 'min',
+                 'close' : 'last',
+                 'volume': 'sum',
+                 'delivery': 'sum',
+                 'trades': 'sum'}
+        int_val = None
+        try:
+            int_val = int(interval)
+            int_val = f'{interval}min'
+        except:
+            int_val = interval
+
+        df = df.resample(interval.value, offset=df_offset_str).apply(logic).dropna()
+        return df
+    
     log('========================', 'debug')
     log(f'Loading for {sector}', 'debug')
     log('========================', 'debug')
@@ -115,6 +135,9 @@ def load_index_members(sector, members, date=datetime.datetime.now(), interval=I
     pacific = pytz.timezone('US/Pacific')
     india = pytz.timezone('Asia/Calcutta')
     s_list = []
+    skipped = []
+
+    duration = entries * interval.to_days()
     for stock in members:
         try:
             if not online:
@@ -122,11 +145,12 @@ def load_index_members(sector, members, date=datetime.datetime.now(), interval=I
                     market = stock.split(':')[0]
                     stock = stock.split(':')[1]
                 stock_obj = Stock.objects.get(symbol=stock, market=Market.objects.get(name=market))
-                s_df = get_stock_listing(stock_obj, duration=entries, last_date = date)
+                s_df = get_stock_listing(stock_obj, duration=duration, last_date = date)
+                s_df = resample(s_df, interval)
                 s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume', 'delivery', 'trades'])
                 #print(s_df.head())
                 if len(s_df)==0:
-                    log('Skip {}'.format(stock_obj), 'info')
+                    skipped.append(stock_obj.symbol)
                     continue
                 s_df.reset_index(inplace = True)
                 s_df.rename(columns={'close': stock,
@@ -198,6 +222,7 @@ def load_index_members(sector, members, date=datetime.datetime.now(), interval=I
     df = df[~df.index.duplicated(keep='first')]
     df.sort_index(inplace=True)
     #print(df.head(10))
+    log(f'Skiped {skipped}', 'info')
     return df
 
 def load_members(sector, members, date, sampling=Interval.in_weekly, entries=50, online=True):

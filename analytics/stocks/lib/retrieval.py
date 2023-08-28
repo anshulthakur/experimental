@@ -75,7 +75,6 @@ def get_stock_listing(stock, duration=None, last_date = datetime.date.today(), s
             if 'sma200' in studies.get('daily'):
                 duration = 291 if duration is None else max(duration, 291)#Need at least 291 days data for SMA
                 
-    #print(duration)
     first_date = last_date - datetime.timedelta(days=duration)
     #print(first_date)
     listing = Listing.objects.filter(stock=stock, date__range=(first_date, last_date))

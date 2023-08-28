@@ -40,10 +40,10 @@ async def main():
     #source = TradingViewSource(name='Stock', symbol='KABRAEXTRU', exchange='NSE', timeframe='1d')
     #source = NseMultiStockSource(name='Source', exchange='NSE', timeframe='1d', offline=True, offset=200)
     #source = MultiStockSource(name='Source', timeframe='1d', offline=True, offset=200, member_file='portfolio.json')
-    source = MultiStockSource(name='Source', timeframe='1d', offline=True, offset=200, min_entries=400, member_file='universe.json')
+    source = MultiStockSource(name='Source', timeframe='1d', offline=True, offset=-1, min_entries=400, member_file='universe.json')
     fg.add_node(source)
 
-    source_w = MultiStockSource(name='Weekly_Source', timeframe='1W', offline=True, offset=20, min_entries=40, member_file='universe.json')
+    source_w = MultiStockSource(name='Weekly_Source', timeframe='1M', offline=True, offset=-1, min_entries=40, member_file='universe.json')
     fg.add_node(source_w)
 
     #Add a column filter node

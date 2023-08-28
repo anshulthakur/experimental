@@ -341,7 +341,7 @@ class MultiStockSource(SourceNode):
         #log(self.df.tail(1), 'debug')
         #log(len(self.df), 'debug')
         if self.index is None:
-            self.index = self.offset
+            self.index = self.offset if self.offset >=0 else len(self.df)+self.offset
         if self.index < len(self.df):
             df = self.df.iloc[0:self.index+1].copy()
             if len(df)>0:

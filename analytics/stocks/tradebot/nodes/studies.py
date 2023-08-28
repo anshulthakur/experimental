@@ -84,11 +84,11 @@ class PriceAlerts(FlowGraphNode):
         if not self.ready(connection, **kwargs):
             log(f'{self}: Not ready yet', 'debug')
             return
-        df = kwargs.get('data')
+        df = kwargs.pop('data')
         #log(f'{df.tail(1)}', 'debug')
         await self.notify(df)
         for node,connection in self.connections:
-            await node.next(connection=connection, data = df.copy(deep=True))
+            await node.next(connection=connection, data = df.copy(deep=True), **kwargs)
         self.consume()
 
     async def handle_event_notification(self, event):

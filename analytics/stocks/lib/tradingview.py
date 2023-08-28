@@ -42,9 +42,9 @@ class Interval(enum.Enum):
         elif self.value == '1D':
             return int(self.value[0])
         elif self.value == '1W':
-            return int(self.value[0]*7)
+            return int(self.value[0])*7
         elif self.value in ['1M', '3M']:
-            return int(self.value[0]*30)
+            return int(self.value[0])*30
 
 def convert_timeframe_to_quant(timeframe):
     if timeframe[-1]=='m':

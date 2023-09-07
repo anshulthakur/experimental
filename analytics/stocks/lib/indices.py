@@ -99,7 +99,7 @@ def load_index_members(sector, members, date=datetime.datetime.now(), interval=I
                         entries=50, online=True, start_date=None, end_date=None, market='NSE'):
     
     def resample(df, interval):
-        df_offset_str = '09h15min'
+        #df_offset_str = '09h15min'
         logic = {'open'  : 'first',
                  'high'  : 'max',
                  'low'   : 'min',
@@ -114,7 +114,8 @@ def load_index_members(sector, members, date=datetime.datetime.now(), interval=I
         except:
             int_val = interval
 
-        df = df.resample(interval.value, offset=df_offset_str).apply(logic).dropna()
+        #df = df.resample(interval.value, offset=df_offset_str).apply(logic).dropna()
+        df = df.resample(interval.value).apply(logic).dropna()
         return df
     
     log('========================', 'debug')

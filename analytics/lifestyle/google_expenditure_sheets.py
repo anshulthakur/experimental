@@ -1,8 +1,3 @@
-'''
-This script is based on https://developers.google.com/sheets/api/quickstart/python
-
-It is aimed to read into Google Spreadsheets and manipulate/pull data from there.
-'''
 from __future__ import print_function
 import httplib2
 import os
@@ -36,11 +31,15 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 APPLICATION_NAME = 'Python Interface Exploration'
 
 class Sheets:
-    def __init__(self, creds, spreadsheet_id, cache_folder='cache'):
+    def __init__(self, creds, spreadsheet_id, cache_folder='cache', offline=False):
+        if offline:
+            print('Working in offline mode. Make sure that the cached files are present.')
         self.creds = creds
         self.spreadsheet_id = spreadsheet_id
-        self.service = build('sheets', 'v4', credentials=self.creds)
+        self.offline = offline
+        self.service = build('sheets', 'v4', credentials=self.creds) if not offline else None
         self.cache_folder = cache_folder
+
 
     def open(self, sheet_names):
         try:
@@ -59,7 +58,7 @@ class Sheets:
                 if os.path.exists(cache_file):
                     s_df = pd.read_csv(cache_file, index_col="Date")
                     s_df.index = pd.to_datetime(s_df.index)
-                    print(f'Load {cache_file} from cache')
+                    #print(f'Load {cache_file} from cache')
                 else:
                     # Fetch data from Google Sheets
                     s_df = self.fetch_data(sheet_name)
@@ -220,9 +219,36 @@ def get_credentials():
             tokenfile.write(creds.to_json())
     return creds
 
-def main():
-    creds = get_credentials()
-    gsheet = Sheets(creds=creds, spreadsheet_id='<id>')
+def reclassify(df):
+    # Define a dictionary to map keywords to categories
+    keyword_to_category = {
+        'Milk': 'Groceries',
+        'Curd': 'Groceries',
+        'Rent': 'Household',
+        'Vegetables': 'Groceries',
+        'Fruits': 'Groceries',
+        'Eggs': 'Groceries',
+        'Flour': 'Groceries',
+        'Book' : 'Books',
+        # Add more keyword-category mappings as needed
+    }
+    # Iterate through the DataFrame and update 'Expense category' based on keywords
+    for keyword, category in keyword_to_category.items():
+        df.loc[df['Spent on'].str.contains(keyword, case=False, na=False), 'Expense category'] = category
+
+    #Additional reclassification for specific cases
+    # Reclassify entries within 'Transport' category based on keywords
+    transport_keywords = ['IIT', 'office', 'college', 'auto', 'uber', 'rapido', 'ola']  # Add more keywords as needed
+    for keyword in transport_keywords:
+        df.loc[(df['Expense category'] == 'Transport') & (df['Spent on'].str.contains(keyword, case=False, na=False)), 'Expense category'] = 'Local Transport'
+    return df
+
+def main(offline=False):
+    creds = None
+    if not offline:
+        creds = get_credentials()
+    
+    gsheet = Sheets(creds=creds, spreadsheet_id='<id>', offline=offline)
     #sheet_names = gsheet.get_sheet_names()
     sheet_names = ["September'23", "August'23", "July'23", "June'23", "May'23", "April'23",
                     "March'23", "February'23", "January'23", "December'22", "September'22", 
@@ -236,10 +262,68 @@ def main():
     #print(sheet_names)
 
     df = gsheet.open(sheet_names=sheet_names)
-    print(df.head(20))
-    print(df.tail(20))
+
+    df = reclassify(df)
+    # Group the DataFrame by 'Expense category' and calculate the sum of 'Money spent'
+    expense_summary = df.groupby('Expense category')['Money spent'].sum().reset_index()
+
+    # Rename the 'Money spent' column to 'Total spent'
+    expense_summary.rename(columns={'Money spent': 'Total spent'}, inplace=True)
+
+    # Sort the summary DataFrame by 'Total spent' in descending order
+    expense_summary = expense_summary.sort_values(by='Total spent', ascending=False)
+
+    # Print the summary
+    print(expense_summary)
+
+    #Monthly summaries
+    # Extract the month and year from the 'Date' column
+    df['YearMonth'] = df.index.strftime('%Y-%m')
+
+    # Group the data by 'YearMonth' and calculate the total expenses for each month
+    monthly_summary = df.groupby('YearMonth')['Money spent'].sum().reset_index()
+
+    # Rename the columns for clarity
+    monthly_summary.columns = ['Month', 'Total Expenses']
+
+    # Display the summary
+    print(monthly_summary)
+
+    # Get unique months
+    unique_months = df['YearMonth'].unique()
+
+    # Iterate through each unique month and display the summary
+    for month in unique_months:
+        monthly_data = df[df['YearMonth'] == month]
+        monthly_category_summary = monthly_data.groupby(['Expense category'])['Money spent'].sum().reset_index()
+        monthly_category_summary.columns = ['Expense Category', 'Total Expenses']
+        
+        print(f"Summary for {month}:")
+        print(monthly_category_summary)
+        print("\n")
     
+    # Combine all 'Spent on' entries into a single text string
+    all_spent_on_text = ', '.join(df['Spent on'].dropna())
+
+    # Split the text string by commas to extract keywords
+    keywords = [keyword.strip() for keyword in all_spent_on_text.split(',')]
+
+    # Create a set of unique keywords
+    unique_keywords = set(keywords)
+
+    # Print the unique keywords
+    print('Unique keywords:')
+    print(unique_keywords)
+
+    # Filter the DataFrame for 'Personal' expenses
+    personal_expenses = df[df['Expense category'] == 'Personal']
+
+    # Sort the 'Personal' expenses by 'Money spent' in descending order
+    personal_expenses_sorted = personal_expenses.sort_values(by='Money spent', ascending=False)
+
+    # Display the sorted 'Personal' expenses
+    print(personal_expenses_sorted)
 
 if __name__ == "__main__":
-    main()
+    main(offline=True)
 

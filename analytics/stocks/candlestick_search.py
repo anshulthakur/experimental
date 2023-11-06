@@ -24,8 +24,8 @@ def print_debug(*args):
 color_scheme = {'candlesticks': {
                                 #'body': ['white', 'black'],
                                 'body': ['green', 'red'],
-                                #'border': ['green', 'red'],
-                                'border': ['black']
+                                'border': ['green', 'red'],
+                                #'border': ['black']
                                 },
                 'bars': {
                     'body': ['green', 'red']
@@ -48,6 +48,7 @@ def classify(rgb_tuple):
               "green" : (0,255,0),
               "black" : (0, 0, 0),
               "white" : (255,255,255),
+              "blue"  : (0, 0, 255),
               }
 
     manhattan = lambda x,y : abs(x[0] - y[0]) + abs(x[1] - y[1]) + abs(x[2] - y[2]) 

@@ -4,10 +4,23 @@ Created on 17-Oct-2022
 
 @author: Anshul
 '''
+from __future__ import print_function
 from PIL import Image, ImageFilter
 from numpy import asarray, array
 
-transform_rule = {'blue': 'white',
+debug = False
+
+
+def progress_bar(done, total):
+    print('\033[KProgress: {progress:.2f}%%\r'.format(progress = (done/total)*100), end='', flush=True)
+
+def print_debug(*args):
+    global debug
+    if debug:
+        print(args)
+    return
+
+transform_rule = {'blue': 'green',
                   'white': 'white',
                   'black': 'black',
                   'red': 'red',
@@ -25,7 +38,7 @@ colors = {"red": (255, 0, 0),
           "green" : (0,255,0),
           "black" : (0, 0, 0),
           "white" : (255,255,255),
-          #"blue"  : (0, 0, 255),
+          "blue"  : (0, 0, 255),
           #"orange": (255,127,0)
           }
 def classify(rgb_tuple):
@@ -120,8 +133,10 @@ def main(img_name):
     #numpydata = asarray(img)
     
     [rows, cols, _colors]= numpydata.shape
+    progress = 0
     for row in range(0, rows):
         for col in range(0, cols):
+            progress +=1
             color = classify(numpydata[row][col])
             if color in transform_rule:
                 if (classify(numpydata[row][col]) in red_candle and classify(numpydata[row][col-1]) in green_candle)\
@@ -131,6 +146,7 @@ def main(img_name):
                     continue
                 else:
                     numpydata[row][col] = colors[transform_rule[color]]
+            progress_bar(progress, rows*cols)
     im = Image.fromarray(numpydata)
     im.save(base_name+'_crop.png')
 
@@ -138,10 +154,14 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Preprocess candlestick image to remove some easy artifacts')
     parser.add_argument('-f', '--file', help="Image of the candlesticks to pre-process")
+    parser.add_argument('-d', '--debug', default=False, action="store_true", help="Debug traces")
     
     fname = None
     args = parser.parse_args()
     if args.file is not None and len(args.file)>0:
         fname = args.file
+    if args.debug:
+        print('Debug is ON')
+        debug=True
     main(fname)
     #variant2(fname)

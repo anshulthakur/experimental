@@ -27,6 +27,7 @@ from talib import MA_Type
 
 from lib.tradingview import TvDatafeed, Interval, convert_timeframe_to_quant
 from lib.cache import cached
+from lib.logging import set_loglevel, log
 from download_index_reports import download_historical_data
 
 #Prepare to load stock data as pandas dataframe from source. In this case, prepare django
@@ -138,7 +139,6 @@ tvfeed_instance = None
 def load_progress():
     import json
     progress_file = '.progress.json'
-    
     try:
         with open(progress_file, 'r') as fd:
             progress = json.load(fd)
@@ -147,6 +147,7 @@ def load_progress():
                 if date.day == datetime.datetime.today().day and \
                     date.month == datetime.datetime.today().month and \
                     date.year == datetime.datetime.today().year:
+                    log('Load saved progress', logtype='debug')
                     return progress['index']
             except:
                 #Doesn't look like a proper date time
@@ -154,6 +155,7 @@ def load_progress():
     except:
         pass
     
+    log('No progress saved', logtype='debug')
     return []
 
 def save_progress(index):
@@ -413,16 +415,25 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
     return df
 
 def compute_jdk(benchmark = 'Nifty_50', base_df=None):
-    print(base_df.head(10))
+    rolling_avg_len = 10
+    log(base_df.head(10), logtype='debug')
     df = base_df.copy(deep=True)
     
     df.sort_values(by='date', inplace=True, ascending=True)
     #Drop all columns which don't have a valid first row
-    for cols in df.columns:
+    # for cols in df.columns:
+    #     #print(f'{cols}: {df[cols].isnull().sum()}')
+    #     if np.isnan(df[cols].iloc[0]):
+    #         log('Drop {}. Contains NaN in the first row.'.format(cols), logtype='warning')
+    #         df = df.drop(columns = cols)
+
+    #Drop column if any row has NaN
+    for col in df.columns:
         #print(f'{cols}: {df[cols].isnull().sum()}')
-        if np.isnan(df[cols].iloc[0]):
-            print('Drop {}'.format(cols))
-            df = df.drop(columns = cols)
+        if df[col].isna().any():
+            log('Drop {}. Contains NaN.'.format(col), logtype='warning')
+            df = df.dropna(subset=[col], inplace=True)
+
     #Calculate the 1-day Returns for the Indices
     df = df.pct_change(1)
     #print(df.tail())
@@ -431,28 +442,44 @@ def compute_jdk(benchmark = 'Nifty_50', base_df=None):
     for ticker in df.columns:
         for i in range(1, len(df[ticker])):
             df[ticker][i] = df[ticker][i-1]*(1+df[ticker][i])
+
     #Define the Index for comparison (Benchamrk Index): Nifty50
-    #print(f'Benchmark: {benchmark}')
+    log(f'Benchmark: {benchmark}', logtype='debug')
+    if benchmark not in list(df.columns):
+        log(f'{benchmark} not present in dataframe', logtype='error')
+        return None
     benchmark_values = df[benchmark]
-    #print(df.tail())
     df = df.drop(columns = benchmark)
+
+
     #print(df.tail())
-    #print(len(df))
+    log(f'Dataframe contains {len(df)} rows now.', logtype='debug')
+
     #Calculate the relative Performance of the Index in relation to the Benchmark
     for ticker in df.columns:   
-        df[ticker] = df[ticker]/benchmark_values - 1
+        df[ticker] = (df[ticker]/benchmark_values) - 1
     
-    #Normalize the Values considering a 14-days Window (Note: 10 weekdays)
+    #Normalize the values considering a 14-days Window (Note: 10 weekdays)
     for ticker in df.columns:
-        df[ticker] = 100 + ((df[ticker] - df[ticker].rolling(10).mean())/df[ticker].rolling(10).std() + 1)
+        df[ticker] = 100 + ((df[ticker] - df[ticker].rolling(rolling_avg_len).mean())/df[ticker].rolling(rolling_avg_len).std() + 1)
 
-    # Rouding and Excluding NA's
+    # Rounding and Excluding NA's
     #print(df.head())
-    df = df.round(2).dropna()
-    
-    #print(df.tail())
+    #Drop column if any row has NaN after this operation
+    #df = df.round(2).dropna()
+    df = df.round(2)
+    log(df.head(10), logtype='debug')
+    log(df.tail(10), logtype='debug')
+    for col in df.columns:
+        log(f'{col}: {df[col].isnull().sum()}', logtype='debug')
+        if df[col].isna().any():
+            log('Drop {}. Contains NaN after strength computation.'.format(col), logtype='warning')
+            df = df.dropna(subset=[col], inplace=True)
 
-    #Compute on the last few dates only (last 5 days)
+    if(len(df)<25):
+        log('Length of dataframe less than 25. Stop computing', logtype='warning')
+        return None
+    #Compute on the last few dates only (last 5 weeks/days)
     JDK_RS_ratio = df.iloc[-25:]
     
     #Calculate the Momentum of the RS-ratio
@@ -461,10 +488,10 @@ def compute_jdk(benchmark = 'Nifty_50', base_df=None):
     
     #Normalize the Values considering a 14-days Window (Note: 10 weekdays)
     for ticker in JDK_RS_momentum.columns: 
-        JDK_RS_momentum[ticker] = 100 + ((JDK_RS_momentum[ticker] - JDK_RS_momentum[ticker].rolling(10).mean())/JDK_RS_momentum[ticker].rolling(10).std() + 1)
+        JDK_RS_momentum[ticker] = 100 + ((JDK_RS_momentum[ticker] - JDK_RS_momentum[ticker].rolling(rolling_avg_len).mean())/JDK_RS_momentum[ticker].rolling(rolling_avg_len).std() + 1)
+    
     #print(JDK_RS_momentum.tail())
     # Rounding and Excluding NA's
-    
     JDK_RS_momentum = JDK_RS_momentum.round(2).dropna()
     
     #Adjust DataFrames to be shown in Monthly terms
@@ -479,10 +506,10 @@ def compute_jdk(benchmark = 'Nifty_50', base_df=None):
     #JDK_RS_momentum = JDK_RS_momentum.set_index('date')
     #JDK_RS_momentum = JDK_RS_momentum.resample('M').ffill()
     
-    #print('JDK')
-    #print(JDK_RS_ratio.head())
-    #print('Momentum')
-    #print(JDK_RS_momentum.head())
+    log('JDK', logtype='debug')
+    log(JDK_RS_ratio.head(), logtype='debug')
+    log('Momentum', logtype='debug')
+    log(JDK_RS_momentum.head(), logtype='debug')
     
     return [JDK_RS_ratio, JDK_RS_momentum]
     
@@ -497,6 +524,10 @@ def load_file_list(directory="./indices/"):
     return file_list
 
 def load_sectoral_indices(date, sampling, entries=50):
+    '''
+    We use only the closing values of the sectoral indices right now
+    '''
+    log('Loading sectoral indices', logtype='debug')
     from pathlib import Path
     df = pd.read_csv(index_data_dir+'Nifty_50.csv')
     df.rename(columns={'Index Date': 'date',
@@ -509,20 +540,20 @@ def load_sectoral_indices(date, sampling, entries=50):
     df = df.reindex(columns = ['Nifty_50'])
     #filelist = load_file_list()
 
-    #print(df.head())
     for index in INDICES:
         f = '{}{}.csv'.format(index_data_dir, index)
         #print('Reading: {}'.format(f))
         #index = Path(f).stem.strip().lower()
         if index == "Nifty_50":
             continue
+        log(f'Loading {index}', logtype='debug')
         s_df = pd.read_csv(f)
         s_df.rename(columns={'Index Date': 'date',
                              'Closing Index Value': index},
                    inplace = True)
         s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y')
-        #s_df.drop_duplicates(inplace = True, subset='date')
         s_df.set_index('date', inplace = True)
+        #Add time offset for everything to begin at 9:15AM
         s_df.index = s_df.index + pd.Timedelta('9 hour') +  pd.Timedelta('15 minute')
         s_df = s_df.sort_index()
         s_df = s_df.reindex(columns = [index])
@@ -531,6 +562,7 @@ def load_sectoral_indices(date, sampling, entries=50):
         df[index] = s_df[index]
     df = df[~df.index.duplicated(keep='first')]
     if date is not None:
+        #Filter till the date
         df = df[:date.strftime('%Y-%m-%d')]
     if sampling=='w':
         #Resample weekly
@@ -734,9 +766,9 @@ def main(date=datetime.date.today(), sampling = 'w', online=True):
         pass
     except:
         print('Error creating folder')
-        
+
     processed = load_progress()
-    #print(processed)
+
     df = load_sectoral_indices(date, sampling, entries=33)
     benchmark = 'Nifty_50'
     [JDK_RS_ratio, JDK_RS_momentum] = compute_jdk(benchmark=benchmark, base_df = df)
@@ -791,6 +823,7 @@ def main(date=datetime.date.today(), sampling = 'w', online=True):
                 
 if __name__ == "__main__":
     day = datetime.date.today()
+    set_loglevel('debug')
     import argparse
     parser = argparse.ArgumentParser(description='Compute RRG data for indices')
     parser.add_argument('-d', '--daily', action='store_true', default = False, help="Compute RRG on daily TF")
@@ -803,10 +836,15 @@ if __name__ == "__main__":
     sampling = 'w'
     if args.daily:
         sampling='d'
+        log('Daily sampling')
     if args.date is not None and len(args.date)>0:
-        print('Get data for date: {}'.format(args.date))
+        log(logtype='info', args = 'Get data for date: {}'.format(args.date))
         day = datetime.datetime.strptime(args.date, "%d/%m/%y")
-    
+    if args.online:
+        log(logtype='info', args = 'Download data')
+    else:
+        log(logtype='info', args = 'Use offline data')
+
     pd.set_option("display.precision", 8)
     download_historical_data(day, silent=True)
     main(date=day, sampling=sampling, online=args.online)

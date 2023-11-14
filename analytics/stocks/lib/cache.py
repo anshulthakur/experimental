@@ -1,5 +1,6 @@
 from lib.tradingview import Interval
 from lib.misc import create_directory
+from lib.logging import log
 import datetime
 import os
 from settings import project_dirs
@@ -20,6 +21,7 @@ def cached(name, df=None, timeframe=Interval.in_daily):
                 if date.day == datetime.datetime.today().day and \
                     date.month == datetime.datetime.today().month and \
                     date.year == datetime.datetime.today().year:
+                    log(f'Found {name} in cache', logtype='debug')
                     pass #Cache hit
                 else:
                     if df is None:#Cache is outdated. Clear it first
@@ -27,6 +29,7 @@ def cached(name, df=None, timeframe=Interval.in_daily):
                             if f != os.path.join(cache_dir,str(timeframe.value),cache_file):
                                 #Remove all files except the cache json meta file
                                 os.remove(os.path.join(cache_dir,str(timeframe.value), f))
+                                log('Rewrite cache', logtype='debug')
                     overwrite = True
             except:
                 #Doesn't look like a proper date time
@@ -48,6 +51,7 @@ def cached(name, df=None, timeframe=Interval.in_daily):
         return None
     else:
         #Cache the results
+        log(f'Add {name} to cache', logtype='debug')
         df.to_csv(f)
         return None
 

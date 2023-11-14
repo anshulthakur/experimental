@@ -87,23 +87,23 @@ INDICES = ["Nifty_50",
            "Nifty_Consumer_Durables",
            "Nifty_Non_Cyclical_Consumer",
            "Nifty_India_Manufacturing",
-           "Nifty_Next_50",
-           "Nifty_100",
-           "Nifty_200",
-           "Nifty_500",
-           "Nifty_Midcap_50",
-           "NIFTY_Midcap_100",
-           "NIFTY_Smallcap_100",
+           #"Nifty_Next_50",
+           #"Nifty_100",
+           #"Nifty_200",
+           #"Nifty_500",
+           #"Nifty_Midcap_50",
+           #"NIFTY_Midcap_100",
+           #"NIFTY_Smallcap_100",
            #"Nifty_Dividend_Opportunities_50",
            #"Nifty_Low_Volatility_50",
            #"Nifty_Alpha_50",
            #"Nifty_High_Beta_50",
-           "Nifty100_Equal_Weight",
-           "Nifty100_Liquid_15",
-           "Nifty_CPSE",
-           "Nifty50_Value_20",
-           "Nifty_Midcap_Liquid_15",
-           "NIFTY100_Quality_30",
+           #"Nifty100_Equal_Weight",
+           #"Nifty100_Liquid_15",
+           #"Nifty_CPSE",
+           #"Nifty50_Value_20",
+           #"Nifty_Midcap_Liquid_15",
+           #"NIFTY100_Quality_30",
            "Nifty_Private_Bank",
            "Nifty_Smallcap_250",
            "Nifty_Smallcap_50",
@@ -111,22 +111,22 @@ INDICES = ["Nifty_50",
            "Nifty_Midcap_150",
            "Nifty_Midcap_Select",
            "NIFTY_LargeMidcap_250",
-           "Nifty_Financial_Services_25_50",
-           "Nifty500_Multicap_50_25_25",
+           #"Nifty_Financial_Services_25_50",
+           #"Nifty500_Multicap_50_25_25",
            "Nifty_Microcap_250",
-           "Nifty200_Momentum_30",
-           "NIFTY100_Alpha_30",
-           "NIFTY500_Value_50",
-           "Nifty100_Low_Volatility_30",
-           "NIFTY_Alpha_Low_Volatility_30",
-           "NIFTY_Quality_Low_Volatility_30",
-           "NIFTY_Alpha_Quality_Low_Volatility_30",
-           "NIFTY_Alpha_Quality_Value_Low_Volatility_30",
-           "NIFTY200_Quality_30",
-           "NIFTY_Midcap150_Quality_50",
-           "Nifty200_Alpha_30",
-           "Nifty_Midcap150_Momentum_50",
-           "NIFTY50_Equal_Weight",
+           #"Nifty200_Momentum_30",
+           #"NIFTY100_Alpha_30",
+           #"NIFTY500_Value_50",
+           #"Nifty100_Low_Volatility_30",
+           #"NIFTY_Alpha_Low_Volatility_30",
+           #"NIFTY_Quality_Low_Volatility_30",
+           #"NIFTY_Alpha_Quality_Low_Volatility_30",
+           #"NIFTY_Alpha_Quality_Value_Low_Volatility_30",
+           #"NIFTY200_Quality_30",
+           #"NIFTY_Midcap150_Quality_50",
+           #"Nifty200_Alpha_30",
+           #"Nifty_Midcap150_Momentum_50",
+           #"NIFTY50_Equal_Weight",
            ]
 
 index_data_dir = './reports/'
@@ -288,6 +288,7 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
         df = df.resample('W').apply(logic)
         #df = df.resample('W-FRI', closed='left').apply(logic)
         df.index -= to_offset("6D")
+        df.index = df.index + pd.Timedelta('9 hour') +  pd.Timedelta('15 minute')
     #Truncate to last n days
     df = df.iloc[-entries:]
     #print(df.head(10))
@@ -295,6 +296,7 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
     #print(date)
     start_date = df.index.values[0]
     end_date = df.index.values[-1]
+    log(f'End date: {end_date}', logtype='debug')
     #print(start_date, type(start_date))
 
     #print(np.datetime64(date))
@@ -310,7 +312,7 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
     password = '@nshulthakur123'
     tv = None
     interval = convert_timeframe_to_quant(sampling)
-    #print(interval)
+    log(f'Samlping interval: {interval}', logtype='debug')
     if online:
         tv = get_tvfeed_instance(username, password)
     #print(duration, type(duration))
@@ -340,7 +342,7 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
                 #df[stock] = s_df[stock]
                 df_arr.append(s_df)
             else:
-                #print(stock)
+                log(f'Download {stock} data', logtype='debug')
                 symbol = stock.strip().replace('&', '_')
                 symbol = symbol.replace('-', '_')
                 nse_map = {'UNITDSPR': 'MCDOWELL_N',
@@ -348,10 +350,8 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
                 if symbol in nse_map:
                     symbol = nse_map[symbol]
                 
-                s_df = cached(symbol)
-                if s_df is not None:
-                    pass
-                else:
+                s_df = cached(name=symbol, timeframe=interval)
+                if s_df is None:
                     s_df = tv.get_hist(
                                 symbol,
                                 'NSE',
@@ -360,7 +360,7 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
                                 extended_session=False,
                             )
                     if s_df is not None:
-                        cached(symbol, s_df)
+                        cached(name=symbol, df = s_df, timeframe=interval)
                 if s_df is None:
                     print(f'Error fetching information on {symbol}')
                 else:
@@ -374,22 +374,31 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
                                inplace = True)
                     #print(s_df.columns)
                     #pd.to_datetime(df['DateTime']).dt.date
-                    s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y %H:%M:%S').dt.date
+                    #s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y %H:%M:%S').dt.date
+                    s_df['date'] = pd.to_datetime(s_df['date'], format='%d-%m-%Y %H:%M:%S')
+                    if sampling=='w':
+                        #Force all weekdays to start on Mondays
+                        s_df['date'] = s_df['date'] - pd.to_timedelta(s_df['date'].dt.weekday, unit='D')
+                        #s_df.index = s_df.index + pd.Timedelta('9 hour') +  pd.Timedelta('15 minute')
                     #s_df.drop_duplicates(inplace = True, subset='date')
                     s_df.set_index('date', inplace = True)
+                    
                     s_df = s_df.sort_index()
                     s_df = s_df.reindex(columns = [stock])
                     s_df = s_df[~s_df.index.duplicated(keep='first')]
                     #print(s_df.index.values[0], type(s_df.index.values[0]))
                     #print(pd.to_datetime(start_date).date(), type(pd.to_datetime(start_date).date()))
-                    s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()]
+                    #Add 1 timedelta to include the last date element as well
+                    s_df = s_df.loc[pd.to_datetime(start_date).date():pd.to_datetime(end_date).date()+pd.Timedelta(days=1)]
                     #print(s_df.loc[start_date:end_date])
-                    #print(s_df.head(10))
                     #print(s_df[s_df.index.duplicated(keep=False)])
+                    if len(s_df) == 0:
+                        log(f'{stock} does not have data in the given range', logtype='warning')
+                        continue
                     if ((pd.to_datetime(s_df.index[0]) - df.index[0]).days > 0) and ((pd.to_datetime(s_df.index[0]) - df.index[0]).days <7):
                         #Handle the case of the start of the week being a holiday
                         data = {stock: s_df[stock][0]}
-                        #print('Handle holiday')
+                        log('Handle holiday', logtype='debug')
                         s_df = pd.concat([s_df, pd.DataFrame(data, index=[pd.to_datetime(df.index[0])])])
                         #print(s_df.tail(10))
                         s_df.sort_index(inplace=True)
@@ -397,6 +406,7 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
                         s_df.drop(s_df.index[1], inplace=True)
                     #print(s_df.head(10))
                     #df[stock] = s_df[stock]
+                    #log(s_df.tail(), logtype='debug')
                     df_arr.append(s_df)
         except Stock.DoesNotExist:
             print(f'{stock} values do not exist')
@@ -408,10 +418,8 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
     #print(df.tail(10))
     df = df[~df.index.duplicated(keep='first')]
     df.index.names = ['date']
-    print(df.head(10))
-    #print(s_df.head(10))
-    #print(df.tail(10))
-    #print(len(df.index))
+    #log(df.head(10), logtype='debug')
+    #log(df.tail(10), logtype='debug')
     return df
 
 def compute_jdk(benchmark = 'Nifty_50', base_df=None):
@@ -428,12 +436,24 @@ def compute_jdk(benchmark = 'Nifty_50', base_df=None):
     #         df = df.drop(columns = cols)
 
     #Drop column if any row has NaN
+    drops = []
     for col in df.columns:
         #print(f'{cols}: {df[cols].isnull().sum()}')
         if df[col].isna().any():
-            log('Drop {}. Contains NaN.'.format(col), logtype='warning')
-            df = df.dropna(subset=[col], inplace=True)
+            try:
+                df[col] = df[col].fillna(method='ffill')
+                if df[col].isna().any():
+                    log('Drop {}. Contains NaN after ffill.'.format(col), logtype='warning')
+                    drops.append(col)
+            except:
+                log('Drop {}. Contains NaN'.format(col), logtype='warning')
+                drops.append(col)
+    if len(drops)>0:
+        log(df.head(10), logtype='debug')
+        df.drop(columns=drops, inplace=True)
 
+    if len(df) == 0:
+        return None
     #Calculate the 1-day Returns for the Indices
     df = df.pct_change(1)
     #print(df.tail())
@@ -468,19 +488,17 @@ def compute_jdk(benchmark = 'Nifty_50', base_df=None):
     #Drop column if any row has NaN after this operation
     #df = df.round(2).dropna()
     df = df.round(2)
-    log(df.head(10), logtype='debug')
-    log(df.tail(10), logtype='debug')
-    for col in df.columns:
-        log(f'{col}: {df[col].isnull().sum()}', logtype='debug')
-        if df[col].isna().any():
-            log('Drop {}. Contains NaN after strength computation.'.format(col), logtype='warning')
-            df = df.dropna(subset=[col], inplace=True)
-
+    
+    #First 'rolling_avg_len' columns will be NaN
     if(len(df)<25):
         log('Length of dataframe less than 25. Stop computing', logtype='warning')
         return None
     #Compute on the last few dates only (last 5 weeks/days)
     JDK_RS_ratio = df.iloc[-25:]
+    JDK_RS_ratio = JDK_RS_ratio.dropna()
+
+    log(df.head(10), logtype='debug')
+    log(df.tail(10), logtype='debug')
     
     #Calculate the Momentum of the RS-ratio
     #JDK_RS_momentum = JDK_RS_ratio.pct_change(10)
@@ -801,7 +819,12 @@ def main(date=datetime.date.today(), sampling = 'w', online=True):
             continue
         df = load_members(sector=column, members=members, date=date, sampling=sampling, entries=33, online=online)
         #print(df.head(10))
-        [ratio, momentum] = compute_jdk(benchmark=column, base_df = df)
+        result = compute_jdk(benchmark=column, base_df = df)
+        if result is None:
+            log(f'Error computing JDK for {column} sector', logtype='error')
+            continue
+        ratio = result[0]
+        momentum = result[1]
         save_scatter_plots(ratio, momentum, column)
         if len(ratio) >0:
             for col in ratio:
@@ -830,6 +853,7 @@ if __name__ == "__main__":
     parser.add_argument('-w', '--weekly', action='store_true', default = True, help="Compute RRG on weekly TF")
     parser.add_argument('-o', '--online', action='store_true', default = False, help="Fetch data from TradingView (Online)")
     parser.add_argument('-f', '--for', dest='date', help="Compute RRG for date")
+    parser.add_argument('-n', '--nodownload', dest='download', action="store_false", default=False, help="Do not attempt download of indices")
     #Can add options for weekly sampling and monthly sampling later
     args = parser.parse_args()
     stock_code = None
@@ -846,6 +870,7 @@ if __name__ == "__main__":
         log(logtype='info', args = 'Use offline data')
 
     pd.set_option("display.precision", 8)
-    download_historical_data(day, silent=True)
+    if args.download is True:
+        download_historical_data(day, silent=True)
     main(date=day, sampling=sampling, online=args.online)
     

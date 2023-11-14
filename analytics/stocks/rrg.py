@@ -461,7 +461,7 @@ def compute_jdk(benchmark = 'Nifty_50', base_df=None):
     df.iloc[0] = 100
     for ticker in df.columns:
         for i in range(1, len(df[ticker])):
-            df[ticker][i] = df[ticker][i-1]*(1+df[ticker][i])
+            df[ticker].iloc[i] = df[ticker].iloc[i-1]*(1+df[ticker].iloc[i])
 
     #Define the Index for comparison (Benchamrk Index): Nifty50
     log(f'Benchmark: {benchmark}', logtype='debug')
@@ -606,16 +606,17 @@ def load_index_members(name):
             members.append(row['Symbol'].strip())
     return members
 
+
 def save_scatter_plots(JDK_RS_ratio, JDK_RS_momentum, sector='unnamed'):
     # Create the DataFrames for Creating the ScaterPlots
     #Create a Sub-Header to the DataFrame: 'JDK_RS_ratio' -> As later both RS_ratio and RS_momentum will be joint
-    JDK_RS_ratio_subheader = pd.DataFrame(np.zeros((1,JDK_RS_ratio.columns.shape[0])),columns=JDK_RS_ratio.columns)
+    JDK_RS_ratio_subheader = pd.DataFrame(np.zeros((1,JDK_RS_ratio.columns.shape[0])),columns=JDK_RS_ratio.columns, dtype=str)
     JDK_RS_ratio_subheader.iloc[0] = 'JDK_RS_ratio'
 
     JDK_RS_ratio_total = pd.concat([JDK_RS_ratio_subheader, JDK_RS_ratio], axis=0)
 
     #... same for JDK_RS Momentum
-    JDK_RS_momentum_subheader = pd.DataFrame(np.zeros((1,JDK_RS_momentum.columns.shape[0])),columns=JDK_RS_momentum.columns)
+    JDK_RS_momentum_subheader = pd.DataFrame(np.zeros((1,JDK_RS_momentum.columns.shape[0])),columns=JDK_RS_momentum.columns, dtype=str)
     JDK_RS_momentum_subheader.iloc[0] = 'JDK_RS_momentum'
 
     JDK_RS_momentum_total = pd.concat([JDK_RS_momentum_subheader, JDK_RS_momentum], axis=0)
@@ -765,7 +766,7 @@ def save_scatter_plots(JDK_RS_ratio, JDK_RS_momentum, sector='unnamed'):
         #All Together
     
         full_scatter = scatter * vline * hline * curve
-        full_scatter = full_scatter.opts(legend_cols= True)
+        full_scatter = full_scatter.opts(legend_cols= False)
     
         return full_scatter
     #Instantiation the Dynamic Map object
@@ -870,6 +871,7 @@ if __name__ == "__main__":
         log(logtype='info', args = 'Use offline data')
 
     pd.set_option("display.precision", 8)
+    pd.options.mode.chained_assignment = None  # default='warn'
     if args.download is True:
         download_historical_data(day, silent=True)
     main(date=day, sampling=sampling, online=args.online)

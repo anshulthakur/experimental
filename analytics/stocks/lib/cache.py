@@ -29,7 +29,6 @@ def cached(name, df=None, timeframe=Interval.in_daily):
                             if f != os.path.join(cache_dir,str(timeframe.value),cache_file):
                                 #Remove all files except the cache json meta file
                                 os.remove(os.path.join(cache_dir,str(timeframe.value), f))
-                                log('Rewrite cache', logtype='debug')
                     overwrite = True
             except:
                 #Doesn't look like a proper date time

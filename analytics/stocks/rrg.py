@@ -854,7 +854,7 @@ if __name__ == "__main__":
     parser.add_argument('-w', '--weekly', action='store_true', default = True, help="Compute RRG on weekly TF")
     parser.add_argument('-o', '--online', action='store_true', default = False, help="Fetch data from TradingView (Online)")
     parser.add_argument('-f', '--for', dest='date', help="Compute RRG for date")
-    parser.add_argument('-n', '--nodownload', dest='download', action="store_false", default=False, help="Do not attempt download of indices")
+    parser.add_argument('-n', '--nodownload', dest='download', action="store_false", default=True, help="Do not attempt download of indices")
     #Can add options for weekly sampling and monthly sampling later
     args = parser.parse_args()
     stock_code = None
@@ -873,6 +873,7 @@ if __name__ == "__main__":
     pd.set_option("display.precision", 8)
     pd.options.mode.chained_assignment = None  # default='warn'
     if args.download is True:
+        log('Download index reports', logtype='debug')
         download_historical_data(day, silent=True)
     main(date=day, sampling=sampling, online=args.online)
     

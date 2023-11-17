@@ -12,7 +12,7 @@ debug = False
 
 
 def progress_bar(done, total):
-    print('\033[KProgress: {progress:.2f}%%\r'.format(progress = (done/total)*100), end='', flush=True)
+    print('\033[KProgress: {progress:.2f}%\r'.format(progress = (done/total)*100), end='', flush=True)
 
 def print_debug(*args):
     global debug
@@ -20,9 +20,9 @@ def print_debug(*args):
         print(args)
     return
 
-transform_rule = {'blue': 'green',
+transform_rule = {'blue': 'white',
                   'white': 'white',
-                  'black': 'black',
+                  'black': 'white',
                   'red': 'red',
                   'green': 'green',
                   'orange': 'white'}

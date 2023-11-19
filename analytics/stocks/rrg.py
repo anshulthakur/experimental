@@ -28,6 +28,7 @@ from talib import MA_Type
 from lib.tradingview import TvDatafeed, Interval, convert_timeframe_to_quant
 from lib.cache import cached
 from lib.logging import set_loglevel, log
+from lib.misc import create_directory
 from download_index_reports import download_historical_data
 
 #Prepare to load stock data as pandas dataframe from source. In this case, prepare django
@@ -607,7 +608,8 @@ def load_index_members(name):
     return members
 
 
-def save_scatter_plots(JDK_RS_ratio, JDK_RS_momentum, sector='unnamed'):
+def save_scatter_plots(JDK_RS_ratio, JDK_RS_momentum, sector='unnamed', sampling = 'w', date=datetime.date.today()):
+    create_directory(f'{plotpath}/{date.strftime("%d/%m/%y")}/{sampling}/')
     # Create the DataFrames for Creating the ScaterPlots
     #Create a Sub-Header to the DataFrame: 'JDK_RS_ratio' -> As later both RS_ratio and RS_momentum will be joint
     JDK_RS_ratio_subheader = pd.DataFrame(np.zeros((1,JDK_RS_ratio.columns.shape[0])),columns=JDK_RS_ratio.columns, dtype=str)
@@ -679,7 +681,7 @@ def save_scatter_plots(JDK_RS_ratio, JDK_RS_momentum, sector='unnamed'):
     full_scatter = scatter * vline * hline
     #Let's use the Panel library to be able to save the Table generated
     p = pn.panel(full_scatter)
-    p.save(plotpath+sector+'_ScatterPlot_1Period.html') 
+    p.save(f'{plotpath}/{date.strftime("%d-%m-%Y")}/{sampling}/{sector}_ScatterPlot_1Period.html') 
     
     #For multiple period we need to create a DataFrame with 3-dimensions 
     #-> to do this we create a dictionary and include each DataFrame with the assigned dictionary key being the Index
@@ -774,7 +776,7 @@ def save_scatter_plots(JDK_RS_ratio, JDK_RS_momentum, sector='unnamed'):
     
     #Let's use the Panel library to be able to save the Table generated
     p = pn.panel(dmap)
-    p.save(plotpath+sector+'_ScatterPlot_Multiple_Period.html', embed = True) 
+    p.save(f'{plotpath}/{date.strftime("%d-%m-%Y")}/{sampling}/{sector}_ScatterPlot_Multiple_Period.html', embed = True) 
     
     
 
@@ -791,7 +793,7 @@ def main(date=datetime.date.today(), sampling = 'w', online=True):
     df = load_sectoral_indices(date, sampling, entries=33)
     benchmark = 'Nifty_50'
     [JDK_RS_ratio, JDK_RS_momentum] = compute_jdk(benchmark=benchmark, base_df = df)
-    save_scatter_plots(JDK_RS_ratio, JDK_RS_momentum, benchmark)
+    save_scatter_plots(JDK_RS_ratio, JDK_RS_momentum, benchmark, sampling, date)
     if len(JDK_RS_ratio) >0:
         for col in JDK_RS_ratio:
             if JDK_RS_ratio.iloc[-1][col] > 100 and len(JDK_RS_momentum) >0 and JDK_RS_momentum.iloc[-1][col] > 100:
@@ -826,7 +828,7 @@ def main(date=datetime.date.today(), sampling = 'w', online=True):
             continue
         ratio = result[0]
         momentum = result[1]
-        save_scatter_plots(ratio, momentum, column)
+        save_scatter_plots(ratio, momentum, column, sampling, date)
         if len(ratio) >0:
             for col in ratio:
                 if ratio.iloc[-1][col] > 100 and len(momentum) >0 and momentum.iloc[-1][col] > 100:
@@ -847,7 +849,7 @@ def main(date=datetime.date.today(), sampling = 'w', online=True):
                 
 if __name__ == "__main__":
     day = datetime.date.today()
-    set_loglevel('debug')
+    set_loglevel('info')
     import argparse
     parser = argparse.ArgumentParser(description='Compute RRG data for indices')
     parser.add_argument('-d', '--daily', action='store_true', default = False, help="Compute RRG on daily TF")

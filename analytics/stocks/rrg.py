@@ -609,7 +609,7 @@ def load_index_members(name):
 
 
 def save_scatter_plots(JDK_RS_ratio, JDK_RS_momentum, sector='unnamed', sampling = 'w', date=datetime.date.today()):
-    create_directory(f'{plotpath}/{date.strftime("%d/%m/%y")}/{sampling}/')
+    create_directory(f'{plotpath}/{date.strftime("%d-%m-%Y")}/{sampling}/')
     # Create the DataFrames for Creating the ScaterPlots
     #Create a Sub-Header to the DataFrame: 'JDK_RS_ratio' -> As later both RS_ratio and RS_momentum will be joint
     JDK_RS_ratio_subheader = pd.DataFrame(np.zeros((1,JDK_RS_ratio.columns.shape[0])),columns=JDK_RS_ratio.columns, dtype=str)

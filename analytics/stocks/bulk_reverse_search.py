@@ -395,6 +395,8 @@ if __name__ == "__main__":
         reference = args.folder
     if args.timeframe is not None and len(args.timeframe)>0:
         timeframe=args.timeframe
+    
+    set_loglevel('error')
 
     main(reference, 
          timeframe=convert_timeframe_to_quant(timeframe),

@@ -246,7 +246,8 @@ def get_dataframe(stock, market, timeframe, duration, date=datetime.datetime.now
 
 
 def main(reference, timeframe, delta, stock=None, logscale=False, 
-         cutoff_date = datetime.datetime.strptime('01-Aug-2018', "%d-%b-%Y"), match = 'close', offline=False):
+         cutoff_date = datetime.datetime.strptime('01-Aug-2018', "%d-%b-%Y"), match = 'close', offline=False,
+         exchange='both'):
     if delta:
         print('Use delta')
     try:
@@ -257,16 +258,17 @@ def main(reference, timeframe, delta, stock=None, logscale=False,
     
     indices = []
     b_indices = []
-    with open(nse_list, 'r') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            indices.append(row['SYMBOL'].strip())
-    
-    with open(bse_list, 'r') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            if row['Security Id'].strip() not in indices:
-                b_indices.append(row['Security Id'].strip())
+    if exchange in ['nse', 'both']:
+        with open(nse_list, 'r') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                indices.append(row['SYMBOL'].strip())
+    if exchange in ['bse', 'both']:
+        with open(bse_list, 'r') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                if row['Security Id'].strip() not in indices:
+                    b_indices.append(row['Security Id'].strip())
     
     # Load the reference candlestick chart
     r_df = pd.read_csv(reference)
@@ -398,6 +400,7 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--cutoff', help="Cutoff date")
     parser.add_argument('-m', '--match', help="Match OHLC (open/high/low/close)", default='close')
     parser.add_argument('-o', '--offline', help="Run the analysis using offline data", action = "store_true", default=False)
+    parser.add_argument('-e', '--exchange', help="Specify the stock exchange where symbols must be searched", default='both')
     timeframe = '1M'
     reference = None
     stock = None
@@ -414,10 +417,17 @@ if __name__ == "__main__":
         cutoff_date = datetime.datetime.strptime(args.cutoff, "%d-%b-%Y")
     else:
         cutoff_date = datetime.datetime.strptime('01-Aug-2018', "%d-%b-%Y")
+    exchange = 'both'
+    if args.exchange is not None and len(args.exchange)>0:
+        if args.exchange.strip().lower() not in ['both', 'bse', 'nse']:
+            print('Unknown exchange. Defaulting to "both"')
+        else:
+            exchange = args.exchange
     main(reference, 
          timeframe=convert_timeframe_to_quant(timeframe), 
          delta=args.delta, stock=stock, 
          logscale=args.log, 
          cutoff_date=cutoff_date,
          match = args.match,
-         offline = args.offline)
+         offline = args.offline,
+         exchange=exchange)

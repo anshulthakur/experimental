@@ -215,7 +215,7 @@ def load_references(folder):
     
     return (df_arr, files)
 
-def load_stocks_data(timeframe, n_bars, offline, logscale, min_length, match='close'):
+def load_stocks_data(timeframe, n_bars, offline, logscale, min_length, match='close', exchange='both'):
     '''
     Load all the stocks into a single dataframe to enable vector processing of correlation across
     all of them rather than iterating one by one, which is slow.
@@ -227,16 +227,18 @@ def load_stocks_data(timeframe, n_bars, offline, logscale, min_length, match='cl
     ref_columns = ['open', 'high', 'low', 'close', 'volume'] 
     ref_columns.remove(match)
     
-    with open(nse_list, 'r') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            indices.append(row['SYMBOL'].strip())
+    if exchange in ['nse', 'both']:
+        with open(nse_list, 'r') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                indices.append(row['SYMBOL'].strip())
     
-    with open(bse_list, 'r') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            if row['Security Id'].strip() not in indices:
-                b_indices.append(row['Security Id'].strip())
+    if exchange in ['bse', 'both']:
+        with open(bse_list, 'r') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                if row['Security Id'].strip() not in indices:
+                    b_indices.append(row['Security Id'].strip())
 
     df_arr = []
     for stock in indices:
@@ -319,7 +321,8 @@ def load_stocks_data(timeframe, n_bars, offline, logscale, min_length, match='cl
     #print(f'Ignore list: {ignore_list}')
     return df
 
-def main(reference, timeframe, logscale=False, match = 'close', offline=False):
+def main(reference, timeframe, logscale=False, match = 'close', offline=False,
+         exchange='both'):
     cutoff_date = datetime.datetime.strptime('01-Aug-2018', "%d-%b-%Y")
     delta = False
     try:
@@ -370,7 +373,8 @@ def main(reference, timeframe, logscale=False, match = 'close', offline=False):
                                 offline=offline, 
                                 logscale=logscale, 
                                 min_length=len(r_df)+1, 
-                                match=match)
+                                match=match,
+                                exchange=exchange)
         if s_df is not None:
             c = compare_stock_info(r_df, s_df, threshold=c_thresh, delta=delta, logscale=logscale)
             #print(f'\n {fnames[ii]}: Shortlist: {json.dumps(c, indent=2)}\n')
@@ -386,6 +390,7 @@ if __name__ == "__main__":
     parser.add_argument('-f', '--folder', help="Folder containing CSV reference files of the candlesticks patterns to search for")
     parser.add_argument('-l', '--log', action="store_true", default=False, help="Use log scaling for price values ")
     parser.add_argument('-o', '--offline', help="Run the analysis using offline data", action = "store_true", default=False)
+    parser.add_argument('-e', '--exchange', help="Specify the stock exchange where symbols must be searched", default='both')
     timeframe = '1M'
     reference = './images/references/'
     #Can add options for weekly sampling and monthly sampling later
@@ -395,11 +400,17 @@ if __name__ == "__main__":
         reference = args.folder
     if args.timeframe is not None and len(args.timeframe)>0:
         timeframe=args.timeframe
-    
+    exchange = 'both'
+    if args.exchange is not None and len(args.exchange)>0:
+        if args.exchange.strip().lower() not in ['both', 'bse', 'nse']:
+            print('Unknown exchange. Defaulting to "both"')
+        else:
+            exchange = args.exchange
     set_loglevel('error')
 
     main(reference, 
          timeframe=convert_timeframe_to_quant(timeframe),
          logscale=args.log, 
          match = 'close',
-         offline = args.offline)
+         offline = args.offline,
+         exchange=exchange)

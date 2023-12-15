@@ -364,3 +364,14 @@ def get_index_members(name):
         for row in reader:
             members.append(row['Symbol'].strip())
     return members
+
+def load_blacklist(name):
+    blacklist = []
+    try:
+        with open(name, 'r') as fd:
+            for symbol in fd:
+                if symbol.strip().upper() not in blacklist:
+                    blacklist.append(symbol.strip().upper())
+    except:
+        log(f'Exception opening {name}. Make sure the path is correct', 'warning')
+    return blacklist

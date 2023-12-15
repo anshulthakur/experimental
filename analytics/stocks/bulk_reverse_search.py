@@ -22,11 +22,13 @@ from lib.retrieval import get_stock_listing
 from lib.logging import set_loglevel, log
 from lib.cache import cached
 from stocks.models import Listing, Stock, Market
+from lib.indices import load_blacklist
 
 nse_list = 'NSE_list.csv'
 bse_list = 'BSE_list.csv'
 img_dir = './images/'
 cache_dir = './images/cache/'
+blacklist_file = 'blacklist.txt'
 
 tvfeed_instance = None
 
@@ -227,10 +229,15 @@ def load_stocks_data(timeframe, n_bars, offline, logscale, min_length, match='cl
     ref_columns = ['open', 'high', 'low', 'close', 'volume'] 
     ref_columns.remove(match)
     
+    blacklist = load_blacklist(blacklist_file)
+
     if exchange in ['nse', 'both']:
         with open(nse_list, 'r') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
+                if f"NSE:{row['SYMBOL'].strip().upper()}" in blacklist:
+                    log(f"Skip blacklisted symbol: NSE:{row['SYMBOL'].strip().upper()}", logtype='info')
+                    continue
                 indices.append(row['SYMBOL'].strip())
     
     if exchange in ['bse', 'both']:
@@ -238,6 +245,9 @@ def load_stocks_data(timeframe, n_bars, offline, logscale, min_length, match='cl
             reader = csv.DictReader(csvfile)
             for row in reader:
                 if row['Security Id'].strip() not in indices:
+                    if f"BSE:{row['Security Id'].strip().upper()}" in blacklist:
+                        log(f"Skip blacklisted symbol: BSE:{row['Security Id'].strip().upper()}", logtype='info')
+                        continue
                     b_indices.append(row['Security Id'].strip())
 
     df_arr = []

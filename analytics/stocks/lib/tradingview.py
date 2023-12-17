@@ -216,7 +216,7 @@ class TvDatafeed:
             data.insert(0, "symbol", value=symbol)
             return data
         except AttributeError:
-            logger.error("no data, please check the exchange and symbol")
+            logger.error(f"no data, please check the exchange and symbol({symbol})")
 
     @staticmethod
     def __format_symbol(symbol, exchange, contract: int = None):

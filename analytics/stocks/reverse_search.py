@@ -432,6 +432,7 @@ if __name__ == "__main__":
             print('Unknown exchange. Defaulting to "both"')
         else:
             exchange = args.exchange
+    np.seterr(divide='ignore', invalid='ignore')
     main(reference, 
          timeframe=convert_timeframe_to_quant(timeframe), 
          delta=args.delta, stock=stock, 

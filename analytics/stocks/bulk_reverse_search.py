@@ -99,7 +99,7 @@ def compare_stock_info(r_df, s_df, threshold, delta=False, logscale=False):
            'min': min(corr_values),
            'map': {}}
     if len(indices)>0:
-        ret['map'] = dict(zip(s_df.columns[indices], corr_values[indices]))
+        ret['map'] = dict(zip(s_df.columns[indices], corr_values.iloc[indices]))
     return ret
 
 
@@ -388,7 +388,8 @@ def main(reference, timeframe, logscale=False, match = 'close', offline=False,
         if s_df is not None:
             c = compare_stock_info(r_df, s_df, threshold=c_thresh, delta=delta, logscale=logscale)
             #print(f'\n {fnames[ii]}: Shortlist: {json.dumps(c, indent=2)}\n')
-            print(f'\n {fnames[ii]}: Shortlist: {sorted( ((v,k) for k,v in c["map"].items()), reverse=True)}')
+            if len(c["map"])>0:
+                print(f'\n {fnames[ii]}: Shortlist: {sorted( ((v,k) for k,v in c["map"].items()), reverse=True)}')
         else:
             continue
         
@@ -417,7 +418,7 @@ if __name__ == "__main__":
         else:
             exchange = args.exchange
     set_loglevel('error')
-
+    np.seterr(divide='ignore', invalid='ignore')
     main(reference, 
          timeframe=convert_timeframe_to_quant(timeframe),
          logscale=args.log, 

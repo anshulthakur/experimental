@@ -73,7 +73,7 @@ class BaseScreen(FlowGraphNode):
             for column in self.column_names:
                 if column not in columns:
                     raise Exception(f"{column} not present in input dataframe.")
-                elif pd.isna(df[column][-1]): #Column is NaN. Filters cannot apply
+                elif pd.isna(df.iloc[-1][column]): #Column is NaN. Filters cannot apply
                     log(f"{column} is NaN.")
                     self.consume()
                     return
@@ -102,18 +102,18 @@ class EMA_Filter(BaseFilter):
     def __init__(self, value, greater=True, what='close'):
         self.column_names = ['EMA'+str(value)]
         if greater==True:
-            self.filter = lambda x: True if x[what][-1]>=x['EMA'+str(value)][-1] else False
+            self.filter = lambda x: True if x.iloc[-1][what]>=x.iloc[-1]['EMA'+str(value)] else False
         else:
-            self.filter = lambda x: True if x[what][-1]<=x['EMA'+str(value)][-1] else False
+            self.filter = lambda x: True if x.iloc[-1][what]<=x.iloc[-1]['EMA'+str(value)] else False
 
 class RSI_Filter(BaseFilter):
     def __init__(self, value=65, greater=True, **kwargs):
         self.column_names = ['RSI']
         if greater==True:
             #self.filter = lambda x: True if ((not pd.isna(x['RSI'][-1])) and x['RSI'][-1]>=value) else False
-            self.filter = lambda x: True if ((not pd.isna(x['RSI'][-1])) and x['RSI'][-1]>=value) else False
+            self.filter = lambda x: True if ((not pd.isna(x.iloc[-1]['RSI'])) and x.iloc[-1]['RSI']>=value) else False
         else:
-            self.filter = lambda x: True if ((not pd.isna(x['RSI'][-1])) and x['RSI'][-1]<=value) else False
+            self.filter = lambda x: True if ((not pd.isna(x.iloc[-1]['RSI'])) and x.iloc[-1]['RSI']<=value) else False
 
 class DivergenceFilter(BaseFilter):
     '''
@@ -125,9 +125,9 @@ class DivergenceFilter(BaseFilter):
     def __init__(self, indicator='RSI', positive=True):
         self.indicator = indicator+'_divergence'
         if positive==True:
-            self.filter = lambda x: True if ((not pd.isna(x[self.indicator][-1])) and x[self.indicator][-1]>0) else False
+            self.filter = lambda x: True if ((not pd.isna(x.iloc[-1][self.indicator])) and x.iloc[-1][self.indicator]>0) else False
         else:
-            self.filter = lambda x: True if ((not pd.isna(x[self.indicator][-1])) and x[self.indicator][-1]<0) else False
+            self.filter = lambda x: True if ((not pd.isna(x.iloc[-1][self.indicator])) and x.iloc[-1][self.indicator]<0) else False
 
 class Crossover_Screen(BaseScreen):
     def __init__(self,  crosses, what='close', direction='None', **kwargs):
@@ -156,17 +156,17 @@ class Crossover_Screen(BaseScreen):
             #log(x, 'debug')
             if self.direction in ['none', 'up']:
                 if type(self.crosses) == float:
-                    if x[self.what][-1]>=self.crosses and x[self.what][-2]<self.crosses:
+                    if x.iloc[-1][self.what]>=self.crosses and x.iloc[-2][self.what]<self.crosses:
                         return True
                 else:
-                    if x[self.what][-1]>=x[self.crosses][-1] and x[self.what][-2]<x[self.crosses][-2]:
+                    if x.iloc[-1][self.what]>=x.iloc[-1][self.crosses] and x.iloc[-2][self.what]<x.iloc[-2][self.crosses]:
                         return True
             elif self.direction in ['none', 'down']:
                 if type(self.crosses) == float:
-                    if x[self.what][-1]<self.crosses and x[self.what][-2]>=self.crosses:
+                    if x.iloc[-1][self.what]<self.crosses and x.iloc[-2][self.what]>=self.crosses:
                         return True
                 else:
-                    if x[self.what][-1]<x[self.crosses][-1] and x[self.what][-2]>=x[self.crosses][-2]:
+                    if x.iloc[-1][self.what]<x.iloc[-1][self.crosses] and x.iloc[-2][self.what]>=x.iloc[-2][self.crosses]:
                         return True
             return False
         filters = []
@@ -201,17 +201,17 @@ class Proximity_Screen(BaseScreen):
             #log(x, 'debug')
             if self.direction in ['none', 'up']:
                 if type(self.near) == float:
-                    if (x[self.what][-1] > self.near) and (x[self.what][-1]-self.near)/self.near <= self.margin:
+                    if (x.iloc[-1][self.what] > self.near) and (x.iloc[-1][self.what]-self.near)/self.near <= self.margin:
                         return True
                 else:
-                    if (x[self.what][-1] > x[self.near][-1]) and (x[self.what][-1]-x[self.near][-1])/x[self.near][-1] <= self.margin:
+                    if (x.iloc[-1][self.what] > x.iloc[-1][self.near]) and (x.iloc[-1][self.what]-x.iloc[-1][self.near])/x.iloc[-1][self.near] <= self.margin:
                         return True
             elif self.direction in ['none', 'down']:
                 if type(self.near) == float:
-                    if (self.near > x[self.what][-1]) and (self.near - x[self.what][-1])/self.near <= self.margin:
+                    if (self.near > x.iloc[-1][self.what]) and (self.near - x.iloc[-1][self.what])/self.near <= self.margin:
                         return True
                 else:
-                    if (x[self.near][-1] > x[self.what][-1]) and (x[self.near][-1] - x[self.what][-1])/x[self.near][-1] <= self.margin:
+                    if (x.iloc[-1][self.near] > x.iloc[-1][self.what]) and (x.iloc[-1][self.near] - x.iloc[-1][self.what])/x.iloc[-1][self.near] <= self.margin:
                         return True
             return False
         filters = []

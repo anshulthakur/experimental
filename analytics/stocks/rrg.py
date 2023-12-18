@@ -608,7 +608,10 @@ def load_index_members(name):
     return members
 
 
-def save_scatter_plots(JDK_RS_ratio, JDK_RS_momentum, sector='unnamed', sampling = 'w', date=datetime.date.today()):
+def save_scatter_plots(rrg_df, sector='unnamed', sampling = 'w', date=datetime.date.today()):
+    JDK_RS_ratio = rrg_df[0]
+    JDK_RS_momentum = rrg_df[1]
+
     create_directory(f'{plotpath}/{date.strftime("%d-%m-%Y")}/{sampling}/')
     # Create the DataFrames for Creating the ScaterPlots
     #Create a Sub-Header to the DataFrame: 'JDK_RS_ratio' -> As later both RS_ratio and RS_momentum will be joint
@@ -778,8 +781,71 @@ def save_scatter_plots(JDK_RS_ratio, JDK_RS_momentum, sector='unnamed', sampling
     p = pn.panel(dmap)
     p.save(f'{plotpath}/{date.strftime("%d-%m-%Y")}/{sampling}/{sector}_ScatterPlot_Multiple_Period.html', embed = True) 
     
-    
+def generate_report(sector, rrg_df, verbose=False):
+    rstrength = rrg_df[0]
+    rmomentum = rrg_df[1]
+    origin = [100,100]
+    if verbose:
+        if len(rstrength) >0:
+            for col in rstrength:
+                if rstrength.iloc[-1][col] > 100 and len(rmomentum) >0 and rmomentum.iloc[-1][col] > 100:
+                    print(f'{col} is leading [RS:{rstrength.iloc[-1][col]} MOM:{rmomentum.iloc[-1][col]}]')
+                elif rstrength.iloc[-1][col] < 100 and len(rmomentum) >0 and rmomentum.iloc[-1][col] > 100:
+                    print(f'{col} is improving [RS:{rstrength.iloc[-1][col]} MOM:{rmomentum.iloc[-1][col]}]')
+                elif rstrength.iloc[-1][col] < 100 and len(rmomentum) >0 and rmomentum.iloc[-1][col] < 100:
+                    print(f'{col} is weakening [RS:{rstrength.iloc[-1][col]} MOM:{rmomentum.iloc[-1][col]}]')
+                elif rstrength.iloc[-1][col] > 100 and len(rmomentum) >0 and rmomentum.iloc[-1][col] < 100:
+                    print(f'{col} is lagging [RS:{rstrength.iloc[-1][col]} MOM:{rmomentum.iloc[-1][col]}]')
+                elif len(rmomentum)==0:
+                    print(f'{sector} has NaN values')
+                else:
+                    print(f'{col}')
+        else:
+            print(f'{sector} has NaN values in ratio')
 
+    #Create a leaderboard: Sort according to the distance from 0 in the first quadrant. We want the entries
+    # with the greatest momentum and strength to be rated higher than the ones with greater momentum but lesser strength
+    
+    #First, get the last values of all members as the first column of a dataframe
+    r_df = rstrength.iloc[[-1]].transpose()
+    m_df = rmomentum.iloc[[-1]].transpose()
+
+    r_df.rename(columns={list(r_df.columns)[0]: 'strength'}, inplace=True)
+    m_df.rename(columns={list(m_df.columns)[0]: 'momentum'}, inplace=True)
+    df = pd.concat([r_df, m_df], axis='columns', join='inner')
+    # Convert to polar coordinates
+    df['radius'] = np.sqrt((df['strength']-origin[0])**2 + (df['momentum']-origin[1])**2)
+    df['angle'] = np.arctan2(df['strength']-origin[1], df['momentum']-origin[0])
+    # Adjust negative angles to be positive
+    df['angle'] = np.where(df['angle'] < 0, 2*np.pi + df['angle'], df['angle'])
+    # Find the leaders and sort
+    first_quadrant = df[(df['angle'] >= 0) & (df['angle'] <= np.pi/2) & (df['radius'] >= 0)]
+    sorted_first_quadrant = first_quadrant.sort_values(by='radius', ascending=False)
+
+    # Display the sorted DataFrame
+    if len(sorted_first_quadrant)>0:
+        print('====================\n| Leaders\n====================')
+        print(sorted_first_quadrant)
+
+    #Find the ones improving and sort
+    fourth_quadrant = df[(df['angle'] >= (3/2)*np.pi) & (df['angle'] <= 2*np.pi) & (df['radius'] >= 0)]
+
+    # Sort by distance from the origin
+    sorted_fourth_quadrant = fourth_quadrant.sort_values(by='radius', ascending=False)
+
+    # Display the sorted DataFrame for the fourth quadrant
+    if len(sorted_fourth_quadrant)>0:
+        print('====================\n| Improving\n====================')
+        print(sorted_fourth_quadrant)
+
+    #Now, we want to report the relative rotations of various stocks. This is in terms of both change 
+    # in radius as well as angle.
+    # r_df = rstrength.diff(periods=1).iloc[[-1]].transpose()
+    # m_df = rmomentum.diff(periods=1).iloc[[-1]].transpose()
+    # r_df.rename(columns={list(r_df.columns)[0]: 'strength'}, inplace=True)
+    # m_df.rename(columns={list(m_df.columns)[0]: 'momentum'}, inplace=True)
+    # df = pd.concat([r_df, m_df], axis='columns', join='inner')
+    
 def main(date=datetime.date.today(), sampling = 'w', online=True):
     try:
         os.mkdir(cache_dir)
@@ -792,27 +858,12 @@ def main(date=datetime.date.today(), sampling = 'w', online=True):
 
     df = load_sectoral_indices(date, sampling, entries=33)
     benchmark = 'Nifty_50'
-    [JDK_RS_ratio, JDK_RS_momentum] = compute_jdk(benchmark=benchmark, base_df = df)
-    save_scatter_plots(JDK_RS_ratio, JDK_RS_momentum, benchmark, sampling, date)
-    if len(JDK_RS_ratio) >0:
-        for col in JDK_RS_ratio:
-            if JDK_RS_ratio.iloc[-1][col] > 100 and len(JDK_RS_momentum) >0 and JDK_RS_momentum.iloc[-1][col] > 100:
-                print(f'{col} is leading [RS:{JDK_RS_ratio.iloc[-1][col]} MOM:{JDK_RS_momentum.iloc[-1][col]}]')
-            elif JDK_RS_ratio.iloc[-1][col] < 100 and len(JDK_RS_momentum) >0 and JDK_RS_momentum.iloc[-1][col] > 100:
-                print(f'{col} is improving [RS:{JDK_RS_ratio.iloc[-1][col]} MOM:{JDK_RS_momentum.iloc[-1][col]}]')
-            elif JDK_RS_ratio.iloc[-1][col] < 100 and len(JDK_RS_momentum) >0 and JDK_RS_momentum.iloc[-1][col] < 100:
-                print(f'{col} is weakening [RS:{JDK_RS_ratio.iloc[-1][col]} MOM:{JDK_RS_momentum.iloc[-1][col]}]')
-            elif JDK_RS_ratio.iloc[-1][col] > 100 and len(JDK_RS_momentum) >0 and JDK_RS_momentum.iloc[-1][col] < 100:
-                print(f'{col} is lagging [RS:{JDK_RS_ratio.iloc[-1][col]} MOM:{JDK_RS_momentum.iloc[-1][col]}]')
-            elif len(JDK_RS_momentum)==0:
-                print(f'{benchmark} has NaN values')
-            else:
-                print(f'{col}')
-    else:
-        print(f'{benchmark} has NaN values in ratio')
-    
+    jdf_df = compute_jdk(benchmark=benchmark, base_df = df)
+    save_scatter_plots(jdf_df, benchmark, sampling, date)
+    generate_report(benchmark, jdf_df)
+
     #Whichever sectors are leading, find the strongest stock in those
-    for column in JDK_RS_ratio.columns:
+    for column in jdf_df[0].columns:
         #if JDK_RS_ratio.iloc[-1][column] > 100 and JDK_RS_momentum.iloc[-1][column] > 100:
         if column in processed:
             print(f'Skip {column}. Already processed for the day')
@@ -826,25 +877,8 @@ def main(date=datetime.date.today(), sampling = 'w', online=True):
         if result is None:
             log(f'Error computing JDK for {column} sector', logtype='error')
             continue
-        ratio = result[0]
-        momentum = result[1]
-        save_scatter_plots(ratio, momentum, column, sampling, date)
-        if len(ratio) >0:
-            for col in ratio:
-                if ratio.iloc[-1][col] > 100 and len(momentum) >0 and momentum.iloc[-1][col] > 100:
-                    print(f'{col} is leading [RS:{ratio.iloc[-1][col]} MOM:{momentum.iloc[-1][col]}]')
-                elif ratio.iloc[-1][col] < 100 and len(momentum) >0 and momentum.iloc[-1][col] > 100:
-                    print(f'{col} is improving [RS:{ratio.iloc[-1][col]} MOM:{momentum.iloc[-1][col]}]')
-                elif ratio.iloc[-1][col] < 100 and len(momentum) >0 and momentum.iloc[-1][col] < 100:
-                    print(f'{col} is weakening [RS:{ratio.iloc[-1][col]} MOM:{momentum.iloc[-1][col]}]')
-                elif ratio.iloc[-1][col] > 100 and len(momentum) >0 and momentum.iloc[-1][col] < 100:
-                    print(f'{col} is lagging [RS:{ratio.iloc[-1][col]} MOM:{momentum.iloc[-1][col]}]')
-                elif len(momentum)==0:
-                    print(f'{column} has NaN values')
-                else:
-                    print(f'{col}')
-        else:
-            print(f'{column} has NaN values in ratio')
+        save_scatter_plots(result, column, sampling, date)
+        generate_report(column, result)
         save_progress(column)
                 
 if __name__ == "__main__":

@@ -128,7 +128,7 @@ if __name__ == "__main__":
         day = datetime.datetime.strptime(args.date, "%d/%m/%y")
     
     if args.all:
-        download_historical_data(day, silent=False)
+        download_historical_data(day, silent=True)
         exit(0)
     
     download_daily_data(day)

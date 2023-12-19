@@ -51,7 +51,219 @@ from holoviews import opts, dim
 
 import panel as pn
 import csv
+import time
+import requests
+import brotli
+import gzip
+from io import BytesIO
 
+raw_data_dir = './reports/indices/'
+
+def handle_download(session, url, filename, path=raw_data_dir):
+    try:
+        create_directory(raw_data_dir)
+    except FileExistsError:
+        pass
+    except:
+        print('Error creating raw data folder')
+        exit(0)
+    print(url)
+    time.sleep(1)
+    try:
+        response = session.get(url, timeout=10)
+    except requests.exceptions.TooManyRedirects:
+        print('Data may not be available')
+        return
+    except requests.exceptions.Timeout:
+        #Skip file download
+        print('Timeout')
+        return
+    #print(response.headers)
+    text = False
+    if response.status_code==200:
+        coder = response.encoding
+        try:
+            #if coder=='br':
+            result = brotli.decompress(response.content).decode('utf-8')
+        except:
+            #elif coder=='gzip':
+            try:
+                buf = BytesIO(response.content)
+                result = gzip.GzipFile(fileobj=buf).read().decode('utf-8')
+            except:
+                #else:
+                try:
+                    result = response.content.decode('utf-8')
+                    text=True
+                except:
+                    result = response.content
+        if text:
+            with open(path+filename, 'w') as fd:
+                fd.write(result)
+        else:
+            with open(path+filename, 'wb') as fd:
+                fd.write(result)
+            
+    else:
+        print(response.content.decode('utf-8'))
+        print('Received textual data')
+        pass
+        
+
+def download_index_constituents(name=None):
+    urlmap = {
+        "Nifty_50": {'url':"https://niftyindices.com/IndexConstituent/ind_nifty50list.csv",
+                     'base': "https://niftyindices.com/indices/equity/broad-based-indices/NIFTY-50"},
+        "Nifty_Auto": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyautolist.csv",
+                       'base': ""},
+        "Nifty_Bank": {'url':"https://niftyindices.com/IndexConstituent/ind_niftybanklist.csv",
+                       'base': ""},
+        "Nifty_Energy": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyenergylist.csv",
+                         'base': ""},
+        "Nifty_Financial_Services": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyfinancelist.csv",
+                                     'base': ""},
+        "Nifty_FMCG": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyfmcglist.csv",
+                       'base': ""},
+        "Nifty_IT": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyitlist.csv",
+                     'base': ""},
+        "Nifty_Media": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymedialist.csv",
+                        'base': ""},
+        "Nifty_Metal": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymetallist.csv",
+                        'base': ""},
+        "Nifty_MNC": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymnclist.csv",
+                      'base': ""},
+        "Nifty_Pharma": {'url':"https://niftyindices.com/IndexConstituent/ind_niftypharmalist.csv",
+                         'base': ""},
+        "Nifty_PSU_Bank": {'url':"https://niftyindices.com/IndexConstituent/ind_niftypsubanklist.csv",
+                           'base': ""},
+        "Nifty_Realty": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyrealtylist.csv",
+                         'base': ""},
+        "Nifty_India_Consumption": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyconsumptionlist.csv",
+                                    'base': ""},
+        "Nifty_Commodities": {'url':"https://niftyindices.com/IndexConstituent/ind_niftycommoditieslist.csv",
+                              'base': ""},
+        "Nifty_Infrastructure": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyinfralist.csv",
+                                 'base': ""},
+        "Nifty_PSE": {'url':"https://niftyindices.com/IndexConstituent/ind_niftypselist.csv",
+                      'base': ""},
+        "Nifty_Services_Sector": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyservicelist.csv",
+                                  'base': ""},
+        "Nifty_Growth_Sectors_15": {'url':"https://niftyindices.com/IndexConstituent/ind_NiftyGrowth_Sectors15_Index.csv",
+                                    'base': ""},
+        "NIFTY_SME_EMERGE": {'url':"https://niftyindices.com/IndexConstituent/ind_niftysmelist.csv",
+                             'base': ""},
+        "Nifty_Oil_&_Gas": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyoilgaslist.csv",
+                            'base': ""},
+        "Nifty_Healthcare_Index": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyhealthcarelist.csv",
+                                   'base': ""},
+        "Nifty_Total_Market": {'url':"https://niftyindices.com/IndexConstituent/ind_niftytotalmarket_list.csv",
+                               'base': ""},
+        "Nifty_India_Digital": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyindiadigital_list.csv",
+                                'base': ""},
+        "Nifty_Mobility": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymobility_list.csv",
+                           'base': ""},
+        "Nifty_India_Defence": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyindiadefence_list.csv",
+                                'base': ""},
+        "Nifty_Financial_Services_Ex_Bank": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyfinancialservicesexbank_list.xlsx",
+                                             'base': ""},
+        "Nifty_Core_Housing": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyCoreHousing_list.csv",
+                               'base': ""},
+        "Nifty_Housing": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyhousing_list.csv",
+                          'base': ""},
+        "Nifty_Transportation_&_Logistics": {'url':"https://niftyindices.com/IndexConstituent/ind_niftytransportationandlogistics%20_list.csv",
+                                             'base': ""},
+        "Nifty_MidSmall_Financial_Services": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymidsmallfinancailservice_list.csv",
+                                              'base': ""},
+        "Nifty_MidSmall_Healthcare": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymidsmallhealthcare_list.csv",
+                                      'base': ""},
+        "Nifty_MidSmall_IT_&_Telecom": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymidsmallitAndtelecom_list.csv",
+                                        'base': ""},
+        "Nifty_Consumer_Durables": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyconsumerdurableslist.csv",
+                                    'base': ""},
+        "Nifty_Non_Cyclical_Consumer": {'url':"https://niftyindices.com/IndexConstituent/ind_niftynon-cyclicalconsumer_list.csv",
+                                        'base': ""},
+        "Nifty_India_Manufacturing": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyindiamanufacturing_list.csv",
+                                      'base': ""},
+        #"Nifty_Next_50": "",
+        #"Nifty_100": "",
+        #"Nifty_200": "",
+        #"Nifty_500": "",
+        #"Nifty_Midcap_50": "",
+        #"NIFTY_Midcap_100": "",
+        #"NIFTY_Smallcap_100": "",
+        "Nifty_Dividend_Opportunities_50": {'url':"https://niftyindices.com/IndexConstituent/ind_niftydivopp50list.csv",
+                                            'base': ""},
+        #"Nifty_Low_Volatility_50": "",
+        #"Nifty_Alpha_50": "",
+        #"Nifty_High_Beta_50": "",
+        #"Nifty100_Equal_Weight": "",
+        #"Nifty100_Liquid_15": "",
+        #"Nifty_CPSE": "",
+        #"Nifty50_Value_20": "",
+        #"Nifty_Midcap_Liquid_15": "",
+        #"NIFTY100_Quality_30": "",
+        "Nifty_Private_Bank": {'url':"https://niftyindices.com/IndexConstituent/ind_nifty_privatebanklist.csv",
+                               'base': ""},
+        "Nifty_Smallcap_250": {'url':"https://niftyindices.com/IndexConstituent/ind_niftysmallcap250list.csv",
+                               'base': ""},
+        "Nifty_Smallcap_50": {'url':"https://niftyindices.com/IndexConstituent/ind_niftysmallcap50list.csv",
+                              'base': ""},
+        "Nifty_MidSmallcap_400": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymidsmallcap400list.csv",
+                                  'base': ""},
+        "Nifty_Midcap_150": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymidcap150list.csv",
+                             'base': ""},
+        "Nifty_Midcap_Select": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymidcapselect_list.csv",
+                                'base': ""},
+        "NIFTY_LargeMidcap_250": {'url':"https://niftyindices.com/IndexConstituent/ind_niftylargemidcap250list.csv",
+                                  'base': ""},
+        #"Nifty_Financial_Services_25_50": "",
+        #"Nifty500_Multicap_50_25_25": "",
+        "Nifty_Microcap_250": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymicrocap250_list.csv",
+                               'base': ""},
+        #"Nifty200_Momentum_30": "",
+        #"NIFTY100_Alpha_30": "",
+        #"NIFTY500_Value_50": "",
+        #"Nifty100_Low_Volatility_30": "",
+        #"NIFTY_Alpha_Low_Volatility_30": "",
+        #"NIFTY_Quality_Low_Volatility_30": "",
+        #"NIFTY_Alpha_Quality_Low_Volatility_30": "",
+        #"NIFTY_Alpha_Quality_Value_Low_Volatility_30": "",
+        #"NIFTY200_Quality_30": "",
+        #"NIFTY_Midcap150_Quality_50": "",
+        #"Nifty200_Alpha_30": "",
+        #"Nifty_Midcap150_Momentum_50": "",
+        #"NIFTY50_Equal_Weight": "",
+    }
+
+    if name is not None and name not in urlmap:
+        log("Index not found in local map.", logtype='error')
+        return
+    
+    session = requests.Session()
+    # Set correct user agent
+    #selenium_user_agent = driver.execute_script("return navigator.userAgent;")
+    selenium_user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.35'
+    #print(selenium_user_agent)
+    session.headers.update({"user-agent": selenium_user_agent})
+    session.headers.update({"accept-encoding": "gzip, deflate, br",
+            "accept":
+    """text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9""",
+            "accept-language": "en-US,en;q=0.9",
+            "host": "niftyindices.com",
+            "referer": "https://niftyindices.com/"})
+    #session.headers.update({"host": "www.nseindia.com"})
+    #session.get("https://niftyindices.com/")
+    #session.headers.update({"host": "archives.nseindia.com"})
+    if name is not None:
+        session.get(urlmap[name]['base'])
+        #session.headers.update({"host": urlmap[name]['base']})
+        handle_download(session, url = urlmap[name]['url'], filename = f'{name}.csv')
+    else:
+        for name in urlmap:
+            session.get(urlmap[name]['base'])
+            #session.headers.update({"host": urlmap[name]['base']})
+            handle_download(session, url = urlmap[name]['url'], filename = f'{name}.csv')
+    pass
 
 INDICES = ["Nifty_50",
            "Nifty_Auto",
@@ -398,7 +610,7 @@ def load_members(sector, members, date, sampling='w', entries=50, online=True):
                         continue
                     if ((pd.to_datetime(s_df.index[0]) - df.index[0]).days > 0) and ((pd.to_datetime(s_df.index[0]) - df.index[0]).days <7):
                         #Handle the case of the start of the week being a holiday
-                        data = {stock: s_df[stock][0]}
+                        data = {stock: s_df.iloc[0][stock]}
                         log('Handle holiday', logtype='debug')
                         s_df = pd.concat([s_df, pd.DataFrame(data, index=[pd.to_datetime(df.index[0])])])
                         #print(s_df.tail(10))
@@ -442,7 +654,7 @@ def compute_jdk(benchmark = 'Nifty_50', base_df=None):
         #print(f'{cols}: {df[cols].isnull().sum()}')
         if df[col].isna().any():
             try:
-                df[col] = df[col].fillna(method='ffill')
+                df[col] = df[col].ffill()
                 if df[col].isna().any():
                     log('Drop {}. Contains NaN after ffill.'.format(col), logtype='warning')
                     drops.append(col)
@@ -891,6 +1103,7 @@ if __name__ == "__main__":
     parser.add_argument('-o', '--online', action='store_true', default = False, help="Fetch data from TradingView (Online)")
     parser.add_argument('-f', '--for', dest='date', help="Compute RRG for date")
     parser.add_argument('-n', '--nodownload', dest='download', action="store_false", default=True, help="Do not attempt download of indices")
+    parser.add_argument('-r', '--refresh', dest='refresh', action="store_true", default=False, help="Refresh index constituents files")
     #Can add options for weekly sampling and monthly sampling later
     args = parser.parse_args()
     stock_code = None
@@ -908,8 +1121,13 @@ if __name__ == "__main__":
 
     pd.set_option("display.precision", 8)
     pd.options.mode.chained_assignment = None  # default='warn'
+    if args.refresh:
+        log('Refreshing index constituents', logtype='info')
+        download_index_constituents()
+
     if args.download is True:
         log('Download index reports', logtype='debug')
         download_historical_data(day, silent=True)
+    
     main(date=day, sampling=sampling, online=args.online)
     

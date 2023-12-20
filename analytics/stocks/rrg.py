@@ -57,17 +57,27 @@ import brotli
 import gzip
 from io import BytesIO
 
-raw_data_dir = './reports/indices/'
 
-def handle_download(session, url, filename, path=raw_data_dir):
+index_data_dir = './reports/'
+member_dir = './reports/members/'
+plotpath = index_data_dir+'plots/'
+cache_dir = index_data_dir+'cache/'
+
+tvfeed_instance = None
+
+
+def handle_download(session, url, filename, path=member_dir, overwrite=False):
     try:
-        create_directory(raw_data_dir)
+        create_directory(path)
     except FileExistsError:
         pass
     except:
         print('Error creating raw data folder')
         exit(0)
     print(url)
+    if not overwrite and os.path.isfile(path+filename):
+        #Skip file download
+        return
     time.sleep(1)
     try:
         response = session.get(url, timeout=10)
@@ -110,80 +120,82 @@ def handle_download(session, url, filename, path=raw_data_dir):
         pass
         
 
-def download_index_constituents(name=None):
+def download_index_constituents(name=None, overwrite=True):
     urlmap = {
         "Nifty_50": {'url':"https://niftyindices.com/IndexConstituent/ind_nifty50list.csv",
                      'base': "https://niftyindices.com/indices/equity/broad-based-indices/NIFTY-50"},
         "Nifty_Auto": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyautolist.csv",
-                       'base': ""},
+                       'base': "https://niftyindices.com/indices/equity/sectoral-indices/nifty-auto"},
         "Nifty_Bank": {'url':"https://niftyindices.com/IndexConstituent/ind_niftybanklist.csv",
-                       'base': ""},
+                       'base': "https://niftyindices.com/indices/equity/sectoral-indices/nifty-bank"},
         "Nifty_Energy": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyenergylist.csv",
-                         'base': ""},
+                         'base': "https://niftyindices.com/indices/equity/thematic-indices/nifty-energy"},
         "Nifty_Financial_Services": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyfinancelist.csv",
-                                     'base': ""},
+                                     'base': "https://niftyindices.com/indices/equity/sectoral-indices/nifty-financial-services"},
         "Nifty_FMCG": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyfmcglist.csv",
-                       'base': ""},
+                       'base': "https://niftyindices.com/indices/equity/sectoral-indices/nifty-fmcg"},
         "Nifty_IT": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyitlist.csv",
-                     'base': ""},
+                     'base': "https://niftyindices.com/indices/equity/sectoral-indices/nifty-it"},
         "Nifty_Media": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymedialist.csv",
-                        'base': ""},
+                        'base': "https://niftyindices.com/indices/equity/sectoral-indices/nifty-media"},
         "Nifty_Metal": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymetallist.csv",
-                        'base': ""},
+                        'base': "https://niftyindices.com/indices/equity/sectoral-indices/nifty-metal"},
         "Nifty_MNC": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymnclist.csv",
-                      'base': ""},
+                      'base': "https://niftyindices.com/indices/equity/thematic-indices/nifty-mnc"},
         "Nifty_Pharma": {'url':"https://niftyindices.com/IndexConstituent/ind_niftypharmalist.csv",
-                         'base': ""},
+                         'base': "https://niftyindices.com/indices/equity/sectoral-indices/nifty-pharma"},
         "Nifty_PSU_Bank": {'url':"https://niftyindices.com/IndexConstituent/ind_niftypsubanklist.csv",
-                           'base': ""},
+                           'base': "https://niftyindices.com/indices/equity/sectoral-indices/nifty-psu-bank"},
         "Nifty_Realty": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyrealtylist.csv",
-                         'base': ""},
+                         'base': "https://niftyindices.com/indices/equity/sectoral-indices/nifty-realty"},
         "Nifty_India_Consumption": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyconsumptionlist.csv",
-                                    'base': ""},
+                                    'base': "https://niftyindices.com/indices/equity/thematic-indices/nifty-india-consumption"},
         "Nifty_Commodities": {'url':"https://niftyindices.com/IndexConstituent/ind_niftycommoditieslist.csv",
-                              'base': ""},
+                              'base': "https://niftyindices.com/indices/equity/thematic-indices/nifty-commodities"},
         "Nifty_Infrastructure": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyinfralist.csv",
-                                 'base': ""},
+                                 'base': "https://niftyindices.com/indices/equity/thematic-indices/nifty-infrastructure"},
         "Nifty_PSE": {'url':"https://niftyindices.com/IndexConstituent/ind_niftypselist.csv",
-                      'base': ""},
+                      'base': "https://niftyindices.com/indices/equity/thematic-indices/nifty-pse"},
         "Nifty_Services_Sector": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyservicelist.csv",
-                                  'base': ""},
+                                  'base': "https://niftyindices.com/indices/equity/thematic-indices/nifty-services-sector"},
+        "Nifty_reits_invits": {"url":"https://niftyindices.com/IndexConstituent/ind_niftyREITs_InvITs_list.csv",
+                               "base":"https://niftyindices.com/indices/equity/thematic-indices/nifty-reits-invits"},
         "Nifty_Growth_Sectors_15": {'url':"https://niftyindices.com/IndexConstituent/ind_NiftyGrowth_Sectors15_Index.csv",
-                                    'base': ""},
+                                    'base': "https://niftyindices.com/indices/equity/strategy-indices/nifty-growth-sectors-15"},
         "NIFTY_SME_EMERGE": {'url':"https://niftyindices.com/IndexConstituent/ind_niftysmelist.csv",
-                             'base': ""},
+                             'base': "https://niftyindices.com/indices/equity/thematic-indices/nifty-sme-emerge"},
         "Nifty_Oil_&_Gas": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyoilgaslist.csv",
-                            'base': ""},
+                            'base': "https://niftyindices.com/indices/equity/sectoral-indices/nifty-oil-and-gas-index"},
         "Nifty_Healthcare_Index": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyhealthcarelist.csv",
-                                   'base': ""},
+                                   'base': "https://niftyindices.com/indices/equity/sectoral-indices/nifty-healthcare-index"},
         "Nifty_Total_Market": {'url':"https://niftyindices.com/IndexConstituent/ind_niftytotalmarket_list.csv",
-                               'base': ""},
+                               'base': "https://niftyindices.com/indices/equity/broad-based-indices/nifty-total-market"},
         "Nifty_India_Digital": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyindiadigital_list.csv",
-                                'base': ""},
+                                'base': "https://niftyindices.com/indices/equity/thematic-indices/nifty-india-digital"},
         "Nifty_Mobility": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymobility_list.csv",
-                           'base': ""},
+                           'base': "https://niftyindices.com/indices/equity/thematic-indices/nifty-mobility"},
         "Nifty_India_Defence": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyindiadefence_list.csv",
-                                'base': ""},
+                                'base': "https://niftyindices.com/indices/equity/thematic-indices/nifty-india-defence"},
         "Nifty_Financial_Services_Ex_Bank": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyfinancialservicesexbank_list.xlsx",
-                                             'base': ""},
+                                             'base': "https://niftyindices.com/indices/equity/sectoral-indices/nifty-financial-services-ex-bank"},
         "Nifty_Core_Housing": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyCoreHousing_list.csv",
-                               'base': ""},
+                               'base': "https://niftyindices.com/indices/equity/thematic-indices/nifty-core-housing"},
         "Nifty_Housing": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyhousing_list.csv",
-                          'base': ""},
+                          'base': "https://niftyindices.com/indices/equity/thematic-indices/nifty-housing"},
         "Nifty_Transportation_&_Logistics": {'url':"https://niftyindices.com/IndexConstituent/ind_niftytransportationandlogistics%20_list.csv",
-                                             'base': ""},
+                                             'base': "https://niftyindices.com/indices/equity/thematic-indices/nifty-transportation-logistics"},
         "Nifty_MidSmall_Financial_Services": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymidsmallfinancailservice_list.csv",
-                                              'base': ""},
+                                              'base': "https://niftyindices.com/indices/equity/sectoral-indices/nifty-midsmall-financial-services"},
         "Nifty_MidSmall_Healthcare": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymidsmallhealthcare_list.csv",
-                                      'base': ""},
+                                      'base': "https://niftyindices.com/indices/equity/sectoral-indices/nifty-midsmall-healthcare"},
         "Nifty_MidSmall_IT_&_Telecom": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymidsmallitAndtelecom_list.csv",
-                                        'base': ""},
+                                        'base': "https://niftyindices.com/indices/equity/sectoral-indices/nifty-midsmall-it-telecom"},
         "Nifty_Consumer_Durables": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyconsumerdurableslist.csv",
-                                    'base': ""},
+                                    'base': "https://niftyindices.com/indices/equity/sectoral-indices/nifty-consumer-durables-index"},
         "Nifty_Non_Cyclical_Consumer": {'url':"https://niftyindices.com/IndexConstituent/ind_niftynon-cyclicalconsumer_list.csv",
-                                        'base': ""},
+                                        'base': "https://niftyindices.com/indices/equity/thematic-indices/nifty-non-cyclical-consumer"},
         "Nifty_India_Manufacturing": {'url':"https://niftyindices.com/IndexConstituent/ind_niftyindiamanufacturing_list.csv",
-                                      'base': ""},
+                                      'base': "https://niftyindices.com/indices/equity/thematic-indices/nifty-india-manufacturing"},
         #"Nifty_Next_50": "",
         #"Nifty_100": "",
         #"Nifty_200": "",
@@ -192,7 +204,7 @@ def download_index_constituents(name=None):
         #"NIFTY_Midcap_100": "",
         #"NIFTY_Smallcap_100": "",
         "Nifty_Dividend_Opportunities_50": {'url':"https://niftyindices.com/IndexConstituent/ind_niftydivopp50list.csv",
-                                            'base': ""},
+                                            'base': "https://niftyindices.com/indices/equity/strategy-indices/nifty-dividend-opportunities-50"},
         #"Nifty_Low_Volatility_50": "",
         #"Nifty_Alpha_50": "",
         #"Nifty_High_Beta_50": "",
@@ -203,23 +215,23 @@ def download_index_constituents(name=None):
         #"Nifty_Midcap_Liquid_15": "",
         #"NIFTY100_Quality_30": "",
         "Nifty_Private_Bank": {'url':"https://niftyindices.com/IndexConstituent/ind_nifty_privatebanklist.csv",
-                               'base': ""},
+                               'base': "https://niftyindices.com/indices/equity/sectoral-indices/nifty-private-bank"},
         "Nifty_Smallcap_250": {'url':"https://niftyindices.com/IndexConstituent/ind_niftysmallcap250list.csv",
-                               'base': ""},
+                               'base': "https://niftyindices.com/indices/equity/broad-based-indices/nifty-smallcap-250"},
         "Nifty_Smallcap_50": {'url':"https://niftyindices.com/IndexConstituent/ind_niftysmallcap50list.csv",
-                              'base': ""},
+                              'base': "https://niftyindices.com/indices/equity/broad-based-indices/niftysmallcap50"},
         "Nifty_MidSmallcap_400": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymidsmallcap400list.csv",
-                                  'base': ""},
+                                  'base': "https://niftyindices.com/indices/equity/broad-based-indices/nifty-midsmallcap-400"},
         "Nifty_Midcap_150": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymidcap150list.csv",
-                             'base': ""},
+                             'base': "https://niftyindices.com/indices/equity/broad-based-indices/nifty-midcap-150"},
         "Nifty_Midcap_Select": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymidcapselect_list.csv",
-                                'base': ""},
+                                'base': "https://niftyindices.com/indices/equity/broad-based-indices/nifty-midcap-select-index"},
         "NIFTY_LargeMidcap_250": {'url':"https://niftyindices.com/IndexConstituent/ind_niftylargemidcap250list.csv",
-                                  'base': ""},
+                                  'base': "https://niftyindices.com/indices/equity/broad-based-indices/nifty-largemidcap-250"},
         #"Nifty_Financial_Services_25_50": "",
         #"Nifty500_Multicap_50_25_25": "",
         "Nifty_Microcap_250": {'url':"https://niftyindices.com/IndexConstituent/ind_niftymicrocap250_list.csv",
-                               'base': ""},
+                               'base': "https://niftyindices.com/indices/equity/broad-based-indices/nifty-microcap-250"},
         #"Nifty200_Momentum_30": "",
         #"NIFTY100_Alpha_30": "",
         #"NIFTY500_Value_50": "",
@@ -257,12 +269,12 @@ def download_index_constituents(name=None):
     if name is not None:
         session.get(urlmap[name]['base'])
         #session.headers.update({"host": urlmap[name]['base']})
-        handle_download(session, url = urlmap[name]['url'], filename = f'{name}.csv')
+        handle_download(session, url = urlmap[name]['url'], filename = f'{name}.csv', overwrite=overwrite)
     else:
         for name in urlmap:
             session.get(urlmap[name]['base'])
             #session.headers.update({"host": urlmap[name]['base']})
-            handle_download(session, url = urlmap[name]['url'], filename = f'{name}.csv')
+            handle_download(session, url = urlmap[name]['url'], filename = f'{name}.csv', overwrite=overwrite)
     pass
 
 INDICES = ["Nifty_50",
@@ -341,13 +353,6 @@ INDICES = ["Nifty_50",
            #"Nifty_Midcap150_Momentum_50",
            #"NIFTY50_Equal_Weight",
            ]
-
-index_data_dir = './reports/'
-member_dir = './reports/members/'
-plotpath = index_data_dir+'plots/'
-cache_dir = index_data_dir+'cache/'
-
-tvfeed_instance = None
 
 def load_progress():
     import json
@@ -1023,7 +1028,9 @@ def generate_report(sector, rrg_df, verbose=False):
     m_df = rmomentum.iloc[[-1]].transpose()
 
     r_df.rename(columns={list(r_df.columns)[0]: 'strength'}, inplace=True)
+    r_df.index.names = ['member']
     m_df.rename(columns={list(m_df.columns)[0]: 'momentum'}, inplace=True)
+    m_df.index.names = ['member']
     df = pd.concat([r_df, m_df], axis='columns', join='inner')
     # Convert to polar coordinates
     df['radius'] = np.sqrt((df['strength']-origin[0])**2 + (df['momentum']-origin[1])**2)
@@ -1123,7 +1130,7 @@ if __name__ == "__main__":
     pd.options.mode.chained_assignment = None  # default='warn'
     if args.refresh:
         log('Refreshing index constituents', logtype='info')
-        download_index_constituents()
+        download_index_constituents(overwrite=True)
 
     if args.download is True:
         log('Download index reports', logtype='debug')

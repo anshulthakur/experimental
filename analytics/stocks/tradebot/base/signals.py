@@ -83,43 +83,43 @@ class Alert(BaseClass):
     def create_filter(self):
         def lt(x):
             if self.level is not None:
-                return True if x[self.key][-1] < self.level else False 
+                return True if x.iloc[-1][self.key] < self.level else False 
             else:
-                return True if x[self.key][-1] < x[self.level_key][-1] else False 
+                return True if x.iloc[-1][self.key] < x.iloc[-1][self.level_key] else False 
             
         def leq(x):
             if self.level is not None:
-                return True if x[self.key][-1] <= self.level else False 
+                return True if x.iloc[-1][self.key] <= self.level else False 
             else:
-                return True if x[self.key][-1] <= x[self.level_key][-1] else False 
+                return True if x.iloc[-1][self.key] <= x.iloc[-1][self.level_key] else False 
         def gt(x):
             if self.level is not None:
-                return True if x[self.key][-1] > self.level else False 
+                return True if x.iloc[-1][self.key] > self.level else False 
             else:
-                return True if x[self.key][-1] >= x[self.level_key][-1] else False 
+                return True if x.iloc[-1][self.key] >= x.iloc[-1][self.level_key] else False 
             
         def geq(x):
             if self.level is not None:
-                return True if x[self.key][-1] >= self.level else False 
+                return True if x.iloc[-1][self.key] >= self.level else False 
             else:
-                return True if x[self.key][-1] >= x[self.level_key][-1] else False 
+                return True if x.iloc[-1][self.key] >= x.iloc[-1][self.level_key] else False 
         
         def eq(x):
             if self.level is not None:
-                return True if x[self.key][-1] == self.level else False 
+                return True if x.iloc[-1][self.key] == self.level else False 
             else:
-                return True if x[self.key][-1] == x[self.level_key][-1] else False 
+                return True if x.iloc[-1][self.key] == x.iloc[-1][self.level_key] else False 
 
         def proximity(x):
             if self.level is not None:
-                if (x[self.key][-1] >= self.level) and (x[self.key][-1]-self.level)/self.level <= self.margin:
+                if (x.iloc[-1][self.key] >= self.level) and (x.iloc[-1][self.key]-self.level)/self.level <= self.margin:
                     return True
-                elif (self.level > x[self.key][-1]) and (self.level -x[self.key][-1])/self.level <= self.margin:
+                elif (self.level > x.iloc[-1][self.key]) and (self.level -x.iloc[-1][self.key])/self.level <= self.margin:
                     return True
             else:
-                if (x[self.key][-1] >= x[self.level_key][-1]) and (x[self.key][-1] - x[self.level_key][-1])/x[self.level_key][-1] <= self.margin:
+                if (x.iloc[-1][self.key] >= x.iloc[-1][self.level_key]) and (x.iloc[-1][self.key] - x.iloc[-1][self.level_key])/x.iloc[-1][self.level_key] <= self.margin:
                     return True
-                elif (x[self.key][-1] < x[self.level_key][-1]) and (x[self.level_key][-1] - x[self.key][-1])/x[self.level_key][-1] <= self.margin:
+                elif (x.iloc[-1][self.key] < x.iloc[-1][self.level_key]) and (x.iloc[-1][self.level_key] - x.iloc[-1][self.key])/x.iloc[-1][self.level_key] <= self.margin:
                     return True
             return False
         
@@ -192,13 +192,13 @@ class Alert(BaseClass):
             #log('Return false')
             '''
             if self.level is not None:
-                if eval(f'{df[self.scrip][self.key][-1]}{self.condition}{self.level}') is True:
+                if eval(f'{df[self.scrip].iloc[-1][self.key]}{self.condition}{self.level}') is True:
                     #self.df = df.loc[df.index[-1]]
                     self.df = df[self.scrip].tail(1)
                     self.active = False if self.recurring is False else True
                     return True
             elif self.level_key in columns:
-                if eval(f'{df[self.scrip][self.key][-1]}{self.condition}{df[self.scrip][self.level_key][-1]}') is True:
+                if eval(f'{df[self.scrip].iloc[-1][self.key]}{self.condition}{df[self.scrip].iloc[-1][self.level_key]}') is True:
                     #self.df = df.loc[df.index[-1]]
                     self.df = df[self.scrip].tail(1)
                     self.active = False if self.recurring is False else True
@@ -216,13 +216,13 @@ class Alert(BaseClass):
                     return True
                 '''
                 if self.level is not None:
-                    if eval(f'{df[self.key][-1]}{self.condition}{self.level}') is True:
+                    if eval(f'{df.iloc[-1][self.key]}{self.condition}{self.level}') is True:
                         #self.df = df.loc[df.index[-1]]
                         self.df = df.tail(1)
                         self.active = False if self.recurring is False else True
                         return True
                 elif self.level_key in list(df.columns):
-                    if eval(f'{df[self.key][-1]}{self.condition}{df[self.level_key][-1]}') is True:
+                    if eval(f'{df.iloc[-1][self.key]}{self.condition}{df.iloc[-1][self.level_key]}') is True:
                         #self.df = df.loc[df.index[-1]]
                         self.df = df.tail(1)
                         self.active = False if self.recurring is False else True

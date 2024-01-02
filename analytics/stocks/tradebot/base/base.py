@@ -8,6 +8,7 @@ class BaseFilter(object):
 
     def filter(self):        
         return self.filter
+    
 
 class TimeFilter(BaseFilter):
     def __init__(self, value, condition):

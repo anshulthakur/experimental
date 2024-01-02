@@ -93,6 +93,7 @@ def main(file):
             df.loc[ii, 'high'] = stock['high'].max()
             df.loc[ii, 'low'] = stock['low'].min()
             df.loc[ii, 'returns'] = ((df.loc[ii, 'cmp']-df.loc[ii, 'initial_price'])/df.loc[ii, 'initial_price'])*100
+            df.loc[ii, 'daily_change'] = ((stock.iloc[len(stock)-1]['close'] - stock.iloc[len(stock)-2]['close'])/stock.iloc[len(stock)-2]['close'])*100
     df.to_csv(file)
 
 if __name__ == "__main__":

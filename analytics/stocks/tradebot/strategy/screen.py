@@ -115,6 +115,95 @@ class RSI_Filter(BaseFilter):
         else:
             self.filter = lambda x: True if ((not pd.isna(x.iloc[-1]['RSI'])) and x.iloc[-1]['RSI']<=value) else False
 
+class Price_Filter(BaseFilter):
+    def create_filter(self):
+        def lt(x):
+            if self.level is not None:
+                if self.level >= 0:
+                    return True if x[self.key][-1] < self.level else False 
+                else:
+                    return True if x[self.key][-1] < x[self.key][int(self.level)] else False 
+            else:
+                return True if x[self.key][-1] < x[self.level_key][-1] else False 
+            
+        def leq(x):
+            if self.level is not None:
+                if self.level >= 0:
+                    return True if x[self.key][-1] <= self.level else False 
+                else:
+                    return True if x[self.key][-1] <= x[self.key][int(self.level)] else False 
+            else:
+                return True if x[self.key][-1] <= x[self.level_key][-1] else False 
+        def gt(x):
+            if self.level is not None:
+                if self.level >= 0:
+                    return True if x[self.key][-1] > self.level else False 
+                else:
+                    return True if x[self.key][-1] > x[self.key][int(self.level)] else False 
+            else:
+                return True if x[self.key][-1] >= x[self.level_key][-1] else False 
+            
+        def geq(x):
+            if self.level is not None:
+                if self.level >= 0:
+                    return True if x[self.key][-1] >= self.level else False 
+                else:
+                    return True if x[self.key][-1] >= x[self.key][int(self.level)] else False 
+            else:
+                return True if x[self.key][-1] >= x[self.level_key][-1] else False 
+        
+        def eq(x):
+            if self.level is not None:
+                if self.level >= 0:
+                    return True if x[self.key][-1] == self.level else False 
+                else:
+                    return True if x[self.key][-1] == x[self.key][int(self.level)] else False 
+            else:
+                return True if x[self.key][-1] == x[self.level_key][-1] else False 
+
+        def proximity(x):
+            if self.level is not None:
+                if self.level >= 0:
+                    if (x[self.key][-1] >= self.level) and (x[self.key][-1]-self.level)/self.level <= self.margin:
+                        return True
+                    elif (self.level > x[self.key][-1]) and (self.level -x[self.key][-1])/self.level <= self.margin:
+                        return True
+                else:
+                    if (x[self.key][-1] >= x[self.key][int(self.level)]) and (x[self.key][-1]-x[self.key][int(self.level)])/x[self.key][int(self.level)] <= self.margin:
+                        return True
+                    elif (x[self.key][int(self.level)] > x[self.key][-1]) and (x[self.key][int(self.level)] -x[self.key][-1])/x[self.key][int(self.level)] <= self.margin:
+                        return True
+            else:
+                if (x[self.key][-1] >= x[self.level_key][-1]) and (x[self.key][-1] - x[self.level_key][-1])/x[self.level_key][-1] <= self.margin:
+                    return True
+                elif (x[self.key][-1] < x[self.level_key][-1]) and (x[self.level_key][-1] - x[self.key][-1])/x[self.level_key][-1] <= self.margin:
+                    return True
+            return False
+        
+        filter_map = {'<=': leq,
+                      '>=': geq,
+                      '<': lt,
+                      '>': gt,
+                      '=': eq,
+                      'near': proximity}
+        return filter_map.get(self.condition.lower().strip(), None)
+    
+    def __init__(self, level, key='close', condition='<=', **kwargs):
+        self.column_names = ['close']
+        self.level_key = None
+        self.margin = float(kwargs.get('margin', 0.0001))
+        try:
+            self.level = float(level)
+        except:
+            self.level = None
+            if level is None:
+                raise Exception('Level field cannot be None')
+            self.level_key = level
+        self.key = key
+        self.condition = condition
+        self.filter = self.create_filter()
+
+
 class DivergenceFilter(BaseFilter):
     '''
     Divergence filter filters the stock if it is exhibiting divergence (as per the divergence field)

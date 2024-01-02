@@ -168,6 +168,7 @@ def load_index_members(sector, members, date=datetime.datetime.now(), interval=I
             else:
                 symbol = stock.strip().replace('&', '_')
                 symbol = symbol.replace('-', '_')
+                symbol = symbol.split(':')[-1]
                 nse_map = {'UNITDSPR': 'MCDOWELL_N',
                            'MOTHERSUMI': 'MSUMI'}
                 if symbol in nse_map:

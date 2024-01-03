@@ -96,7 +96,7 @@ INDICES = {"NIFTY 50":"Nifty_50",
         }
 
 def load_index_members(sector, members, date=datetime.datetime.now(), interval=Interval.in_weekly, 
-                        entries=50, online=True, start_date=None, end_date=None, market='NSE'):
+                        entries=50, online=True, start_date=None, end_date=None, market='NSE', drop_columns=['open', 'high', 'low', 'volume']):
     
     def resample(df, interval):
         #df_offset_str = '09h15min'
@@ -148,7 +148,8 @@ def load_index_members(sector, members, date=datetime.datetime.now(), interval=I
                 stock_obj = Stock.objects.get(symbol=stock, market=Market.objects.get(name=market))
                 s_df = get_stock_listing(stock_obj, duration=duration, last_date = date)
                 s_df = resample(s_df, interval)
-                s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume', 'delivery', 'trades'])
+                drop_columns = drop_columns + ['delivery', 'trades']
+                s_df = s_df.drop(columns = drop_columns)
                 #print(s_df.head())
                 if len(s_df)==0:
                     skipped.append(stock_obj.symbol)
@@ -190,7 +191,7 @@ def load_index_members(sector, members, date=datetime.datetime.now(), interval=I
                 if s_df is None:
                     log(f'Error fetching information on {symbol}', 'warning')
                 else:
-                    s_df = s_df.drop(columns = ['open', 'high', 'low', 'volume'])
+                    s_df = s_df.drop(columns = drop_columns)
                     #print(s_df.head())
                     if len(s_df)==0:
                         log('Skip {}'.format(symbol), 'info')

@@ -11,7 +11,7 @@ from lib.logging import log, set_loglevel
 from base import FlowGraph
 from base.scheduler import AsyncScheduler as Scheduler
 from nodes import Sink, Resampler, NseMultiStockSource, Indicator, DataFrameSink, TradingViewSource, ColumnFilter, MultiStockSource
-from strategy.screen import EMA_RSI_Screen, Proximity_Screen, Crossover_Screen, EMA_Filter, Price_Filter, CustomScreen
+from strategy.screen import EMA_RSI_Screen, Proximity_Screen, Crossover_Screen, EMA_Filter, Price_Filter, CustomScreen, Eval_Filter
 
 from tradebot.base.signals import EndOfData, Shutdown
 
@@ -33,7 +33,8 @@ async def main():
     fg = FlowGraph(name='FlowGraph', mode='backtest')
 
     # Add a dataframe source 
-    source = MultiStockSource(name='Source', timeframe='1M', offline=False, offset=-1, min_entries=6, member_file='universe.json')
+    source = MultiStockSource(name='Source', timeframe='1M', offline=False, offset=-1, min_entries=6, 
+                              member_file='nselist.json')
     fg.add_node(source)
 
     # Add indicator nodes
@@ -45,7 +46,8 @@ async def main():
     fg.add_node(node_indicators)
 
     # Add screener node
-    screener = CustomScreen(name="Screener", filters=[Price_Filter(level=-2, key='close', condition='near', margin='0.01')])
+    screener = CustomScreen(name="Screener", filters=[Price_Filter(level=-2, key='close', condition='near', margin='0.01'),
+                                                      Eval_Filter(condition="x.iloc[-2]['close'] <= x.iloc[-3]['close']")])
     fg.add_node(screener)
 
     # Add some sink nodes 

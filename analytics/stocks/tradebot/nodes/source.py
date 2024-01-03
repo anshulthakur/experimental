@@ -280,6 +280,7 @@ class MultiStockSource(SourceNode):
         self.ended = False
         self.offset = offset
         self.min_entries = min_entries
+        self.drop_columns = kwargs.get('drop_columns', ['open', 'high', 'low', 'volume'])
         #super().__init__(**kwargs)
 
     def get_members(self, name):
@@ -312,7 +313,8 @@ class MultiStockSource(SourceNode):
                                         entries=max(self.offset, self.min_entries),
                                         interval=convert_timeframe_to_quant(self.timeframe),
                                         online=not self.offline,
-                                        date = datetime.date.today())
+                                        date = datetime.date.today(),
+                                        drop_columns=self.drop_columns)
                 self.df.fillna(0, inplace=True)
                 #log(self.df.head(10), 'debug')
                 #log(self.df.tail(10), 'debug')
@@ -346,7 +348,7 @@ class MultiStockSource(SourceNode):
             df = self.df.iloc[0:self.index+1].copy()
             if len(df)>0:
                 self.last_ts = df.index[-1]
-                #log(f'{self.name}:{df.tail(1)}', 'debug')
+                log(f'{self.name}:{df.tail(1)}', 'debug')
                 for node,connection in self.connections:
                     await node.next(connection=connection, data = df.copy(deep=True), metadata={'timeframe': self.timeframe})
                 self.consume()

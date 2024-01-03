@@ -5,7 +5,6 @@
             "3IINFOLTD",
             "3MINDIA",
             "3PLAND",
-            "4THDIM",
             "5PAISA",
             "63MOONS",
             "A2ZINFRA",
@@ -63,7 +62,6 @@
             "AJANTPHARM",
             "AJMERA",
             "AJOONI",
-            "AJRINFRA",
             "AKASH",
             "AKG",
             "AKSHAR",
@@ -157,7 +155,7 @@
             "ASTRON",
             "ATFL",
             "ATGL",
-            "ATLANTA",
+            "ATLANTAA",
             "ATUL",
             "ATULAUTO",
             "AUBANK",
@@ -194,7 +192,6 @@
             "BALAXI",
             "BALKRISHNA",
             "BALKRISIND",
-            "BALLARPUR",
             "BALMLAWRIE",
             "BALPHARMA",
             "BALRAMCHIN",
@@ -5900,5 +5897,7 @@
         "ALAN-RE",
         "HASJUICE",
         "WEBSL",
-        "ADHIRAJ"]
+        "ADHIRAJ",
+        "AJRINFRA",
+        "BALLARPUR"]
 }

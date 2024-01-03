@@ -115,6 +115,12 @@ class RSI_Filter(BaseFilter):
         else:
             self.filter = lambda x: True if ((not pd.isna(x.iloc[-1]['RSI'])) and x.iloc[-1]['RSI']<=value) else False
 
+class Eval_Filter(BaseFilter):
+    def __init__(self, condition, column_names=['open', 'high', 'low', 'close'], **kwargs):
+        super().__init__(column_names, **kwargs)
+        self.condition = condition
+        self.filter = lambda x: True if eval(f'{self.condition}') else False
+
 class Price_Filter(BaseFilter):
     def create_filter(self):
         def lt(x):

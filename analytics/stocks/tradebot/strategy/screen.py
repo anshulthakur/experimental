@@ -122,16 +122,16 @@ class Price_Filter(BaseFilter):
                 if self.level >= 0:
                     return True if x.iloc[-1][self.key] < self.level else False 
                 else:
-                    return True if x.iloc[-1][self.key] < x.iloc[int(self.level)][self.level_key] else False 
+                    return True if x.iloc[-1][self.key] < x[self.key][int(self.level)] else False 
             else:
                 return True if x.iloc[-1][self.key] < x.iloc[-1][self.level_key] else False 
-            
+
         def leq(x):
             if self.level is not None:
                 if self.level >= 0:
                     return True if x.iloc[-1][self.key] <= self.level else False 
                 else:
-                    return True if x.iloc[-1][self.key] <= x.iloc[int(self.level)][self.level_key] else False 
+                    return True if x.iloc[-1][self.key] <= x[self.key][int(self.level)] else False 
             else:
                 return True if x.iloc[-1][self.key] <= x.iloc[-1][self.level_key] else False 
         def gt(x):
@@ -139,25 +139,25 @@ class Price_Filter(BaseFilter):
                 if self.level >= 0:
                     return True if x.iloc[-1][self.key] > self.level else False 
                 else:
-                    return True if x.iloc[-1][self.key] > x.iloc[int(self.level)][self.level_key] else False 
+                    return True if x.iloc[-1][self.key] > x[self.key][int(self.level)] else False 
             else:
                 return True if x.iloc[-1][self.key] >= x.iloc[-1][self.level_key] else False 
-            
+
         def geq(x):
             if self.level is not None:
                 if self.level >= 0:
                     return True if x.iloc[-1][self.key] >= self.level else False 
                 else:
-                    return True if x.iloc[-1][self.key] >= x.iloc[int(self.level)][self.level_key] else False 
+                    return True if x.iloc[-1][self.key] >= x[self.key][int(self.level)] else False 
             else:
                 return True if x.iloc[-1][self.key] >= x.iloc[-1][self.level_key] else False 
-        
+
         def eq(x):
             if self.level is not None:
                 if self.level >= 0:
                     return True if x.iloc[-1][self.key] == self.level else False 
                 else:
-                    return True if x.iloc[-1][self.key] == x.iloc[int(self.level)][self.level_key] else False 
+                    return True if x.iloc[-1][self.key] == x[self.key][int(self.level)] else False 
             else:
                 return True if x.iloc[-1][self.key] == x.iloc[-1][self.level_key] else False 
 
@@ -169,9 +169,9 @@ class Price_Filter(BaseFilter):
                     elif (self.level > x.iloc[-1][self.key]) and (self.level -x.iloc[-1][self.key])/self.level <= self.margin:
                         return True
                 else:
-                    if (x.iloc[-1][self.key] >= x.iloc[int(self.level)][self.level_key]) and (x.iloc[-1][self.key]-x.iloc[int(self.level)][self.level_key])/x.iloc[int(self.level)][self.level_key] <= self.margin:
+                    if (x.iloc[-1][self.key] >= x.iloc[int(self.level)][self.key]) and (x.iloc[-1][self.key]-x.iloc[int(self.level)][self.key])/x.iloc[int(self.level)][self.key] <= self.margin:
                         return True
-                    elif (x.iloc[int(self.level)][self.level_key] > x.iloc[-1][self.key]) and (x.iloc[int(self.level)][self.level_key] -x.iloc[-1][self.key])/x.iloc[int(self.level)][self.level_key] <= self.margin:
+                    elif (x.iloc[int(self.level)][self.key] > x.iloc[-1][self.key]) and (x.iloc[int(self.level)][self.key] -x.iloc[-1][self.key])/x.iloc[int(self.level)][self.key] <= self.margin:
                         return True
             else:
                 if (x.iloc[-1][self.key] >= x.iloc[-1][self.level_key]) and (x.iloc[-1][self.key] - x.iloc[-1][self.level_key])/x.iloc[-1][self.level_key] <= self.margin:

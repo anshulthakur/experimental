@@ -237,9 +237,10 @@ def get_index_dataframe(name, end_date, duration=300, sampling='w', online=True,
     
     n_df = (df * weights)
     n_df = n_df.sum(axis=1, numeric_only=True)
+    n_df = n_df.iloc[max(-duration, -len(n_df)):].to_frame()
     n_df.columns = [name]
     
-    return n_df.iloc[max(-duration, -len(n_df)):]
+    return n_df
 
 
 def main(date=datetime.date.today(), sampling='w', online=True, refresh=False):

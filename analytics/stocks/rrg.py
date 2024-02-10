@@ -24,6 +24,7 @@ import datetime
 import talib
 from talib.abstract import *
 from talib import MA_Type
+import json 
 
 from lib.tradingview import TvDatafeed, Interval, convert_timeframe_to_quant
 from lib.cache import cached
@@ -65,6 +66,7 @@ cache_dir = index_data_dir+'cache/'
 
 tvfeed_instance = None
 
+from custom_index import index_map, get_index_dataframe
 
 def handle_download(session, url, filename, path=member_dir, overwrite=False):
     try:
@@ -479,20 +481,23 @@ import csv
 
 from lib.retrieval import get_stock_listing
 
-def load_members(sector, members, date, sampling='w', entries=50, online=True):
+def load_members(sector, members, date, sampling='w', entries=50, online=True, sector_df = None):
     print('========================')
     print(f'Loading for {sector}')
     print('========================')
     
-    df = pd.read_csv(f'{index_data_dir}{sector}.csv')
-    df.rename(columns={'Index Date': 'date',
-                       'Closing Index Value': sector},
-               inplace = True)
-    df['date'] = pd.to_datetime(df['date'], format='%d-%m-%Y')+ pd.Timedelta('9 hour') +  pd.Timedelta('15 minute')
-    df.set_index('date', inplace = True)
-    df = df.sort_index()
-    df = df.reindex(columns = [sector])
-    df = df[~df.index.duplicated(keep='first')]
+    if (sector_df is None) or (sector_df is not None and sector not in list(sector_df.columns)):
+        df = pd.read_csv(f'{index_data_dir}{sector}.csv')
+        df.rename(columns={'Index Date': 'date',
+                        'Closing Index Value': sector},
+                inplace = True)
+        df['date'] = pd.to_datetime(df['date'], format='%d-%m-%Y')+ pd.Timedelta('9 hour') +  pd.Timedelta('15 minute')
+        df.set_index('date', inplace = True)
+        df = df.sort_index()
+        df = df.reindex(columns = [sector])
+        df = df[~df.index.duplicated(keep='first')]
+    else:
+        df = sector_df
     
     if date is not None:
         df = df[:date.strftime('%Y-%m-%d')]
@@ -796,6 +801,7 @@ def load_sectoral_indices(date, sampling, entries=50):
         s_df = s_df[~s_df.index.duplicated(keep='first')]
         #print(s_df[s_df.index.duplicated(keep=False)])
         df[index] = s_df[index]
+    
     df = df[~df.index.duplicated(keep='first')]
     if date is not None:
         #Filter till the date
@@ -810,11 +816,47 @@ def load_sectoral_indices(date, sampling, entries=50):
         df = df.resample('W').apply(logic)
         #df = df.resample('W-FRI', closed='left').apply(logic)
         df.index -= to_offset("6D")
+
+    filemapping = None
+    with open(index_map, 'r') as fd:
+        filemapping = json.load(fd)
+    #Load up members and compute indices for the required period
+    for index, fname in filemapping.items():
+        log(f'Loading {index}', logtype='debug')
+        s_df = get_index_dataframe(name=index, path=fname, sampling=sampling, online=True, end_date=date)
+
+        #print(s_df.head(10))
+        #s_df['date'] = pd.to_datetime(s_df['date'], format='%Y-%m-%d %H:%M:%S')
+        #s_df.set_index('date', inplace = True)
+        #s_df.index = s_df.index + pd.Timedelta('9 hour') +  pd.Timedelta('15 minute')
+
+        #s_df = s_df.sort_index()
+        #s_df = s_df[~s_df.index.duplicated(keep='first')]
+        #print(list(s_df.columns))
+        if sampling=='w':
+            # #Resample weekly
+            # logic = {}
+            # for cols in s_df.columns:
+            #     if cols != 'date':
+            #         logic[cols] = 'last'
+            # #Resample on weekly levels
+            # s_df = s_df.resample('W').apply(logic)
+            # #df = df.resample('W-FRI', closed='left').apply(logic)
+            # s_df.index -= to_offset("6D")
+            s_df.index = s_df.index.date
+        #print(s_df.tail(10))
+        df[index] = s_df[index]
+    #print(df.tail(10))
+
     return df.tail(entries)
 
 def load_index_members(name):
     members = []
-    if name not in INDICES:#MEMBER_MAP:
+    print(name)
+    filemapping = {}
+    with open(index_map, 'r') as fd:
+        filemapping = json.load(fd)
+    if name not in INDICES and name not in filemapping:#MEMBER_MAP:
         print(f'{name} not in list')
         return members
     #with open('./indices/members/'+MEMBER_MAP[name], 'r', newline='') as csvfile:
@@ -1076,6 +1118,7 @@ def main(date=datetime.date.today(), sampling = 'w', online=True):
     processed = load_progress()
 
     df = load_sectoral_indices(date, sampling, entries=33)
+    df = df.copy()
     benchmark = 'Nifty_50'
     jdf_df = compute_jdk(benchmark=benchmark, base_df = df)
     save_scatter_plots(jdf_df, benchmark, sampling, date)
@@ -1090,14 +1133,20 @@ def main(date=datetime.date.today(), sampling = 'w', online=True):
         members = load_index_members(column)
         if len(members) ==0:
             continue
-        df = load_members(sector=column, members=members, date=date, sampling=sampling, entries=33, online=online)
+        w_df = load_members(sector=column, sector_df= df[column].to_frame(), members=members, date=date, sampling=sampling, entries=33, online=online)
         #print(df.head(10))
-        result = compute_jdk(benchmark=column, base_df = df)
+        result = compute_jdk(benchmark=column, base_df = w_df)
         if result is None:
             log(f'Error computing JDK for {column} sector', logtype='error')
             continue
-        save_scatter_plots(result, column, sampling, date)
-        generate_report(column, result)
+        try:
+            save_scatter_plots(result, column, sampling, date)
+        except:
+            log(f'Error saving plots for {column}', logtype='error')
+        try:
+            generate_report(column, result)
+        except:
+            log(f'Error saving reports for {column}', logtype='error')
         save_progress(column)
                 
 if __name__ == "__main__":

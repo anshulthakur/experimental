@@ -138,7 +138,8 @@ class NseIndia(object):
     '''
     def getEquityDetails(self, symbol):
         log('getEquityDetails', 'debug')
-        return self.getDataByEndpoint(f"/api/quote-equity?symbol={urllib.parse.urlencode(symbol)}")
+        return self.getDataByEndpoint(f"/api/quote-equity?symbol={urllib.parse.quote(symbol)}")
+        #return self.getDataByEndpoint(f"/api/quote-equity?symbol={symbol}")
 
     '''
      @param symbol 
@@ -146,7 +147,7 @@ class NseIndia(object):
     '''
     def getEquityTradeInfo(self, symbol):
         log('getEquityTradeInfo', 'debug')
-        return self.getDataByEndpoint(f"/api/quote-equity?symbol={urllib.parse.urlencode(symbol)}&section=trade_info")
+        return self.getDataByEndpoint(f"/api/quote-equity?symbol={symbol}&section=trade_info")
     
     '''
      @param symbol 
@@ -154,7 +155,7 @@ class NseIndia(object):
     '''
     def getEquityCorporateInfo(self, symbol):
         log('getEquityCorporateInfo', 'debug')
-        return self.getDataByEndpoint(f"/api/quote-equity?symbol={urllib.parse.urlencode(symbol)}&section=corp_info")
+        return self.getDataByEndpoint(f"/api/quote-equity?symbol={symbol}&section=corp_info")
     
     '''
      @param symbol 
@@ -201,7 +202,7 @@ class NseIndia(object):
     '''
     def getEquitySeries(self, symbol):
         log('getEquitySeries', 'debug')
-        return self.getDataByEndpoint(f"/api/historical/cm/equity/series?symbol={urllib.parse.urlencode(symbol)}")
+        return self.getDataByEndpoint(f"/api/historical/cm/equity/series?symbol={symbol}")
 
     '''
      @param index 

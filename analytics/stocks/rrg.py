@@ -40,6 +40,9 @@ django.setup()
 
 from stocks.models import Listing, Stock, Market
 
+import traceback
+
+
 #Libraries for the Plotting
 from bokeh.plotting import figure
 from bokeh.io import show, save, output_file
@@ -1135,18 +1138,24 @@ def main(date=datetime.date.today(), sampling = 'w', online=True):
             continue
         w_df = load_members(sector=column, sector_df= df[column].to_frame(), members=members, date=date, sampling=sampling, entries=33, online=online)
         #print(df.head(10))
-        result = compute_jdk(benchmark=column, base_df = w_df)
-        if result is None:
+        try:
+            result = compute_jdk(benchmark=column, base_df = w_df)
+            if result is None:
+                log(f'Error computing JDK for {column} sector', logtype='error')
+                continue
+            try:
+                save_scatter_plots(result, column, sampling, date)
+            except:
+                log(f'Error saving plots for {column}', logtype='error')
+                print(traceback.format_exc())
+            try:
+                generate_report(column, result)
+            except:
+                log(f'Error saving reports for {column}', logtype='error')
+                print(traceback.format_exc())
+        except:
             log(f'Error computing JDK for {column} sector', logtype='error')
-            continue
-        try:
-            save_scatter_plots(result, column, sampling, date)
-        except:
-            log(f'Error saving plots for {column}', logtype='error')
-        try:
-            generate_report(column, result)
-        except:
-            log(f'Error saving reports for {column}', logtype='error')
+            print(traceback.format_exc())
         save_progress(column)
                 
 if __name__ == "__main__":

@@ -322,7 +322,7 @@ def main(date=datetime.date.today(), sampling='w', online=True, refresh=False):
     for index, fname in filemapping.items():
         print(f'Loading {index}')
         df = get_index_dataframe(name=index, path=fname, sampling=sampling, online=online, end_date=date)
-        print(df.tail(10))
+        #print(df.tail(10))
         
     pass
 

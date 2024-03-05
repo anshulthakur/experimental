@@ -8,6 +8,7 @@ from lib.logging import set_loglevel, log
 import datetime
 from lib.cache import cached
 from stocks.models import Listing, Stock, Market
+import time
 
 watchlist_file = './reports/watchlist_performance.csv'
 
@@ -74,26 +75,31 @@ def main(file):
                                                             'returns': float})
     df['date_added'] = pd.to_datetime(df['date_added'], format='%Y-%m-%d')
     for ii in range(0, len(df)):
-        log(f"{df.loc[ii ,'market'].strip()}:{df.loc[ii, 'symbol'].strip()}", logtype='info')
-        stock = get_dataframe(df.loc[ii, 'symbol'].strip().upper(), 
-                              df.loc[ii, 'market'].strip().upper(), 
-                              timeframe=Interval.in_daily,
-                              offline = False,
-                              duration=500)
-        stock.reset_index(inplace=True)
-        stock.set_index('datetime', inplace=True)
-        stock = stock.sort_index()
-        if stock is None:
+        try:
+            log(f"{df.loc[ii ,'market'].strip()}:{df.loc[ii, 'symbol'].strip()}", logtype='info')
+            stock = get_dataframe(df.loc[ii, 'symbol'].strip().upper(), 
+                                df.loc[ii, 'market'].strip().upper(), 
+                                timeframe=Interval.in_daily,
+                                offline = False,
+                                duration=500)
+            stock.reset_index(inplace=True)
+            stock.set_index('datetime', inplace=True)
+            stock = stock.sort_index()
+            if stock is None:
+                log(f"Could not fetch data for {df.loc[ii, 'symbol']}", logtype='error')
+                continue
+            if pd.to_datetime(stock.index[0]) < pd.to_datetime(df.loc[ii, 'date_added']):
+                stock = stock[stock.index > df.loc[ii, 'date_added']]
+            if(len(stock)>0):
+                df.loc[ii, 'cmp'] = stock.iloc[len(stock)-1]['close']
+                df.loc[ii, 'high'] = stock['high'].max()
+                df.loc[ii, 'low'] = stock['low'].min()
+                df.loc[ii, 'returns'] = ((df.loc[ii, 'cmp']-df.loc[ii, 'initial_price'])/df.loc[ii, 'initial_price'])*100
+                df.loc[ii, 'daily_change'] = ((stock.iloc[len(stock)-1]['close'] - stock.iloc[len(stock)-2]['close'])/stock.iloc[len(stock)-2]['close'])*100
+        except:
             log(f"Could not fetch data for {df.loc[ii, 'symbol']}", logtype='error')
-            continue
-        if pd.to_datetime(stock.index[0]) < pd.to_datetime(df.loc[ii, 'date_added']):
-            stock = stock[stock.index > df.loc[ii, 'date_added']]
-        if(len(stock)>0):
-            df.loc[ii, 'cmp'] = stock.iloc[len(stock)-1]['close']
-            df.loc[ii, 'high'] = stock['high'].max()
-            df.loc[ii, 'low'] = stock['low'].min()
-            df.loc[ii, 'returns'] = ((df.loc[ii, 'cmp']-df.loc[ii, 'initial_price'])/df.loc[ii, 'initial_price'])*100
-            df.loc[ii, 'daily_change'] = ((stock.iloc[len(stock)-1]['close'] - stock.iloc[len(stock)-2]['close'])/stock.iloc[len(stock)-2]['close'])*100
+            time.sleep(1)
+            pass
     df.to_csv(file)
 
 if __name__ == "__main__":
